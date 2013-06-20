@@ -7,31 +7,33 @@ Datamodel Attributes
 
 The following CLR types are supported as Datamodel attributes:
 
-* int
-* float
-* bool
-* string
-* byte[]
-* TimeSpan
-* System.Drawing.Color
+* `int`
+* `float`
+* `bool`
+* `string`
+* `byte[]`
+* `System.TimeSpan`
+* `System.Drawing.Color`
 
-Additionally, the following custom types are supported:
+Additionally, the following Datamodel.NET types are supported:
 
-* Element (a named collection of attributes)
-* Vector2
-* Vector3 / Angle
-* Vector4 / Quaternion
-* Matrix (4x4)
+* `Element` (a named collection of attributes)
+* `Vector2`
+* `Vector3` / `Angle`
+* `Vector4` / `Quaternion`
+* `Matrix` (4x4)
+
+Collections of all of the above types are also supported.
 
 Datamodel.NET features
 ----------------------
 
 * Threaded, thread-safe
 * Support for all known versions of Valve's binary and keyvalues2 DMX encodings
-* Convenient IEnumerable and INotifyPropertyChanged implementations
+* Convenient `IEnumerable` and `INotifyPropertyChanged` implementations
 * Inline documentation
 * Binary codec supports just-in-time attribute loading
-* Write your own codecs with the ICodec interface
+* Write your own codecs with the `ICodec` interface
 
 Quick example
 -------------
@@ -39,8 +41,8 @@ Quick example
 ```c#
 var HelloWorld = new Datamodel.Datamodel("helloworld", 1); // must provide a format name (can be anything) and version
 
-HelloWorld.Root = HelloWorld.CreateElement("root");
-HelloWorld.Root["Hello"] = "World"; // any supported attribute type can be given
+HelloWorld.Root = HelloWorld.CreateElement("my_root");
+HelloWorld.Root["Hello"] = "World"; // any supported attribute type can be assigned
 
 var MyString = HelloWorld.Root.Get<string>("Hello");
 
