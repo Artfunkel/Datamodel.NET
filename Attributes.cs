@@ -136,7 +136,7 @@ namespace Datamodel
 
         public override string ToString()
         {
-            return String.Join(System.Globalization.CultureInfo.CurrentCulture.TextInfo.ListSeparator, this.ToArray());
+            return String.Join(" ", this.ToArray());
         }
 
         public static bool operator ==(VectorBase x, VectorBase y)
@@ -388,15 +388,15 @@ namespace Datamodel
 
     public class Matrix : VectorBase
     {
-        public Vector4 Column0 { get { return column0; } set { column0 = value; NotifyPropertyChanged("Row0"); } }
-        public Vector4 Column1 { get { return column1; } set { column1 = value; NotifyPropertyChanged("Row1"); } }
-        public Vector4 Column2 { get { return column2; } set { column2 = value; NotifyPropertyChanged("Row2"); } }
-        public Vector4 Column3 { get { return column3; } set { column3 = value; NotifyPropertyChanged("Row3"); } }
+        public Vector4 Row0 { get { return row0; } set { row0 = value; NotifyPropertyChanged("Row0"); } }
+        public Vector4 Row1 { get { return row1; } set { row1 = value; NotifyPropertyChanged("Row1"); } }
+        public Vector4 Row2 { get { return row2; } set { row2 = value; NotifyPropertyChanged("Row2"); } }
+        public Vector4 Row3 { get { return row3; } set { row3 = value; NotifyPropertyChanged("Row3"); } }
 
-        Vector4 column0 = new Vector4();
-        Vector4 column1 = new Vector4();
-        Vector4 column2 = new Vector4();
-        Vector4 column3 = new Vector4();
+        Vector4 row0 = new Vector4();
+        Vector4 row1 = new Vector4();
+        Vector4 row2 = new Vector4();
+        Vector4 row3 = new Vector4();
 
         public Matrix()
         { }
@@ -406,10 +406,10 @@ namespace Datamodel
             if (value.GetUpperBound(0) < 4)
                 throw new InvalidOperationException("Not enough columns for a Matrix4.");
 
-            column0 = new Vector4(value.GetValue(0) as float[]);
-            column1 = new Vector4(value.GetValue(1) as float[]);
-            column2 = new Vector4(value.GetValue(2) as float[]);
-            column3 = new Vector4(value.GetValue(3) as float[]);
+            row0 = new Vector4(value.GetValue(0) as float[]);
+            row1 = new Vector4(value.GetValue(1) as float[]);
+            row2 = new Vector4(value.GetValue(2) as float[]);
+            row3 = new Vector4(value.GetValue(3) as float[]);
         }
 
         public Matrix(IEnumerable<float> values)
@@ -417,20 +417,20 @@ namespace Datamodel
             if (values.Count() < 4 * 4)
                 throw new ArgumentException("Not enough values for a Matrix4.");
 
-            column0 = new Vector4(values.Take(4));
-            column1 = new Vector4(values.Skip(4).Take(4));
-            column2 = new Vector4(values.Skip(8).Take(4));
-            column3 = new Vector4(values.Skip(12).Take(4));
+            row0 = new Vector4(values.Take(4));
+            row1 = new Vector4(values.Skip(4).Take(4));
+            row2 = new Vector4(values.Skip(8).Take(4));
+            row3 = new Vector4(values.Skip(12).Take(4));
         }
 
         public override string ToString()
         {
-            return String.Join("\n", Column0, Column1, Column2, Column3);
+            return String.Join("  ", Row0, Row1, Row2, Row3);
         }
 
         public override IEnumerator<float> GetEnumerator()
         {
-            return Column0.Concat(Column1.Concat(Column2.Concat(Column3))).GetEnumerator();
+            return Row0.Concat(Row1.Concat(Row2.Concat(Row3))).GetEnumerator();
         }
     }
 }

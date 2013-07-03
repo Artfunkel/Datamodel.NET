@@ -69,6 +69,9 @@ namespace Datamodel.Codecs
                 Output.Write(indent_string);
             }
 
+            /// <summary>
+            /// Writes a new line followed by the given value
+            /// </summary>
             public void WriteLine(string value)
             {
                 WriteLine();
