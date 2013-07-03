@@ -135,7 +135,7 @@ namespace Datamodel.Codecs
                 {
                     bool is_element = type == typeof(Element);
 
-                    var inner_type = Datamodel.IsDatamodelArrayType(type) ? type.GetGenericArguments()[0] : null;
+                    var inner_type = Datamodel.GetArrayInnerType(type);
 
                     if (!ValidAttributes[EncodingVersion].Contains(inner_type ?? type))
                         throw new CodecException(type.Name + " is not valid in KeyValues2 " + EncodingVersion);

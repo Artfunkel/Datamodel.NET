@@ -97,7 +97,8 @@ namespace Datamodel
         public override string ToString()
         {
             var type = Value.GetType();
-            return String.Format("{0} <{1}>", Name, type.IsGenericType ? type.GetGenericArguments()[0].FullName + "[]" : type.FullName);
+            var inner_type = Datamodel.GetArrayInnerType(type);
+            return String.Format("{0} <{1}>", Name, inner_type != null ? inner_type.FullName + "[]" : type.FullName);
         }
 
         #region Interfaces

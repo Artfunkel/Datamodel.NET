@@ -35,17 +35,28 @@ namespace Datamodel
         /// Determines whether the given Type is valid as a Datamodel <see cref="Attribute"/> array.
         /// </summary>
         /// <seealso cref="IsDatamodelType"/>
-        /// <param name="t">the Type to check.</param>
+        /// <seealso cref="GetArrayInnerType"/>
+        /// <param name="t">The Type to check.</param>
         public static bool IsDatamodelArrayType(Type t)
         {
-            var collection = t.GetInterface("ICollection`1");
-            return collection != null && Datamodel.AttributeTypes.Contains(collection.GetGenericArguments()[0]);
+            var inner = GetArrayInnerType(t);
+            return inner != null ? Datamodel.AttributeTypes.Contains(inner) : false;
+        }
+
+        /// <summary>
+        /// Returns the inner type of an object which implements IList&lt;T&gt;.
+        /// </summary>
+        /// <param name="t">The Type to check.</param>
+        public static Type GetArrayInnerType(Type t)
+        {
+            var list_iface = t.GetInterfaces().Concat(new Type[] { t }).FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(System.Collections.Generic.IList<>));
+            return list_iface != null ? list_iface.GetGenericArguments()[0] : null;
         }
         #endregion
 
         static Datamodel()
         {
-            Datamodel.RegisterCodec(typeof(Codecs.Binary), "binary", 2, 5);
+            Datamodel.RegisterCodec(typeof(Codecs.Binary), "binary", 1, 2, 3, 5);
             Datamodel.RegisterCodec(typeof(Codecs.KeyValues2), "keyvalues2", 1);
         }
 
@@ -447,7 +458,7 @@ namespace Datamodel
                 if (IsDatamodelArrayType(attr.Value.GetType()))
                 {
                     var list = attr.Value as System.Collections.ICollection;
-                    var inner_type = list.GetType().GetGenericArguments()[0];
+                    var inner_type = GetArrayInnerType(list.GetType());
 
                     var copied_array = inner_type.MakeListType().GetConstructor(new Type[] { typeof(int) }).Invoke(new object[] { list.Count }) as System.Collections.IList;
                     foreach (var item in list)

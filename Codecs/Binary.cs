@@ -15,20 +15,14 @@ namespace Datamodel.Codecs
 
         static Binary()
         {
-            SupportedAttributes[1] = SupportedAttributes[2] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), null /* ObjectID */, typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
+            SupportedAttributes[1] = SupportedAttributes[2] = SupportedAttributes[3] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), null /* ObjectID */, typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
             SupportedAttributes[5] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
         }
 
         static byte TypeToId(Type type, int version)
         {
-            var search_type = type;
-
-            bool array = false;
-            if (type.IsGenericType)
-            {
-                search_type = type.GetGenericArguments()[0];
-                array = true;
-            }
+            bool array = Datamodel.IsDatamodelArrayType(type);
+            var search_type = array ? Datamodel.GetArrayInnerType(type) : type;
 
             var type_list = SupportedAttributes[version];
             byte i = 0;
@@ -204,9 +198,14 @@ namespace Datamodel.Codecs
             {
                 if (elem.Stub)
                 {
-                    Writer.Write(-2);
-                    Writer.Write(elem.ID.ToString().ToArray()); // yes, ToString()!
-                    Writer.Write((byte)0);
+                    if (encoding_version < 5)
+                        Writer.Write(-1);
+                    else
+                    {
+                        Writer.Write(-2);
+                        Writer.Write(elem.ID.ToString().ToArray()); // yes, ToString()!
+                        Writer.Write((byte)0);
+                    }
                     return;
                 }
                 Writer.Write(elem.Count);
@@ -236,10 +235,10 @@ namespace Datamodel.Codecs
 
                             if (attr_type == typeof(string))
                             {
-                                if (encoding_version >= 5 && !in_array)
-                                    dict.WriteString(out_value as string);
+                                if (encoding_version < 5 || in_array)
+                                    WriteString_Raw(out_value as string);                                    
                                 else
-                                    WriteString_Raw(out_value as string);
+                                    dict.WriteString(out_value as string);
                                 return;
                             }
 
@@ -278,7 +277,7 @@ namespace Datamodel.Codecs
                     {
                         var array = attr.Value as System.Collections.ICollection;
                         Writer.Write(array.Count);
-                        attr_type = array.GetType().GetGenericArguments()[0];
+                        attr_type = Datamodel.GetArrayInnerType(array.GetType());
                         foreach (var item in array)
                             WriteValue(item, true);
                     }
@@ -378,9 +377,9 @@ namespace Datamodel.Codecs
             }
             var dm = new Datamodel(format, format_version);
 
-            Reader = new BinaryReader(stream, Encoding.ASCII);
-            StringDict = new StringDictionary(this, encoding_version, Reader);
             EncodingVersion = encoding_version;
+            Reader = new BinaryReader(stream, Encoding.ASCII);
+            StringDict = new StringDictionary(this, EncodingVersion, Reader);
 
             var num_elements = Reader.ReadInt32();
 
@@ -388,7 +387,7 @@ namespace Datamodel.Codecs
             foreach (var i in Enumerable.Range(0, num_elements))
             {
                 var type = StringDict.ReadString();
-                var name = encoding_version >= 5 ? StringDict.ReadString() : ReadString_Raw();
+                var name = EncodingVersion >= 5 ? StringDict.ReadString() : ReadString_Raw();
                 var id_bits = Reader.ReadBytes(16);
                 var id = new Guid(BitConverter.IsLittleEndian ? id_bits : id_bits.Reverse().ToArray());
                 dm.CreateElement(name, id, type);
@@ -433,11 +432,12 @@ namespace Datamodel.Codecs
                 return ReadValue(dm, type, EncodingVersion < 5);
             else
             {
-                var inner_type = type.GetGenericArguments()[0];
+                var inner_type = Datamodel.GetArrayInnerType(type);
                 var array = type.GetConstructor(Type.EmptyTypes).Invoke(null);
+                var add = type.GetMethod("Add", new Type[] { inner_type });
 
                 foreach (var x in Enumerable.Range(0, Reader.ReadInt32()))
-                    array.GetType().GetMethod("Add", new Type[] { inner_type }).Invoke(array, new object[] { ReadValue(dm, inner_type, true) }); // BEHOLD REFLECTION
+                    add.Invoke(array, new object[] { ReadValue(dm, inner_type, true) });
 
                 return array;
             }
@@ -453,7 +453,7 @@ namespace Datamodel.Codecs
             {
                 array = true;
                 count = Reader.ReadInt32();
-                type = type.GetGenericArguments()[0];
+                type = Datamodel.GetArrayInnerType(type);
             }
 
             if (type == typeof(Element))

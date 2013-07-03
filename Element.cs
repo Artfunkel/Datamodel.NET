@@ -84,14 +84,8 @@ namespace Datamodel
 
             object value = this[name];
 
-            var attr_type = value.GetType();
-            if (attr_type != typeof(T))
-            {
-                if (attr_type.GetInterface("ICollection`1") == null && attr_type.GetGenericArguments()[0] != typeof(T))
-                    throw new AttributeTypeException(String.Format("Attribute \"{0}\" is not an array of {1}.", name, typeof(T).Name));
-                else
-                    throw new AttributeTypeException(String.Format("Attribute \"{0}\" is not of type {1}.", name, typeof(T).Name));
-            }
+            if (!(value is T))
+                throw new AttributeTypeException(String.Format("Attribute \"{0}\" ({1}) does not implement {2}.", name, value.GetType().Name, typeof(T).Name));
 
             return (T)value;
         }
@@ -103,9 +97,9 @@ namespace Datamodel
         /// <typeparam name="T">The expected <see cref="Type"/> of the array's items.</typeparam>
         /// <param name="name">The name to search for.</param>
         /// <returns>The value of the Attribute with the given name.</returns>
-        public List<T> GetArray<T>(string name)
+        public IList<T> GetArray<T>(string name)
         {
-            return Get<List<T>>(name);
+            return Get<IList<T>>(name);
         }
 
         /// <summary>
@@ -131,7 +125,7 @@ namespace Datamodel
                 if (Stub) throw new InvalidOperationException("Cannot set attributes on a stub element.");
 
                 if (value != null && !Datamodel.IsDatamodelType(value.GetType()))
-                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type.", value.GetType().FullName));
+                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. Array values must implement IList.", value.GetType().FullName));
 
                 if (value is Element)
                 {
