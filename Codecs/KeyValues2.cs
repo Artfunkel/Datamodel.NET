@@ -199,6 +199,8 @@ namespace Datamodel.Codecs
                             value = (bool)value ? 1 : 0;
                         if (type == typeof(float))
                             value = (double)(float)value;
+                        if (type == typeof(byte[]))
+                            value = BitConverter.ToString(value as byte[]).Replace("-", string.Empty);
 
                         if (in_array)
                             Writer.Write(String.Format(" \"{0}\",", value.ToString()));

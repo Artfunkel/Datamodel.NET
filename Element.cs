@@ -99,7 +99,15 @@ namespace Datamodel
         /// <returns>The value of the Attribute with the given name.</returns>
         public IList<T> GetArray<T>(string name)
         {
-            return Get<IList<T>>(name);
+            try
+            {
+                return Get<IList<T>>(name);
+            }
+            catch (AttributeTypeException)
+            {
+                throw new AttributeTypeException(String.Format("Attribute \"{0}\" ({1}) is not an array.", name, this[name].GetType().Name));
+            }
+
         }
 
         /// <summary>
@@ -125,7 +133,7 @@ namespace Datamodel
                 if (Stub) throw new InvalidOperationException("Cannot set attributes on a stub element.");
 
                 if (value != null && !Datamodel.IsDatamodelType(value.GetType()))
-                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. Array values must implement IList.", value.GetType().FullName));
+                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. Array values must implement IList<T>.", value.GetType().FullName));
 
                 if (value is Element)
                 {

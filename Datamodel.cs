@@ -50,7 +50,8 @@ namespace Datamodel
         public static Type GetArrayInnerType(Type t)
         {
             var list_iface = t.GetInterfaces().Concat(new Type[] { t }).FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(System.Collections.Generic.IList<>));
-            return list_iface != null ? list_iface.GetGenericArguments()[0] : null;
+            var inner = list_iface != null ? list_iface.GetGenericArguments()[0] : null;
+            return inner == typeof(byte) ? null : inner; // exception for byte[]
         }
         #endregion
 
@@ -190,7 +191,7 @@ namespace Datamodel
             var match = System.Text.RegularExpressions.Regex.Match(header, CodecUtilities.HeaderPattern_Regex);
 
             if (!match.Success || match.Groups.Count != 5)
-                throw new InvalidOperationException("Could not read DMX header.");
+                throw new InvalidOperationException(String.Format("Could not read DMX header ({0}).",header));
 
             string encoding = match.Groups[1].Value;
             int encoding_version = int.Parse(match.Groups[2].Value);
