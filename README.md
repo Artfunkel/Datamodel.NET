@@ -23,14 +23,14 @@ Additionally, the following Datamodel.NET types are supported:
 * `Vector4` / `Quaternion`
 * `Matrix` (4x4)
 
-Collections of all of the above types are also supported.
+`IList<T>` collections of the above types are also supported.
 
 Datamodel.NET features
 ----------------------
 
 * Threaded, thread-safe
-* Support for all known versions of Valve's binary and keyvalues2 DMX encodings
-* Convenient `IEnumerable` and `INotifyPropertyChanged` implementations
+* Support for all known versions of Valve's `binary` and `keyvalues2` DMX encodings
+* Convenient `IEnumerable`, `INotifyPropertyChanged` and `INotifyCollectionChanged` implementations
 * Inline documentation
 * Binary codec supports just-in-time attribute loading
 * Write your own codecs with the `ICodec` interface
