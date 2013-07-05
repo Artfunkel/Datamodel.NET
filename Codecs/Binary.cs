@@ -6,7 +6,7 @@ using System.IO;
 
 namespace Datamodel.Codecs
 {
-    class Binary : IDeferredAttributeCodec
+    class Binary : IDeferredAttributeCodec, IDisposable
     {
         protected BinaryReader Reader;
         protected BinaryWriter Writer;
@@ -17,6 +17,12 @@ namespace Datamodel.Codecs
         {
             SupportedAttributes[1] = SupportedAttributes[2] = SupportedAttributes[3] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), null /* ObjectID */, typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
             SupportedAttributes[5] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
+        }
+
+        public void Dispose()
+        {
+            if (Reader != null) Reader.Dispose();
+            if (Writer != null) Writer.Dispose();
         }
 
         static byte TypeToId(Type type, int version)

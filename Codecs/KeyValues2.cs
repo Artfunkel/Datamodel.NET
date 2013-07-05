@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace Datamodel.Codecs
 {
-    class KeyValues2 : ICodec
+    class KeyValues2 : ICodec, IDisposable
     {
         TextReader Reader;
         KV2Writer Writer;
@@ -34,7 +34,13 @@ namespace Datamodel.Codecs
             ValidAttributes[1] = TypeNames.Select(kv => kv.Key).ToArray();
         }
 
-        class KV2Writer
+        public void Dispose()
+        {
+            if (Reader != null) Reader.Dispose();
+            if (Writer != null) Writer.Dispose();
+        }
+
+        class KV2Writer : IDisposable
         {
             public int Indent
             {
@@ -52,6 +58,11 @@ namespace Datamodel.Codecs
             public KV2Writer(Stream output)
             {
                 Output = new StreamWriter(output, Encoding.ASCII);
+            }
+
+            public void Dispose()
+            {
+                Output.Dispose();
             }
 
             public void Write(string value)
@@ -203,7 +214,7 @@ namespace Datamodel.Codecs
                         if (type == typeof(float))
                             value = (double)(float)value;
                         if (type == typeof(byte[]))
-                            value = BitConverter.ToString(value as byte[]).Replace("-", string.Empty);
+                            value = BitConverter.ToString(value as byte[]).Replace("-", String.Empty);
 
                         if (in_array)
                             Writer.Write(String.Format(" \"{0}\",", value.ToString()));
