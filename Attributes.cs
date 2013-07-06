@@ -41,42 +41,48 @@ namespace Datamodel
         {
             get
             {
+                var dm = Owner.Owner;
                 // read deferred
                 if (Offset > 0)
                 {
                     try
                     {
-                        lock (Owner.Owner.Codec)
+                        lock (dm.Codec)
                         {
-                            value = Owner.Owner.Codec.DeferredDecodeAttribute(Owner.Owner, Offset);
+                            value = dm.Codec.DeferredDecodeAttribute(dm, Offset);
                         }
                     }
                     catch (Exception err)
                     {
-                        throw new CodecException(String.Format("Deferred loading of attribute \"{0}\" on element {1} using codec {2} threw an exception.", Name, Owner.ID, Owner.Owner.Codec), err);
+                        throw new CodecException(String.Format("Deferred loading of attribute \"{0}\" on element {1} using codec {2} threw an exception.", Name, Owner.ID, dm.Codec), err);
                     }
                     Offset = 0;
                 }
 
                 // expand stubs
-                if (Owner.Owner.ElementsAdded > LastStubSearch)
+                if (dm.ElementsAdded > LastStubSearch)
                 {
-                    lock (Owner.Owner.AllElements.ChangeLock)
+                    lock (dm.AllElements.ChangeLock)
                     {
                         var elem = value as Element;
                         if (elem != null)
                         {
-                            if (elem.Stub) value = Owner.Owner.AllElements[elem.ID] ?? value;
+                            if (elem.Stub) value = dm.AllElements[elem.ID] ?? value;
                         }
                         else
                         {
                             var elem_list = value as List<Element>;
-                            if (elem_list != null && elem_list.Any(e => e != null && e.Stub)) // threading this query is slower!
-                                value = elem_list.AsParallel().Select(e => e.Stub ? Owner.Owner.AllElements[e.ID] ?? e : e).ToList();
+                            if (elem_list != null)
+                                for (int i = 0; i < elem_list.Count; i++)
+                                {
+                                    var e = elem_list[i];
+                                    if (e != null && e.Stub)
+                                        elem_list[i] = dm.AllElements[e.ID];
+                                }
                         }
                     }
                 }
-                LastStubSearch = Owner.Owner.ElementsAdded;
+                LastStubSearch = dm.ElementsAdded;
 
                 return value;
             }
