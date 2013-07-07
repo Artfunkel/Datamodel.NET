@@ -48,7 +48,7 @@ namespace Datamodel.Codecs
             var type_list = SupportedAttributes[version];
 
             if (id >= type_list.Length * 2)
-                throw new CodecException("Unrecognised type: " + id);
+                throw new CodecException("Unrecognised attribute type: " + id);
 
             bool array = false;
             id--;

@@ -579,7 +579,7 @@ namespace Datamodel
     {
         public static Type MakeListType(this Type t)
         {
-            return System.Reflection.TypeDelegator.GetType(String.Format("System.Collections.Generic.List`1[{0}]", t.FullName), true);
+            return typeof(List<>).MakeGenericType(t);
         }
     }
 }
