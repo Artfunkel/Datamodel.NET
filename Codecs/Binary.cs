@@ -40,18 +40,18 @@ namespace Datamodel.Codecs
             if (i == type_list.Length)
                 throw new CodecException(String.Format("{0} is not supported in encoding binary {1}", type.Name, version));
             if (array) i += (byte)type_list.Length;
-            return (byte)(i + 1);
+            return ++i;
         }
 
         static Type IdToType(byte id, int version)
         {
+            id--;
             var type_list = SupportedAttributes[version];
 
             if (id >= type_list.Length * 2)
                 throw new CodecException("Unrecognised attribute type: " + id);
 
             bool array = false;
-            id--;
             if (id >= type_list.Length)
             {
                 id -= (byte)(type_list.Length);
@@ -117,10 +117,10 @@ namespace Datamodel.Codecs
                             foreach (var attr in elem)
                             {
                                 Strings.Add(attr.Name);
-                                if (attr.Value is string) Strings.Add(attr.Value as string);
-                                if (attr.Value is Element) ScrapeElement(attr.Value as Element);
-                                if (attr.Value is List<Element>)
-                                    foreach (var array_elem in attr.Value as List<Element>)
+                                if (attr.Value is string) Strings.Add((string)attr.Value);
+                                if (attr.Value is Element) ScrapeElement((Element)attr.Value);
+                                if (attr.Value is IList<Element>)
+                                    foreach (var array_elem in (IList<Element>)attr.Value)
                                         ScrapeElement(array_elem);
                             }
                         };
@@ -186,16 +186,19 @@ namespace Datamodel.Codecs
 
                     foreach (var attr in elem)
                     {
-                        if (attr.Value is Element)
+                        var child_elem = attr.Value as Element;
+                        if (child_elem != null)
                         {
-                            if (!elem_order.Contains(attr.Value))
-                                WriteIndex(attr.Value as Element);
+                            if (!elem_order.Contains(child_elem))
+                                WriteIndex(child_elem);
                         }
-                        else if (attr.Value is List<Element>)
+                        else
                         {
-                            foreach (var child_elem in attr.Value as List<Element>)
-                                if (!elem_order.Contains(child_elem))
-                                    WriteIndex(child_elem);
+                            var elem_list = attr.Value as IList<Element>;
+                            if (elem_list != null)
+                                foreach (var item in elem_list)
+                                    if (!elem_order.Contains(item))
+                                        WriteIndex(item);
                         }
                     }
                 };
@@ -225,7 +228,7 @@ namespace Datamodel.Codecs
                         {
                             if (attr_type == typeof(Element))
                             {
-                                var child_elem = out_value as Element;
+                                var child_elem = (Element)out_value;
                                 if (child_elem == null)
                                     Writer.Write(-1);
                                 else if (child_elem.Stub)
@@ -242,9 +245,9 @@ namespace Datamodel.Codecs
                             if (attr_type == typeof(string))
                             {
                                 if (encoding_version < 5 || in_array)
-                                    WriteString_Raw(out_value as string);                                    
+                                    WriteString_Raw((string)out_value);                                    
                                 else
-                                    dict.WriteString(out_value as string);
+                                    dict.WriteString((string)out_value);
                                 return;
                             }
 
@@ -252,7 +255,7 @@ namespace Datamodel.Codecs
                                 out_value = (bool)out_value ? (byte)1 : (byte)0;
 
                             else if (attr_type == typeof(byte[]))
-                                Writer.Write((out_value as byte[]).Length);
+                                Writer.Write(((byte[])out_value).Length);
 
                             else if (attr_type == typeof(TimeSpan))
                                 out_value = (int)(((TimeSpan)out_value).TotalSeconds * 10000);
@@ -262,17 +265,8 @@ namespace Datamodel.Codecs
                                 var color = (System.Drawing.Color)out_value;
                                 out_value = new byte[] { color.R, color.G, color.B, color.A };
                             }
-                            else if (attr_type == typeof(Vector2))
-                                out_value = (out_value as Vector2).SelectMany(f => BitConverter.GetBytes(f)).ToArray();
-
-                            else if (attr_type == typeof(Vector3) || attr_type == typeof(Angle))
-                                out_value = (out_value as Vector3).SelectMany(f => BitConverter.GetBytes(f)).ToArray();
-
-                            else if (attr_type == typeof(Vector4) || attr_type == typeof(Quaternion))
-                                out_value = (out_value as Vector4).SelectMany(f => BitConverter.GetBytes(f)).ToArray();
-
-                            else if (attr_type == typeof(Matrix))
-                                out_value = (out_value as Matrix).SelectMany(f => BitConverter.GetBytes(f)).ToArray();
+                            else if (attr_type.IsSubclassOf(typeof(VectorBase)))
+                                out_value = ((VectorBase)out_value).SelectMany(f => BitConverter.GetBytes(f)).ToArray();
 
                             Writer.GetType().GetMethod("Write", new Type[] { out_value.GetType() }).Invoke(Writer, new object[] { out_value });
                         };
@@ -281,7 +275,7 @@ namespace Datamodel.Codecs
                         WriteValue(attr.Value, false);
                     else
                     {
-                        var array = attr.Value as System.Collections.ICollection;
+                        var array = (System.Collections.IList)attr.Value;
                         Writer.Write(array.Count);
                         attr_type = Datamodel.GetArrayInnerType(array.GetType());
                         foreach (var item in array)
