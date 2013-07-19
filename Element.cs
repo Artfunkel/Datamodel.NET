@@ -209,7 +209,7 @@ namespace Datamodel
         /// </summary>
         public event NotifyCollectionChangedEventHandler CollectionChanged;
         /// <summary>
-        /// Raised when the Element's <see cref="Element.Name"/>, <see cref="Element.ClassName"/>, or <see cref="Element.ID"/> has changed.
+        /// Raised when <see cref="Element.Name"/>, <see cref="Element.ClassName"/>, or <see cref="Element.ID"/> has changed.
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
         void NotifyPropertyChanged(string info)
@@ -241,5 +241,53 @@ namespace Datamodel
         {
             return String.Format("{0} [{1}]", Name, ClassName);
         }
+
+        #region IEqualityComparer
+        /// <summary>
+        /// Compares two <see cref="Element"/>s for equivalence by using their Names.
+        /// </summary>
+        public class NameComparer : IEqualityComparer<Element>
+        {
+            public bool Equals(Element x, Element y)
+            {
+                return x.Name == y.Name;
+            }
+
+            public int GetHashCode(Element obj)
+            {
+                return obj.Name.GetHashCode();
+            }
+        }
+        /// <summary>
+        /// Compares two <see cref="Element"/>s for equivalence by using their ClassNames.
+        /// </summary>
+        public class ClassNameComparer : IEqualityComparer<Element>
+        {
+            public bool Equals(Element x, Element y)
+            {
+                return x.ClassName == y.ClassName;
+            }
+
+            public int GetHashCode(Element obj)
+            {
+                return obj.ClassName.GetHashCode();
+            }
+        }
+        /// <summary>
+        /// Compares two <see cref="Element"/>s for equivalence by using their IDs.
+        /// </summary>
+        public class IDComparer : IEqualityComparer<Element>
+        {
+            public bool Equals(Element x, Element y)
+            {
+                return x.ID == y.ID;
+            }
+
+            public int GetHashCode(Element obj)
+            {
+                return obj.ID.GetHashCode();
+            }
+        }
+        #endregion
     }
 }
