@@ -44,13 +44,15 @@ namespace Datamodel
         }
 
         /// <summary>
-        /// Returns the inner type of an object which implements IList&lt;T&gt;.
+        /// Returns the inner Type of an object which implements IList&lt;T&gt;, or null if there is no inner Type.
         /// </summary>
         /// <param name="t">The Type to check.</param>
         public static Type GetArrayInnerType(Type t)
         {
-            var list_iface = t.GetInterfaces().Concat(new Type[] { t }).FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(System.Collections.Generic.IList<>));
-            var inner = list_iface != null ? list_iface.GetGenericArguments()[0] : null;
+            var i_type = t.GetType() == typeof(IList<>) ? t : t.GetInterface("IList`1");
+            if (i_type == null) return null;
+
+            var inner = i_type.GetGenericArguments()[0];
             return inner == typeof(byte) ? null : inner; // exception for byte[]
         }
         #endregion
@@ -99,11 +101,10 @@ namespace Datamodel
         static ICodec GetCodec(string encoding, int encoding_version)
         {
             Type codec_type;
-            Codecs.TryGetValue(new CodecRegistration(encoding, encoding_version), out codec_type);
-            if (codec_type == null)
+            if (!Codecs.TryGetValue(new CodecRegistration(encoding, encoding_version), out codec_type))
                 throw new CodecException(String.Format("No codec found for {0} version {1}.", encoding, encoding_version));
 
-            return codec_type.GetConstructor(Type.EmptyTypes).Invoke(null) as ICodec;
+            return (ICodec)codec_type.GetConstructor(Type.EmptyTypes).Invoke(null);
         }
 
         /// <summary>
@@ -461,7 +462,7 @@ namespace Datamodel
                     var list = attr.Value as System.Collections.ICollection;
                     var inner_type = GetArrayInnerType(list.GetType());
 
-                    var copied_array = inner_type.MakeListType().GetConstructor(new Type[] { typeof(int) }).Invoke(new object[] { list.Count }) as System.Collections.IList;
+                    var copied_array = CodecUtilities.MakeList(inner_type, list.Count);
                     foreach (var item in list)
                         copied_array.Add(copy_value(item));
 

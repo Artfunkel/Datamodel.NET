@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
+using System.Reflection;
 
 namespace Datamodel.Codecs
 {
@@ -10,6 +11,7 @@ namespace Datamodel.Codecs
     {
         protected BinaryReader Reader;
         protected BinaryWriter Writer;
+        static readonly Dictionary<Type, MethodInfo> WriteMethods = new Dictionary<Type, MethodInfo>();
 
         static readonly Dictionary<int, Type[]> SupportedAttributes = new Dictionary<int, Type[]>();
 
@@ -267,8 +269,18 @@ namespace Datamodel.Codecs
                             }
                             else if (attr_type.IsSubclassOf(typeof(VectorBase)))
                                 out_value = ((VectorBase)out_value).SelectMany(f => BitConverter.GetBytes(f)).ToArray();
+                            
+                            var out_type = out_value.GetType();
 
-                            Writer.GetType().GetMethod("Write", new Type[] { out_value.GetType() }).Invoke(Writer, new object[] { out_value });
+                            if (out_type == typeof(byte))
+                                Writer.Write((byte)out_value);
+                            else if (out_type == typeof(byte[]))
+                                Writer.Write((byte[])out_value);
+                            else if (out_type == typeof(int))
+                                Writer.Write((int)out_value);
+                            else if (out_type == typeof(float))
+                                Writer.Write((float)out_value);
+                            else throw new InvalidOperationException("Unrecognised output Type.");
                         };
 
                     if (attr.Value == null || !Datamodel.IsDatamodelArrayType(attr.Value.GetType()))
@@ -432,12 +444,12 @@ namespace Datamodel.Codecs
                 return ReadValue(dm, type, EncodingVersion < 5);
             else
             {
+                var count = Reader.ReadInt32();
                 var inner_type = Datamodel.GetArrayInnerType(type);
-                var array = type.GetConstructor(Type.EmptyTypes).Invoke(null);
-                var add = type.GetMethod("Add", new Type[] { inner_type });
+                var array = CodecUtilities.MakeList(inner_type, count);
 
-                foreach (var x in Enumerable.Range(0, Reader.ReadInt32()))
-                    add.Invoke(array, new object[] { ReadValue(dm, inner_type, true) });
+                foreach (var x in Enumerable.Range(0, count))
+                    array.Add(ReadValue(dm, inner_type, true));
 
                 return array;
             }

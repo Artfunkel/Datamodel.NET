@@ -373,7 +373,7 @@ namespace Datamodel.Codecs
                     attr_value = Decode_ParseElement(attr_type_s);
                 else if (attr_type_s.EndsWith("_array"))
                 {
-                    var array = (System.Collections.IList)attr_type.MakeListType().GetConstructor(Type.EmptyTypes).Invoke(null);
+                    var array = CodecUtilities.MakeList(attr_type, 5); // assume 5 items
                     attr_value = array;
 
                     next = Decode_NextToken();

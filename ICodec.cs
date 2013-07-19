@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Generic;
 
 namespace Datamodel.Codecs
 {
@@ -90,5 +91,42 @@ namespace Datamodel.Codecs
         /// </summary>
         public const string HeaderPattern_Regex = "<!-- dmx encoding (\\S+) ([0-9]+) format (\\S+) ([0-9]+) -->";
         //public const string HeaderPattern_Proto2 = "<!-- DMXVersion binary_v{0} -->";
+
+        /// <summary>
+        /// Creates a <see cref="List&lt;T&gt;"/> for the given Type with the given starting size.
+        /// </summary>
+        public static System.Collections.IList MakeList(Type t, int count)
+        {
+            if (t == typeof(Element))
+                return new List<Element>(count);
+            if (t == typeof(int))
+                return new List<int>(count); 
+            if (t == typeof(float))
+                return new List<float>(count); 
+            if (t == typeof(bool))
+                return new List<bool>(count); 
+            if (t == typeof(string))
+                return new List<string>(count); 
+            if (t == typeof(byte[]))
+                return new List<byte[]>(count);
+            if (t == typeof(TimeSpan))
+                return new List<TimeSpan>(count);
+            if (t == typeof(System.Drawing.Color))
+                return new List<System.Drawing.Color>(count); 
+            if (t == typeof(Vector2))
+                return new List<Vector2>(count); 
+            if (t == typeof(Vector3))
+                return new List<Vector3>(count); 
+            if (t == typeof(Vector4))
+                return new List<Vector4>(count); 
+            if (t == typeof(Angle))
+                return new List<Angle>(count);
+            if (t == typeof(Quaternion))
+                return new List<Quaternion>(count); 
+            if (t == typeof(Matrix))
+                return new List<Matrix>(count);
+
+            throw new ArgumentException("Unrecognised Type.");
+        }
     }
 }
