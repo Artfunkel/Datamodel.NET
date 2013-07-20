@@ -49,7 +49,7 @@ namespace Datamodel
         /// <param name="t">The Type to check.</param>
         public static Type GetArrayInnerType(Type t)
         {
-            var i_type = t.GetType() == typeof(IList<>) ? t : t.GetInterface("IList`1");
+            var i_type = t.IsGenericType && t.GetGenericTypeDefinition() == typeof(IList<>) ? t : t.GetInterface("IList`1");
             if (i_type == null) return null;
 
             var inner = i_type.GetGenericArguments()[0];
