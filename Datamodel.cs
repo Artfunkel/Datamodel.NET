@@ -16,8 +16,7 @@ namespace Datamodel
     public class Datamodel : INotifyPropertyChanged, IDisposable
     {
         #region Attribute types
-        internal static readonly Type[] AttributeTypes =
-            new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), 
+        internal static readonly Type[] AttributeTypes = { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), 
                 typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3),typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
 
         /// <summary>
