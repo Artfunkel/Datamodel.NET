@@ -17,8 +17,8 @@ namespace Datamodel.Codecs
 
         static Binary()
         {
-            SupportedAttributes[1] = SupportedAttributes[2] = SupportedAttributes[3] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), null /* ObjectID */, typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
-            SupportedAttributes[5] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
+            SupportedAttributes[1] = SupportedAttributes[2] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), null /* ObjectID */, typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
+            SupportedAttributes[3] = SupportedAttributes[4] = SupportedAttributes[5] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
         }
 
         public void Dispose()
@@ -84,63 +84,61 @@ namespace Datamodel.Codecs
         {
             Binary Codec;
             List<string> Strings = new List<string>();
-            public bool UseShorts;
             public bool Dummy;
 
-            public StringDictionary(Binary codec, int encoding_version, BinaryReader reader)
+            // binary 4 uses int for dictionary length, but short for dictionary indices. Whoops!
+            public byte LengthSize { get { return (byte)(Codec.EncodingVersion < 4 ? sizeof(short) : sizeof(int)); } }
+            public byte IndiceSize { get { return (byte)(Codec.EncodingVersion < 5 ? sizeof(short) : sizeof(int)); } }
+
+            /// <summary>
+            /// Constructs a new <see cref="StringDictionary"/> from a Binary stream.
+            /// </summary>
+            public StringDictionary(Binary codec, BinaryReader reader)
             {
                 Codec = codec;
-                Dummy = encoding_version == 1;
+                Dummy = Codec.EncodingVersion == 1;
                 if (!Dummy)
                 {
-                    UseShorts = encoding_version < 5;
-
-                    int dict_size = ReadNumber();
-
-                    foreach (var i in Enumerable.Range(0, dict_size))
+                    foreach (var i in Enumerable.Range(0, LengthSize == sizeof(short) ? Codec.Reader.ReadInt16() : Codec.Reader.ReadInt32()))
                         Strings.Add(Codec.ReadString_Raw());
                 }
             }
 
-            public StringDictionary(Binary codec, int encoding_version, Datamodel dm)
+            /// <summary>
+            /// Constructs a new <see cref="StringDictionary"/> from a <see cref="Datamodel"/> object.
+            /// </summary>
+            public StringDictionary(Binary codec, Datamodel dm)
             {
                 Codec = codec;
-                Dummy = encoding_version == 1;
+                Dummy = Codec.EncodingVersion == 1;
                 if (!Dummy)
                 {
-                    UseShorts = encoding_version < 5;
-                    Action<Element> ScrapeElement = null;
-                    ScrapeElement = elem =>
-                        {
-                            if (elem.Stub) return;
-                            var scraped = new List<Element>();
-                            Strings.Add(elem.Name);
-                            Strings.Add(elem.ClassName);
-                            foreach (var attr in elem)
-                            {
-                                Strings.Add(attr.Name);
-                                if (attr.Value is string) Strings.Add((string)attr.Value);
-                                if (attr.Value is Element) ScrapeElement((Element)attr.Value);
-                                if (attr.Value is IList<Element>)
-                                    foreach (var array_elem in (IList<Element>)attr.Value)
-                                        ScrapeElement(array_elem);
-                            }
-                        };
-
                     ScrapeElement(dm.Root);
                     Strings = Strings.Distinct().ToList();
                 }
             }
 
-            int ReadNumber()
+            void ScrapeElement(Element elem)
             {
-                return UseShorts ? Codec.Reader.ReadInt16() : Codec.Reader.ReadInt32();
+                if (elem.Stub) return;
+                var scraped = new List<Element>();
+                Strings.Add(elem.Name);
+                Strings.Add(elem.ClassName);
+                foreach (var attr in elem)
+                {
+                    Strings.Add(attr.Name);
+                    if (attr.Value is string) Strings.Add((string)attr.Value);
+                    if (attr.Value is Element) ScrapeElement((Element)attr.Value);
+                    if (attr.Value is IList<Element>)
+                        foreach (var array_elem in (IList<Element>)attr.Value)
+                            ScrapeElement(array_elem);
+                }
             }
 
             public string ReadString()
             {
                 if (Dummy) return Codec.ReadString_Raw();
-                else return Strings[ReadNumber()];
+                return Strings[IndiceSize == sizeof(short) ? Codec.Reader.ReadInt16() : Codec.Reader.ReadInt32()];
             }
 
             public void WriteString(string value)
@@ -150,7 +148,7 @@ namespace Datamodel.Codecs
                 else
                 {
                     var index = Strings.IndexOf(value);
-                    if (UseShorts) Codec.Writer.Write((short)index);
+                    if (IndiceSize == sizeof(short)) Codec.Writer.Write((short)index);
                     else Codec.Writer.Write(index);
                 }
             }
@@ -159,8 +157,10 @@ namespace Datamodel.Codecs
             {
                 if (Dummy) return;
 
-                if (UseShorts) Codec.Writer.Write((short)Strings.Count);
-                else Codec.Writer.Write(Strings.Count);
+                if (LengthSize == sizeof(short))
+                    Codec.Writer.Write((short)Strings.Count);
+                else
+                    Codec.Writer.Write(Strings.Count);
 
                 foreach (var str in Strings)
                     Codec.WriteString_Raw(str);
@@ -170,11 +170,12 @@ namespace Datamodel.Codecs
 
         public void Encode(Datamodel dm, int encoding_version, Stream stream)
         {
+            EncodingVersion = encoding_version;
             Writer = new BinaryWriter(stream);
 
-            WriteString_Raw(String.Format(CodecUtilities.HeaderPattern, "binary", encoding_version, dm.Format, dm.FormatVersion) + "\n");
+            WriteString_Raw(String.Format(CodecUtilities.HeaderPattern, "binary", EncodingVersion, dm.Format, dm.FormatVersion) + "\n");
 
-            var dict = new StringDictionary(this, encoding_version, dm);
+            var dict = new StringDictionary(this, dm);
             var elem_order = new List<Element>();
 
             Action<Element> WriteIndex = null;
@@ -182,7 +183,7 @@ namespace Datamodel.Codecs
                 {
                     elem_order.Add(elem);
                     dict.WriteString(elem.ClassName);
-                    if (encoding_version >= 5) dict.WriteString(elem.Name);
+                    if (EncodingVersion >= 4) dict.WriteString(elem.Name);
                     else WriteString_Raw(elem.Name);
                     Writer.Write(elem.ID.ToByteArray());
 
@@ -209,7 +210,7 @@ namespace Datamodel.Codecs
             {
                 if (elem.Stub)
                 {
-                    if (encoding_version < 5)
+                    if (EncodingVersion < 5)
                         Writer.Write(-1);
                     else
                     {
@@ -224,7 +225,7 @@ namespace Datamodel.Codecs
                 {
                     dict.WriteString(attr.Name);
                     var attr_type = attr.Value == null ? typeof(Element) : attr.Value.GetType();
-                    Writer.Write(TypeToId(attr_type, encoding_version));
+                    Writer.Write(TypeToId(attr_type, EncodingVersion));
 
                     Action<object, bool> WriteValue = (out_value, in_array) =>
                         {
@@ -246,8 +247,8 @@ namespace Datamodel.Codecs
 
                             if (attr_type == typeof(string))
                             {
-                                if (encoding_version < 5 || in_array)
-                                    WriteString_Raw((string)out_value);                                    
+                                if (EncodingVersion < 4 || in_array)
+                                    WriteString_Raw((string)out_value);
                                 else
                                     dict.WriteString((string)out_value);
                                 return;
@@ -269,7 +270,7 @@ namespace Datamodel.Codecs
                             }
                             else if (attr_type.IsSubclassOf(typeof(VectorBase)))
                                 out_value = ((VectorBase)out_value).SelectMany(f => BitConverter.GetBytes(f)).ToArray();
-                            
+
                             var out_type = out_value.GetType();
 
                             if (out_type == typeof(byte))
@@ -391,7 +392,7 @@ namespace Datamodel.Codecs
 
             EncodingVersion = encoding_version;
             Reader = new BinaryReader(stream, Encoding.ASCII);
-            StringDict = new StringDictionary(this, EncodingVersion, Reader);
+            StringDict = new StringDictionary(this, Reader);
 
             var num_elements = Reader.ReadInt32();
 
@@ -399,7 +400,7 @@ namespace Datamodel.Codecs
             foreach (var i in Enumerable.Range(0, num_elements))
             {
                 var type = StringDict.ReadString();
-                var name = EncodingVersion >= 5 ? StringDict.ReadString() : ReadString_Raw();
+                var name = EncodingVersion >= 4 ? StringDict.ReadString() : ReadString_Raw();
                 var id_bits = Reader.ReadBytes(16);
                 var id = new Guid(BitConverter.IsLittleEndian ? id_bits : id_bits.Reverse().ToArray());
                 dm.CreateElement(name, id, type);
@@ -491,8 +492,8 @@ namespace Datamodel.Codecs
             }
             else if (type == typeof(string))
             {
-                if (!StringDict.Dummy && !array && EncodingVersion >= 5)
-                    length = StringDict.UseShorts ? sizeof(short) : sizeof(int);
+                if (!StringDict.Dummy && !array && EncodingVersion >= 4)
+                    length = StringDict.IndiceSize;
                 else
                 {
                     foreach (var i in Enumerable.Range(0, count))
