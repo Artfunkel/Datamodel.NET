@@ -442,7 +442,7 @@ namespace Datamodel.Codecs
             var type = IdToType(Reader.ReadByte(), EncodingVersion);
 
             if (!Datamodel.IsDatamodelArrayType(type))
-                return ReadValue(dm, type, EncodingVersion < 5);
+                return ReadValue(dm, type, EncodingVersion < 4);
             else
             {
                 var count = Reader.ReadInt32();
