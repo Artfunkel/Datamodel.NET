@@ -1,0 +1,64 @@
+﻿<Application x:Class="DmxPad.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="clr-namespace:Datamodel;assembly=datamodel.net" xmlns:l="clr-namespace:DmxPad"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <l:DebugConverter x:Key="DebugConverter" />
+        <l:AttributeIconConverter x:Key="AttributeIconConverter" />
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <l:VisibleIfNotNull x:Key="VisibleIfNotNull" />
+        <l:ExtractFileNameConverter x:Key="ExtractFileNameConverter" />
+        <l:GetFriendlyTypeName x:Key="GetFriendlyTypeName" />
+        <l:VectorToString x:Key="VectorToString" />
+        <l:GetAttributeValue x:Key="GetAttributeValue" />
+        <l:ChildPathConverter x:Key="ChildPathConverter"/>
+        <l:ValueColumnWidthConverter x:Key="ValueColumnWidthConverter"/>
+        <l:ValuePanelVisibilityConverter x:Key="ValuePanelVisibilityConverter"/>
+
+        <l:InspectPaneTemplateSelector x:Key="InspectPaneTemplateSelector"/>
+        <l:ValueColumnTemplateSelector x:Key="ValueColumnTemplateSelector"/>
+
+        <Image x:Key="DatamodelIcon" x:Shared="False" Source="/DmxPad;component/Resources/datamodel.png" SnapsToDevicePixels="True" />
+        <Image x:Key="CloseIcon" x:Shared="False" Source="/DmxPad;component/Resources/close.png" SnapsToDevicePixels="True" />
+
+        <DataTemplate x:Key="AttrValueTemplate">
+            <TextBox Text="{Binding Path=Value}" Padding="0" Margin="0" BorderThickness="0" Background="Transparent"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ObjectList">
+            <ListBox ItemsSource="{Binding}" />
+            <!--<DataGrid ItemsSource="{Binding}" DisplayMemberPath="Value" HeadersVisibility="Column" MinColumnWidth="80" HorizontalAlignment="Left" VerticalAlignment="Top" />-->
+        </DataTemplate>
+        <DataTemplate x:Key="ElementAttrs">
+            <StackPanel Grid.Row="0">
+                <StackPanel.Resources>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Width" Value="50" />
+                        <Setter Property="TextAlignment" Value="Right"/>
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="Margin" Value="0,0,5,0"/>
+                    </Style>
+                    <Style TargetType="TextBox">
+                        <Setter Property="Width" Value="250" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                    </Style>
+                    <Style TargetType="StackPanel">
+                        <Setter Property="Margin" Value="0,2" />
+                    </Style>
+                </StackPanel.Resources>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Name:" />
+                    <TextBox Text="{Binding Path=Name}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Class:" />
+                    <TextBox Text="{Binding Path=ClassName}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="GUID:" />
+                    <TextBox Text="{Binding Path=ID,Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent" FontFamily="Consolas" />
+                </StackPanel>
+            </StackPanel>
+        </DataTemplate>
+
+    </Application.Resources>
+</Application>

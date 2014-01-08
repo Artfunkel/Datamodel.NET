@@ -1,0 +1,133 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:c="clr-namespace:DmxPad.Controls">
+    <c:ExpanderMarginConverter x:Key="ExpanderMarginConverter"/>
+    <c:ExpanderVisibilityConverter x:Key="ExpanderVisibilityConverter"/>
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    <c:CellMarginConverter x:Key="CellMarginConverter"/>
+
+    <Style TargetType="{x:Type c:TreeGridView}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:TreeGridView}">
+                    <ControlTemplate.Resources>
+                        <Style TargetType="{x:Type c:TreeGridViewCell}">
+                            <Setter Property="Margin" Value="{Binding Path=ColumnSpacing, RelativeSource={RelativeSource FindAncestor,AncestorType=c:TreeGridView}, Converter={StaticResource CellMarginConverter}, ConverterParameter=8}"/>
+                        </Style>
+                    </ControlTemplate.Resources>
+                    <Border BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}" BorderThickness="1" Background="{TemplateBinding Background}">
+                        <Grid Grid.IsSharedSizeScope="True">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Grid Name="PART_Grid" Visibility="{TemplateBinding ShowHeaders,Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Grid.Background>
+                                    <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                                        <GradientStop Offset="0" Color="{DynamicResource {x:Static SystemColors.ControlLightLightColorKey}}" />
+                                        <GradientStop Offset="1" Color="{DynamicResource {x:Static SystemColors.MenuBarColorKey}}" />
+                                    </LinearGradientBrush>
+                                </Grid.Background>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition SharedSizeGroup="TitleHeaderColumn"/>
+                                </Grid.ColumnDefinitions>
+                                <c:TreeGridViewCell Grid.Column="0" Content="{TemplateBinding TitleColumnHeader}"/>
+                            </Grid>
+                            <Border Grid.Row="1" Name="Border" BorderThickness="0,1,0,0" Background="{DynamicResource {x:Static SystemColors.ControlLightLightBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}">
+                                <ScrollViewer ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                                    <ItemsPresenter />
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type c:TreeGridViewItem}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:TreeGridViewItem}">
+                    <ControlTemplate.Resources>
+                        <Style TargetType="{x:Type c:TreeGridViewCell}">
+                            <Setter Property="Margin" Value="{Binding Path=ColumnSpacing, RelativeSource={RelativeSource FindAncestor,AncestorType=c:TreeGridView}, Converter={StaticResource CellMarginConverter}, ConverterParameter=3}"/>
+                        </Style>
+                    </ControlTemplate.Resources>
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition SharedSizeGroup="TitleHeaderColumn"/>
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Grid.ColumnSpan="2" Background="{TemplateBinding Background}"/>
+                        <c:TreeGridViewCell>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <ToggleButton Width="10" Height="15"
+                                                          Visibility="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Items.IsEmpty, Converter={StaticResource ExpanderVisibilityConverter}, Mode=OneWay}" 
+                                                          IsChecked="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=IsExpanded}" 
+                                                          Margin="{Binding  RelativeSource={RelativeSource TemplatedParent}, Path=Indent, Converter={StaticResource ExpanderMarginConverter}, Mode=OneWay}">
+                                    <ToggleButton.Style>
+                                        <Style TargetType="ToggleButton">
+                                            <Style.Resources>
+                                                <Color x:Key="GlyphColor">#FF444444</Color>
+                                            </Style.Resources>
+                                            <Setter Property="Focusable" Value="False" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ToggleButton">
+                                                        <Grid Width="15" Height="13" Background="Transparent">
+                                                            <VisualStateManager.VisualStateGroups>
+                                                                <VisualStateGroup x:Name="CheckStates">
+                                                                    <VisualState x:Name="Checked">
+                                                                        <Storyboard>
+                                                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Visibility)" Storyboard.TargetName="Collapsed">
+                                                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Hidden}" />
+                                                                            </ObjectAnimationUsingKeyFrames>
+                                                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Visibility)" Storyboard.TargetName="Expanded">
+                                                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Visible}" />
+                                                                            </ObjectAnimationUsingKeyFrames>
+                                                                        </Storyboard>
+                                                                    </VisualState>
+                                                                    <VisualState x:Name="Unchecked" />
+                                                                    <VisualState x:Name="Indeterminate" />
+                                                                </VisualStateGroup>
+                                                            </VisualStateManager.VisualStateGroups>
+                                                            <Path x:Name="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1,1,1,1" Data="M 4 0 L 8 4 L 4 8 Z">
+                                                                <Path.Fill>
+                                                                    <SolidColorBrush Color="{DynamicResource GlyphColor}" />
+                                                                </Path.Fill>
+                                                            </Path>
+                                                            <Path x:Name="Expanded" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1,1,1,1" Data="M 0 4 L 8 4 L 4 8 Z" Visibility="Hidden">
+                                                                <Path.Fill>
+                                                                    <SolidColorBrush Color="{DynamicResource GlyphColor}" />
+                                                                </Path.Fill>
+                                                            </Path>
+                                                        </Grid>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ToggleButton.Style>
+                                </ToggleButton>
+                                <ContentPresenter ContentSource="Title"/>
+                            </StackPanel>
+                        </c:TreeGridViewCell>
+                        <Grid Grid.Column="1" Name="PART_Grid"/>
+                        <ItemsPresenter Grid.Row="1" Grid.ColumnSpan="2" Visibility="{TemplateBinding IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="{x:Static SystemColors.HighlightBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+</ResourceDictionary>
+<!-- http://blogs.msd/delay/archive/2009/09/23/if-it-walks-like-a-duck-and-talks-like-a-duck-it-must-be-a-treegrid-a-simple-xaml-only-treegrid-ui-for-wpf.aspx -->

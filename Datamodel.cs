@@ -390,7 +390,12 @@ namespace Datamodel
         /// <summary>
         /// All Elements created for this Datamodel. Only Elements which are referenced by the Root element or one of its children are actually considered part of the Datamodel.
         /// </summary>
-        public readonly ElementList AllElements;
+        public ElementList AllElements
+        {
+            get { return _AllElements; }
+            protected set { _AllElements = value; }
+        }
+        ElementList _AllElements;
         #endregion
 
         #region Element handling
