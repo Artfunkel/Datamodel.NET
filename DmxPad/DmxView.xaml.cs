@@ -26,13 +26,27 @@ namespace DmxPad
         {
             InitializeComponent();
         }
-
-        public Datamodel.Datamodel Datamodel
+        
+        static DmxView()
         {
-            get { return GetValue(DatamodelProperty) as Datamodel.Datamodel; }
-            set { SetValue(DatamodelProperty, value); }
+            DataContextProperty.OverrideMetadata(
+                typeof(DmxView),
+                new FrameworkPropertyMetadata(typeof(DmxView)));
         }
-        public static DependencyProperty DatamodelProperty = DependencyProperty.Register("Datamodel", typeof(Datamodel.Datamodel), typeof(DmxView), new PropertyMetadata(DatamodelChanged));
+
+        private void DmxTree_Loaded(object sender, RoutedEventArgs e)
+        {
+            var tgv = ((DmxPad.Controls.TreeGridView)sender);
+
+            var root_item = ((DmxPad.Controls.TreeGridViewItem)tgv.ItemContainerGenerator.ContainerFromItem(tgv.Items[0]));
+            if (root_item != null)
+            {
+                root_item.IsSelected = true;
+                root_item.IsExpanded = true;
+            }
+        }
+
+        public Datamodel.Datamodel Datamodel { get { return DataContext as Datamodel.Datamodel; } }
 
         private static void DatamodelChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
         {
@@ -184,7 +198,13 @@ namespace DmxPad
                 DragStart = e.MouseDevice.GetPosition(sender as IInputElement);
                 Dragging = true;
             }
-            
+        }
+
+        private void DeleteButton_Click(object sender, RoutedEventArgs e)
+        {
+            var attr = ((Button)sender).DataContext as Datamodel.Attribute;
+            if (attr != null)
+                attr.Owner.Remove(attr);
         }
     }
 
@@ -195,11 +215,10 @@ namespace DmxPad
             if (item == null) return null;
 
             var type = item.GetType();
-            
-            if (type == typeof(Datamodel.Element))
-                return App.Current.Resources["ElementAttrs"] as DataTemplate;
-            else
+
+            if (type == typeof(Datamodel.Attribute))
                 return App.Current.Resources["ObjectList"] as DataTemplate;
+            else return null;
         }
     }
 }

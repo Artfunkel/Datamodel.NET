@@ -167,10 +167,11 @@ namespace Datamodel
         {
             lock (Attribute_ChangeLock)
             {
+                var index = Attributes.IndexOf(item);
                 if (Attributes.Remove(item))
                 {
                     if (CollectionChanged != null)
-                        CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item));
+                        CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
                     return true;
                 }
                 else return false;

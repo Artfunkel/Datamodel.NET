@@ -13,6 +13,7 @@
         <l:ChildPathConverter x:Key="ChildPathConverter"/>
         <l:ValueColumnWidthConverter x:Key="ValueColumnWidthConverter"/>
         <l:ValuePanelVisibilityConverter x:Key="ValuePanelVisibilityConverter"/>
+        <l:EnsureElementConverter x:Key="EnsureElementConverter"/>
 
         <l:InspectPaneTemplateSelector x:Key="InspectPaneTemplateSelector"/>
         <l:ValueColumnTemplateSelector x:Key="ValueColumnTemplateSelector"/>
@@ -25,39 +26,16 @@
         </DataTemplate>
 
         <DataTemplate x:Key="ObjectList">
-            <ListBox ItemsSource="{Binding}" />
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                
+                <TextBlock Text="{Binding Path=Value.Count,StringFormat={}{0} items}"/>
+                <ListBox Grid.Row="1" ItemsSource="{Binding Path=Value}"/>
+            </Grid>
             <!--<DataGrid ItemsSource="{Binding}" DisplayMemberPath="Value" HeadersVisibility="Column" MinColumnWidth="80" HorizontalAlignment="Left" VerticalAlignment="Top" />-->
-        </DataTemplate>
-        <DataTemplate x:Key="ElementAttrs">
-            <StackPanel Grid.Row="0">
-                <StackPanel.Resources>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="Width" Value="50" />
-                        <Setter Property="TextAlignment" Value="Right"/>
-                        <Setter Property="VerticalAlignment" Value="Center" />
-                        <Setter Property="Margin" Value="0,0,5,0"/>
-                    </Style>
-                    <Style TargetType="TextBox">
-                        <Setter Property="Width" Value="250" />
-                        <Setter Property="VerticalAlignment" Value="Center" />
-                    </Style>
-                    <Style TargetType="StackPanel">
-                        <Setter Property="Margin" Value="0,2" />
-                    </Style>
-                </StackPanel.Resources>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Name:" />
-                    <TextBox Text="{Binding Path=Name}" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Class:" />
-                    <TextBox Text="{Binding Path=ClassName}" />
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="GUID:" />
-                    <TextBox Text="{Binding Path=ID,Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent" FontFamily="Consolas" />
-                </StackPanel>
-            </StackPanel>
         </DataTemplate>
 
     </Application.Resources>

@@ -17,7 +17,7 @@ namespace Datamodel
             Name = name;
             Value = value;
             Offset = offset;
-            Owner = owner;
+            this.owner = owner;
             if (Owner.Attributes.Count == Int32.MaxValue)
                 throw new InvalidOperationException("Maximum Attribute count reached for this Element.");
             Owner.Attributes.Add(this);
@@ -33,6 +33,12 @@ namespace Datamodel
             set { name = value; NotifyPropertyChanged("Name"); }
         }
         string name;
+
+        /// <summary>
+        /// The <see cref="Element"/> which this Attribute is part of.
+        /// </summary>
+        public Element Owner { get { return owner; } }
+        Element owner;
 
         /// <summary>
         /// The value held by this Attribute.
@@ -97,7 +103,6 @@ namespace Datamodel
         #endregion
 
         long Offset;
-        Element Owner;
         int LastStubSearch = 0;
 
         public override string ToString()

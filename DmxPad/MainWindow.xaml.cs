@@ -82,14 +82,17 @@ namespace DmxPad
 
         public void Load(params string[] paths)
         {
+            var recent = Properties.Settings.Default.Recent;
             Datamodel.Datamodel new_dm = null;
             foreach (var path in paths)
             {
                 new_dm = Datamodel.Datamodel.Load(path);
                 Datamodels.Add(new_dm);
-                Properties.Settings.Default.Recent.Remove(path);
-                Properties.Settings.Default.Recent.Insert(0,path);
+                recent.Remove(path);
+                recent.Insert(0,path);
             }
+            while (recent.Count > 10)
+                recent.RemoveAt(0);
             Tabs.SelectedItem = new_dm;
             RecentMenu.Items.Refresh();
         }
@@ -150,6 +153,29 @@ namespace DmxPad
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
             Close();
+        }
+
+        private void RegisterExtensions_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var class_name = "DmxPadFile";
+                using (var classes = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Classes", true))
+                {
+                    var path = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    var file_def = classes.CreateSubKey(class_name);
+                    file_def.SetValue(null, "Datamodel Exchange File");
+                    file_def.CreateSubKey(@"shell\edit\command").SetValue(null, String.Format("{0} \"%1\"", path));
+                    file_def.CreateSubKey("DefaultIcon").SetValue(null, String.Format("{0},0", path));
+
+                    classes.CreateSubKey(".dmx").SetValue(null, class_name);
+                }
+                System.Windows.MessageBox.Show("File extensions registered for current user.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception err)
+            {
+                System.Windows.MessageBox.Show(err.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 

@@ -55,7 +55,7 @@
                             <Setter Property="Margin" Value="{Binding Path=ColumnSpacing, RelativeSource={RelativeSource FindAncestor,AncestorType=c:TreeGridView}, Converter={StaticResource CellMarginConverter}, ConverterParameter=3}"/>
                         </Style>
                     </ControlTemplate.Resources>
-                    <Grid Background="Transparent">
+                    <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition SharedSizeGroup="TitleHeaderColumn"/>
                             <ColumnDefinition Width="*" />
@@ -117,17 +117,37 @@
                                 <ContentPresenter ContentSource="Title"/>
                             </StackPanel>
                         </c:TreeGridViewCell>
-                        <Grid Grid.Column="1" Name="PART_Grid"/>
+                        <Grid Grid.Column="1" Name="PART_Grid" />
                         <ItemsPresenter Grid.Row="1" Grid.ColumnSpan="2" Visibility="{TemplateBinding IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Setter Property="Foreground" Value="{x:Static SystemColors.ControlTextBrush}"/>
+        <Setter Property="Background" Value="Transparent"/>
         <Style.Triggers>
             <Trigger Property="IsSelected" Value="True">
                 <Setter Property="Background" Value="{x:Static SystemColors.HighlightBrush}"/>
+                <Setter Property="Foreground" Value="{x:Static SystemColors.HighlightTextBrush}"/>
             </Trigger>
         </Style.Triggers>
     </Style>
+
+    <Style TargetType="{x:Type c:LabelledControl}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type c:LabelledControl}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{TemplateBinding LabelWidth}"/>
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Label HorizontalContentAlignment="Right" Content="{TemplateBinding LabelText}" VerticalAlignment="Center"/>
+                        <ContentPresenter Grid.Column="1" VerticalAlignment="Top"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>
-<!-- http://blogs.msd/delay/archive/2009/09/23/if-it-walks-like-a-duck-and-talks-like-a-duck-it-must-be-a-treegrid-a-simple-xaml-only-treegrid-ui-for-wpf.aspx -->

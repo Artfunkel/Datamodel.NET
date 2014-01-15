@@ -5,7 +5,7 @@
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
-            <ColumnDefinition Name="ValueColumn" Width="{Binding SelectedItem, Converter={StaticResource ValueColumnWidthConverter}, ElementName=DmxTree, Mode=OneWay}"/>
+            <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -18,13 +18,14 @@
                    MouseDown="ResetRoot_Click" ToolTip="Return to the root element"/>
         </Grid>
 
-        <c:TreeGridView x:Name="DmxTree" Grid.Row="1" Grid.Column="0" ItemsSource="{Binding}" ChildItemsSelector="{Binding Converter={StaticResource ChildPathConverter}}"
-                        UseLayoutRounding="True" d:DataContext="{Binding Path=AllElements}" TitleColumnHeader="Name">
+        <c:TreeGridView x:Name="DmxTree" Grid.Row="1" Grid.Column="0" ItemsSource="{Binding Converter={StaticResource EnsureElementConverter}}" ChildItemsSelector="{Binding Converter={StaticResource ChildPathConverter}}"
+                        UseLayoutRounding="True" d:DataContext="{Binding Path=AllElements}" TitleColumnHeader="Name" Loaded="DmxTree_Loaded">
             <c:TreeGridView.ColumnDefinitions>
                 <c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}">
                     <c:TreeGridContentColumnDefinition.CellStyle>
-                        <Style TargetType="c:TreeGridViewCell">
-                            <Setter Property="Foreground" Value="Gray"/>
+                        <Style TargetType="Control">
+                            <Setter Property="Control.Opacity" Value="0.5"/>
+                            <Setter Property="IsTabStop" Value="False"/>
                         </Style>
                     </c:TreeGridContentColumnDefinition.CellStyle>
                 </c:TreeGridContentColumnDefinition>
@@ -35,7 +36,7 @@
                     <ContentControl Content="{Binding}"/>
                 </DataTemplate>
             </c:TreeGridView.TitleTemplate>
-            
+
             <c:TreeGridView.Resources>
                 <DataTemplate DataType="{x:Type dm:Attribute}">
                     <StackPanel Orientation="Horizontal" Margin="0,0,5,0" VerticalAlignment="Center">
@@ -58,10 +59,63 @@
         </c:TreeGridView>
 
         <GridSplitter Grid.Column="1" Grid.Row="1" Width="2" VerticalAlignment="Stretch" HorizontalAlignment="Left" ResizeDirection="Columns"/>
-        
+
         <Grid Name="AttributeProperties" Grid.Column="1" Grid.Row="1" Margin="5,0" Background="{DynamicResource {x:Static SystemColors.WindowColor}}"
-                  d:DataContext="{Binding Path=Root[model]}" DataContext="{Binding ElementName=DmxTree, Path=SelectedItem}" Visibility="{Binding ElementName=ValueColumn,Path=Width,Converter={StaticResource ValuePanelVisibilityConverter}}">
-            <ContentControl Content="{Binding Converter={StaticResource GetAttributeValue}}" ContentTemplateSelector="{StaticResource InspectPaneTemplateSelector}" />
+                Visibility="{Binding ElementName=DmxTree, Path=SelectedItem, Converter={StaticResource VisibleIfNotNull},FallbackValue=Visible}"
+                  d:DataContext="{Binding Path=Root}" DataContext="{Binding ElementName=DmxTree, Path=SelectedItem}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.Resources>
+                <Style TargetType="c:LabelledControl">
+                    <Setter Property="LabelWidth" Value="45"/>
+                    <Setter Property="Margin" Value="3,0"/>
+                </Style>
+                <Style TargetType="GroupBox">
+                    <Setter Property="Margin" Value="0,3"/>
+                    <Setter Property="Padding" Value="5"/>
+                </Style>
+            </Grid.Resources>
+            <GroupBox Header="Element" DataContext="{Binding Converter={StaticResource EnsureElementConverter}}">
+                <StackPanel>
+                    <c:LabelledControl LabelText="Name:">
+                        <TextBox Text="{Binding Path=Name}" />
+                    </c:LabelledControl>
+
+                    <c:LabelledControl LabelText="Class:">
+                        <TextBox Text="{Binding Path=ClassName}" />
+                    </c:LabelledControl>
+
+                    <c:LabelledControl LabelText="GUID:">
+                        <TextBox Text="{Binding Path=ID,Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent" FontFamily="Consolas" />
+                    </c:LabelledControl>
+                </StackPanel>
+            </GroupBox>
+
+            <GroupBox Grid.Row="1" Header="Attribute">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <c:LabelledControl LabelText="Name:" Grid.Row="0">
+                        <TextBox Text="{Binding Path=Name}" />
+                    </c:LabelledControl>
+                    <c:LabelledControl LabelText="Type:" Grid.Row="1">
+                        <TextBlock Text="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>
+                        <!--<ComboBox ItemsSource="{x:Static dm:Datamodel.AttributeTypes}" SelectedItem="{Binding Converter={StaticResource DebugConverter}}" ItemTemplate="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>-->
+                    </c:LabelledControl>
+                    <c:LabelledControl LabelText="Value:" Grid.Row="2">
+                        <ContentPresenter Content="{Binding}" ContentTemplateSelector="{StaticResource InspectPaneTemplateSelector}"/>
+                    </c:LabelledControl>
+                    <StackPanel Orientation="Horizontal" Grid.Row="3">
+                        <Button Content="Delete" Click="DeleteButton_Click"/>
+                    </StackPanel>
+                </Grid>
+            </GroupBox>
         </Grid>
     </Grid>
 </UserControl>
