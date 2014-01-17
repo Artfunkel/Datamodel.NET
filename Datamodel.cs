@@ -6,6 +6,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.IO;
 
+using Codec_t = System.Tuple<string, int>;
 using Datamodel.Codecs;
 
 namespace Datamodel
@@ -77,6 +78,8 @@ namespace Datamodel
         }
         static Dictionary<CodecRegistration, Type> Codecs = new Dictionary<CodecRegistration, Type>();
 
+        public static IEnumerable<Codec_t> CodecsRegistered { get { return Codecs.Select(t => new Codec_t(t.Key.Encoding,t.Key.Version)); } }
+
         /// <summary>
         /// Registers a new <see cref="ICodec"/> with an encoding name and one or more encoding versions.
         /// </summary>
@@ -138,10 +141,10 @@ namespace Datamodel
         /// <param name="encoding_version">The desired encoding version.</param>
         public void Save(string path, string encoding, int encoding_version)
         {
-            using (var stream = File.Create(path))
+            using (var stream = System.IO.File.Create(path))
             {
                 Save(stream, encoding, encoding_version);
-                filepath = path;
+                File = new FileInfo(path);
             }
         }
 
@@ -162,12 +165,12 @@ namespace Datamodel
         /// <param name="defer_mode">How to handle deferred loading.</param>
         public static Datamodel Load(string path, DeferredMode defer_mode = DeferredMode.Automatic)
         {
-            var stream = File.OpenRead(path);
+            var stream = System.IO.File.OpenRead(path);
             Datamodel dm = null;
             try
             {
                 dm = Load_Internal(stream, defer_mode);
-                dm.filepath = path;
+                dm.File = new FileInfo(path);
                 return dm;
             }
             finally
@@ -208,6 +211,13 @@ namespace Datamodel
                 dm.Stream = stream;
                 dm.Codec = codec as IDeferredAttributeCodec;
             }
+
+            dm.Format = format;
+            dm.FormatVersion = format_version;
+
+            dm.Encoding = encoding;
+            dm.EncodingVersion = encoding_version;
+            
             return dm;
         }
 
@@ -339,13 +349,13 @@ namespace Datamodel
 
         #region Properties
         /// <summary>
-        /// Gets the path that this Datamodel was loaded from, if any.
+        /// Gets or sets a <see cref="FileInfo"/> object associated with this Datamodel.
         /// </summary>
-        public string FilePath { get { return filepath; } }
-        string filepath = null;
+        public FileInfo File { get { return _File; } set { _File = value; } }
+        FileInfo _File;
 
         /// <summary>
-        /// The internal format of the Datamodel. This is not the same as the encoding used to save or load the Datamodel.
+        /// The internal format of the Datamodel.
         /// </summary>
         public string Format
         {
@@ -369,6 +379,26 @@ namespace Datamodel
             set { formatVersion = value; NotifyPropertyChanged("FormatVersion"); }
         }
         int formatVersion;
+
+        /// <summary>
+        /// The encoding with which this Datamodel should be stored.
+        /// </summary>
+        public string Encoding
+        {
+            get { return encoding; }
+            set { encoding = value; }
+        }
+        string encoding;
+
+        /// <summary>
+        /// The version of the <see cref="Encoding"/> in use.
+        /// </summary>
+        public int EncodingVersion
+        {
+            get { return encodingVersion; }
+            set { encodingVersion = value; }
+        }
+        int encodingVersion;
 
         Stream Stream;
         internal IDeferredAttributeCodec Codec;

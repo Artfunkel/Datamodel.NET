@@ -21,17 +21,36 @@ namespace Datamodel
             this.id = id;
             Name = name;
             ClassName = class_name;
-            Stub = stub;
+            this.stub = stub;
             if (!stub)
             {
-                Owner = datamodel;
+                owner = datamodel;
                 Owner.AllElements.Add(this);
                 if (Owner.AllElements.Count == 1) Owner.Root = this;
             }
         }
 
-        internal List<Attribute> Attributes = new List<Attribute>();
+        private List<Attribute> Attributes = new List<Attribute>();
         private object Attribute_ChangeLock = new object();
+        
+        internal void AddAttribute(Attribute attr)
+        {
+            lock (Attribute_ChangeLock)
+            {
+                if (Attributes.Count == Int32.MaxValue)
+                    throw new InvalidOperationException(String.Format("Maximum Attribute count reached for Element {0}.", ID));
+
+                Attributes.Add(attr);
+                attr.PropertyChanged += AttributeChanged;
+            }
+        }
+
+        void AttributeChanged(object sender, PropertyChangedEventArgs e)
+        {
+            var attr = (Attribute)sender;
+            if (CollectionChanged != null)
+                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, (object)sender, (object)sender, Attributes.IndexOf(attr)));
+        }
 
         #region Properties
         /// <summary>
@@ -63,12 +82,14 @@ namespace Datamodel
         /// <summary>
         /// A Stub element does (or did) exist, but is not defined in this Element's <see cref="Datamodel"/>. Only its <see cref="ID"/> is known.
         /// </summary>
-        public readonly bool Stub;
+        public bool Stub { get { return stub; } }
+        readonly bool stub;
 
         /// <summary>
         /// The <see cref="Datamodel"/> that this Element is part of.
         /// </summary>
-        public readonly Datamodel Owner;
+        public Datamodel Owner { get { return owner; } }
+        readonly Datamodel owner;
         #endregion
 
         /// <summary>

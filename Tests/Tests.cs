@@ -258,7 +258,23 @@ namespace Datamodel_Tests
         public void Perf_Create_Binary5()
         {
             foreach (var i in Enumerable.Range(0, 1000))
-                Create("binary", 5,true);
+                Create("binary", 5, true);
+        }
+
+        [TestMethod]
+        public void Perf_CreateElements_Binary5()
+        {
+            var dm = new Datamodel.Datamodel("model", 1); // using "model" to keep dxmconvert happy
+            dm.Root = dm.CreateElement("root");
+            var inner_elem = dm.CreateElement("inner_elem");
+            var arr = new Element[20000];
+            dm.Root["big_array"] = arr;
+
+            foreach (int i in Enumerable.Range(0,19999))
+                arr[i] = inner_elem;
+
+            SaveAndConvert(dm, "binary", 5);
+            Cleanup();
         }
     }
 

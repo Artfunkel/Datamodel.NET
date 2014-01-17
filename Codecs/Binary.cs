@@ -113,15 +113,22 @@ namespace Datamodel.Codecs
                 Dummy = Codec.EncodingVersion == 1;
                 if (!Dummy)
                 {
+                    Scraped = new HashSet<Element>();
+                    
                     ScrapeElement(dm.Root);
                     Strings = Strings.Distinct().ToList();
+                    
+                    Scraped = null;
                 }
             }
 
+            private HashSet<Element> Scraped;
+
             void ScrapeElement(Element elem)
             {
-                if (elem.Stub) return;
-                var scraped = new List<Element>();
+                if (elem == null || elem.Stub || Scraped.Contains(elem)) return;
+                Scraped.Add(elem);
+
                 Strings.Add(elem.Name);
                 Strings.Add(elem.ClassName);
                 foreach (var attr in elem)
@@ -177,11 +184,14 @@ namespace Datamodel.Codecs
 
             var dict = new StringDictionary(this, dm);
             var elem_order = new List<Element>();
+            var elem_indices = new Dictionary<Element, int>();
 
             Action<Element> WriteIndex = null;
             WriteIndex = elem =>
                 {
+                    elem_indices[elem] = elem_indices.Count;
                     elem_order.Add(elem);
+
                     dict.WriteString(elem.ClassName);
                     if (EncodingVersion >= 4) dict.WriteString(elem.Name);
                     else WriteString_Raw(elem.Name);
@@ -192,16 +202,15 @@ namespace Datamodel.Codecs
                         var child_elem = attr.Value as Element;
                         if (child_elem != null)
                         {
-                            if (!elem_order.Contains(child_elem))
+                            if (!elem_indices.ContainsKey(child_elem))
                                 WriteIndex(child_elem);
                         }
                         else
                         {
                             var elem_list = attr.Value as IList<Element>;
                             if (elem_list != null)
-                                foreach (var item in elem_list)
-                                    if (!elem_order.Contains(item))
-                                        WriteIndex(item);
+                                foreach (var item in elem_list.Where(e => e != null && !elem_indices.ContainsKey(e)))
+                                    WriteIndex(item);
                         }
                     }
                 };
@@ -241,7 +250,7 @@ namespace Datamodel.Codecs
                                     Writer.Write(BitConverter.IsLittleEndian ? bits : bits.Reverse().ToArray());
                                 }
                                 else
-                                    Writer.Write(elem_order.IndexOf(child_elem));
+                                    Writer.Write(elem_indices[child_elem]);
                                 return;
                             }
 
@@ -301,7 +310,7 @@ namespace Datamodel.Codecs
             dict.WriteSelf();
 
             Func<Element, int> CountChildElems = null;
-            var counted = new List<Element>();
+            var counted = new HashSet<Element>();
             CountChildElems = (elem) =>
                 {
                     int num_elems = 1;
@@ -309,10 +318,12 @@ namespace Datamodel.Codecs
                     foreach (var child in elem.Select(a => a.Value))
                     {
                         if (child == null) continue;
-                        else if (child.GetType() == typeof(Element) && !counted.Contains(child))
+
+                        var t = child.GetType();
+                        if (t == typeof(Element) && !counted.Contains(child))
                             num_elems += CountChildElems(child as Element);
-                        else if (child.GetType() == typeof(List<Element>))
-                            foreach (var child_elem in (child as List<Element>).Where(c => c != null && !counted.Contains(c)))
+                        else if (Datamodel.IsDatamodelArrayType(t) && Datamodel.GetArrayInnerType(t) == typeof(Element))
+                            foreach (var child_elem in (child as IEnumerable<Element>).Where(c => c != null && !counted.Contains(c)))
                                 num_elems += CountChildElems(child_elem);
                     }
                     return num_elems;
@@ -321,7 +332,8 @@ namespace Datamodel.Codecs
             Writer.Write(CountChildElems(dm.Root));
 
             WriteIndex(dm.Root);
-            elem_order.ForEach(e => WriteBody(e));
+            foreach(var e in elem_order)
+                WriteBody(e);
         }
 
         object ReadValue(Datamodel dm, Type type, bool raw_string)

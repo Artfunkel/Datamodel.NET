@@ -18,9 +18,7 @@ namespace Datamodel
             Value = value;
             Offset = offset;
             this.owner = owner;
-            if (Owner.Attributes.Count == Int32.MaxValue)
-                throw new InvalidOperationException("Maximum Attribute count reached for this Element.");
-            Owner.Attributes.Add(this);
+            Owner.AddAttribute(this);
         }
 
         #region Properties
