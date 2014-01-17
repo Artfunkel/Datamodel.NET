@@ -1,0 +1,16 @@
+﻿<UserControl
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:c="clr-namespace:DmxPad.Controls" x:Class="DmxPad.Controls.SearchBox"
+             mc:Ignorable="d" d:DesignWidth="200"
+             Focusable="False" IsTabStop="False">
+    <UserControl.Resources>
+        <c:SearchHintVisibilityConverter x:Key="SearchHintVisibilityConverter"/>
+    </UserControl.Resources>
+    <Grid>
+        <TextBox x:Name="Input" TextChanged="Input_TextChanged"/>
+        <TextBlock Text="Search..." Opacity="0.5" FontStyle="Italic" Padding="4,3" Visibility="{Binding Text, Converter={StaticResource SearchHintVisibilityConverter}, ElementName=Input}" IsHitTestVisible="False"/>
+    </Grid>
+</UserControl>

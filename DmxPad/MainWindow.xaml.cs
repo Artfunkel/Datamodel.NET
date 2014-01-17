@@ -45,9 +45,10 @@ namespace DmxPad
         #region CommandBindings
         private void New_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            var new_dm = new Datamodel.Datamodel("my_format", 1);
-            Datamodels.Add(new_dm);
-            Tabs.SelectedItem = new_dm;
+            var dm = new Datamodel.Datamodel("my_format", 1);
+            Datamodels.Add(dm);
+            dm.Root = dm.CreateElement("root");
+            Tabs.SelectedItem = dm;
             e.Handled = true;
         }
         private void OpenRecentItem(object sender, RoutedEventArgs e)
@@ -100,12 +101,12 @@ namespace DmxPad
         private void Save_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var dm = Tabs.SelectedItem as Datamodel.Datamodel;
-            if (String.IsNullOrEmpty(dm.FilePath))
+            if (String.IsNullOrEmpty(dm.File.FullName))
             {
                 SaveAs_Executed(sender, e);
             }
             else
-                dm.Save(dm.FilePath,"binary",5);
+                dm.Save(dm.File.FullName, dm.Encoding, dm.EncodingVersion);
         }
 
         private void SaveAs_Executed(object sender, ExecutedRoutedEventArgs e)
@@ -113,15 +114,16 @@ namespace DmxPad
             var sfd = new Microsoft.Win32.SaveFileDialog();
             var dm = Tabs.SelectedItem as Datamodel.Datamodel;
 
-            sfd.InitialDirectory = dm.FilePath;
-            sfd.FileName = dm.FilePath;
+            sfd.InitialDirectory = dm.File.FullName;
+            sfd.FileName = System.IO.Path.GetFileName(dm.File.Name);
             sfd.Filter = "Datamodel Exchange (*.dmx)|*.dmx|All files (*.*)|*.*";
             if (sfd.ShowDialog() == true)
             {
                 Cursor = Cursors.Wait;
                 try
                 {
-                    dm.Save(sfd.FileName, "binary", 5);
+                    dm.Save(sfd.FileName, dm.Encoding, dm.EncodingVersion);
+                    dm.File = new System.IO.FileInfo(sfd.FileName);
                 }
                 catch (Exception err)
                 {

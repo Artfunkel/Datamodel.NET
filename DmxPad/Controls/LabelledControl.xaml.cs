@@ -26,9 +26,8 @@ namespace DmxPad.Controls
 
         static LabelledControl()
         {
-            DefaultStyleKeyProperty.OverrideMetadata(
-                typeof(LabelledControl),
-                new FrameworkPropertyMetadata(typeof(LabelledControl)));
+            DefaultStyleKeyProperty.OverrideMetadata(typeof(LabelledControl), new FrameworkPropertyMetadata(typeof(LabelledControl)));
+            VerticalContentAlignmentProperty.OverrideMetadata(typeof(LabelledControl), new FrameworkPropertyMetadata(VerticalAlignment.Center));
         }
 
         public string LabelText
@@ -44,11 +43,8 @@ namespace DmxPad.Controls
             get { return (GridLength)GetValue(LabelWidthProperty); }
             set { SetValue(LabelWidthProperty, value); }
         }
-
-        // Using a DependencyProperty as the backing store for LabelWidth.  This enables animation, styling, binding, etc...
         public static readonly DependencyProperty LabelWidthProperty =
             DependencyProperty.Register("LabelWidth", typeof(GridLength), typeof(LabelledControl), new PropertyMetadata(GridLength.Auto));
 
-        
     }
 }

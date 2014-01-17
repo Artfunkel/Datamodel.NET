@@ -143,8 +143,8 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <Label HorizontalContentAlignment="Right" Content="{TemplateBinding LabelText}" VerticalAlignment="Center"/>
-                        <ContentPresenter Grid.Column="1" VerticalAlignment="Top"/>
+                        <Label HorizontalContentAlignment="Right" Content="{TemplateBinding LabelText}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        <ContentPresenter Grid.Column="1" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>

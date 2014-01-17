@@ -4,6 +4,7 @@ using System.Configuration;
 using System.Data;
 using System.Linq;
 using System.Windows;
+using System.Windows.Input;
 
 namespace DmxPad
 {
@@ -26,5 +27,7 @@ namespace DmxPad
 
         public static StartupEventArgs StartArgs { get { return startArgs; } }
         public static StartupEventArgs startArgs;
+
+        public static RoutedCommand ChooseElement = new RoutedCommand();
     }
 }

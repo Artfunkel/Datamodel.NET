@@ -1,7 +1,8 @@
 ﻿<Window x:Class="DmxPad.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:dm="clr-namespace:Datamodel;assembly=datamodel.net" xmlns:l="clr-namespace:DmxPad" xmlns:c="clr-namespace:DmxPad.Controls" xmlns:p="clr-namespace:DmxPad.Properties"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d"
-        Title="DmxPad" Width="800" Height="600" WindowStartupLocation="CenterScreen" d:DataContext="{Binding Source={d:DesignInstance Type=l:DesignTimeData,IsDesignTimeCreatable=True}}" Icon="/DmxPad;component/Resources/dmx.ico">
+        Width="800" Height="600" WindowStartupLocation="CenterScreen" d:DataContext="{Binding Source={d:DesignInstance Type=l:DesignTimeData,IsDesignTimeCreatable=True}}" Icon="/DmxPad;component/Resources/dmx.ico"
+        Title="{Binding ElementName=Tabs,Path=SelectedItem.File.FullName,StringFormat=DmxPad - {0},TargetNullValue=DmxPad}">
     <Window.CommandBindings>
         <CommandBinding Command="New" Executed="New_Executed" />
         <CommandBinding Command="Open" Executed="Open_Executed" />
@@ -58,7 +59,7 @@
                         <TextBlock ToolTip="{Binding Path=FilePath}" VerticalAlignment="Center">
                             <TextBlock.Text>
                                 <MultiBinding StringFormat="{}{0}">
-                                    <Binding Path="FilePath" Converter="{StaticResource ExtractFileNameConverter}" />
+                                    <Binding Path="File.Name" FallbackValue="new" />
                                 </MultiBinding>
                             </TextBlock.Text>
                         </TextBlock>

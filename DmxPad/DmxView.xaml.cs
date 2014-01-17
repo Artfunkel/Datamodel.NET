@@ -206,19 +206,54 @@ namespace DmxPad
             if (attr != null)
                 attr.Owner.Remove(attr);
         }
+
+        private void CommandBinding_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            var attr = (Datamodel.Attribute)DmxTree.SelectedItem;
+            
+            var select = new Controls.SelectElement();
+            select.Owner = App.Current.MainWindow;
+            select.SelectedElement = (Element)attr.Value;
+            select.DataContext = DataContext;
+
+            if (select.ShowDialog() == true)
+            {
+                attr.Value = select.SelectedElement;
+            }
+        }
+
+        private void GUIDCopy_Click(object sender, RoutedEventArgs e)
+        {
+            var elem = ((Element)((Hyperlink)sender).CommandParameter);
+            System.Windows.Clipboard.SetText(elem.ID.ToString());
+        }
     }
 
     public class InspectPaneTemplateSelector : DataTemplateSelector
     {
+        static DataTemplate ObjectList = (DataTemplate)App.Current.Resources["Attr_List"];
+
+        static DataTemplate GenericSingle = (DataTemplate)App.Current.Resources["Attr_Generic"];
+        static DataTemplate ElementSingle = (DataTemplate)App.Current.Resources["Attr_Element"];
+        static DataTemplate BoolSingle = (DataTemplate)App.Current.Resources["Attr_Bool"];
+
         public override DataTemplate SelectTemplate(object item, DependencyObject container)
         {
             if (item == null) return null;
 
-            var type = item.GetType();
+            var attr = item as Datamodel.Attribute;
+            if (attr != null)
+            {
+                var inner_type = attr.Value == null ? typeof(Element) : attr.Value.GetType();
 
-            if (type == typeof(Datamodel.Attribute))
-                return App.Current.Resources["ObjectList"] as DataTemplate;
-            else return null;
+                if (Datamodel.Datamodel.IsDatamodelArrayType(inner_type))
+                    return ObjectList;
+                if (inner_type == typeof(Element))
+                    return ElementSingle;
+                if (inner_type == typeof(bool))
+                    return BoolSingle;
+            }
+            return GenericSingle;
         }
     }
 }

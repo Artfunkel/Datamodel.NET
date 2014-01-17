@@ -8,11 +8,12 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Globalization;
 
+using DmEncoding = System.Tuple<string, int>;
 using Datamodel;
 
-namespace DmxPad
+namespace DmxPad.Converters
 {
-    public class DebugConverter : IValueConverter
+    public class Debug : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
@@ -25,7 +26,7 @@ namespace DmxPad
         }
     }
 
-    public class ChildPathConverter : IValueConverter
+    public class ChildPath : IValueConverter
     {
         static object[] Empty = { };
 
@@ -65,7 +66,7 @@ namespace DmxPad
         }
     }
 
-    public class ValueColumnWidthConverter : IValueConverter
+    public class ValueColumnWidth : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
@@ -91,7 +92,7 @@ namespace DmxPad
         }
     }
 
-    public class ValuePanelVisibilityConverter : IValueConverter
+    public class ValuePanelVisibility : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
@@ -107,7 +108,7 @@ namespace DmxPad
         }
     }
 
-    public class AttributeIconConverter : IValueConverter
+    public class AttributeIcon : IValueConverter
     {
         static Image GetIcon(string name)
         {
@@ -155,21 +156,6 @@ namespace DmxPad
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             return value != null || System.ComponentModel.DesignerProperties.GetIsInDesignMode(new DependencyObject()) ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            throw new NotImplementedException();
-        }
-    }
-
-    public class ExtractFileNameConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (String.IsNullOrEmpty(value as string))
-                return "Unsaved";
-            return System.IO.Path.GetFileName(value as string);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -296,7 +282,7 @@ namespace DmxPad
         }
     }
 
-    public class EnsureElementConverter : IValueConverter
+    public class EnsureElement : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
@@ -312,6 +298,47 @@ namespace DmxPad
                 return attr.Owner;
 
             return DependencyProperty.UnsetValue;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class Encoding : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            return new DmEncoding(values[0] as string, values[1] == DependencyProperty.UnsetValue ? 0 : (int)values[1]);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            var t = (DmEncoding)value;
+            return new object[] { t.Item1, t.Item2 };
+        }
+    }
+
+    public class EncodingDisplay : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var t = value as DmEncoding;
+            return String.Join(" ",t.Item1,t.Item2);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    class AttributeGroupDisplay : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is Datamodel.Attribute ? Visibility.Visible : Visibility.Hidden;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
