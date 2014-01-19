@@ -80,8 +80,9 @@ namespace Datamodel
         string className;
 
         /// <summary>
-        /// A Stub element does (or did) exist, but is not defined in this Element's <see cref="Datamodel"/>. Only its <see cref="ID"/> is known.
+        /// Gets or sets whether this Element is a stub.
         /// </summary>
+        /// <remarks>A Stub element does (or did) exist, but is not defined in this Element's <see cref="Datamodel"/>. Only its <see cref="ID"/> is known.</remarks>
         public bool Stub { get { return stub; } }
         readonly bool stub;
 
@@ -96,13 +97,12 @@ namespace Datamodel
         /// Returns the value of the <see cref="Attribute"/> with the specified type and name. An exception is thrown there is no Attribute of the given name and type.
         /// </summary>
         /// <seealso cref="GetArray&lt;T&gt;"/>
-        /// <typeparam name="T">The expected <see cref="ClassName"/> of the Attribute.</typeparam>
+        /// <typeparam name="T">The expected Type of the Attribute.</typeparam>
         /// <param name="name">The Attribute name to search for.</param>
         /// <returns>The value of the Attribute with the given name.</returns>
+        /// <exception cref="AttributeTypeException">Thrown when the value requested is not compatible with <see cref="T"/>.</exception>
         public T Get<T>(string name)
         {
-            if (!Datamodel.IsDatamodelType(typeof(T))) throw new AttributeTypeException(typeof(T).Name + " is not a valid Datamodel attribute type.");
-
             object value = this[name];
 
             if (!(value is T))
@@ -132,21 +132,38 @@ namespace Datamodel
         }
 
         /// <summary>
+        /// Returns the <see cref="Attribute"/> object with the specified name. Do not store references to Attributes as they are replaced whenever a new value is set.
+        /// </summary>
+        /// <param name="name">The name to search for.</param>
+        /// <returns>The <see cref="Attribute"/> object with the given name.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when name is null.</exception>
+        /// <exception cref="KeyNotFoundException">Thrown when there is no attribute with the given name.</exception>
+        public Attribute GetAttribute(string name)
+        {
+            if (name == null) throw new ArgumentNullException("name");
+            if (Stub) throw new InvalidOperationException("Cannot access attributes on a stub element.");
+
+            Attribute attr = Attributes.Find(a => a.Name == name);
+
+            if (attr == null) throw new KeyNotFoundException(String.Format("Attribute \"{0}\" not found on <{1}>.", name, this));
+
+            return attr;
+        }
+
+        /// <summary>
         /// Gets or sets the value of the <see cref="Attribute"/> with the given name. Raises an exception if no such Attribute exists.
         /// </summary>
         /// <param name="name">The name to search for. Cannot be null.</param>
         /// <returns>The value associated with the given name.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when the value of name is null.</exception>
+        /// <exception cref="KeyNotFoundException">Thrown when there is no attribute with the given name.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when an attempt is made to set an attribute on a <see cref="Stub"/> Element, or when the value is an Element from a different <see cref="Datamodel"/>.</exception>
+        /// <exception cref="AttributeTypeException">Thrown when the value is not a valid Datamodel attribute type.</exception>
         public object this[string name]
         {
             get
             {
-                if (name == null) throw new ArgumentNullException("name");
-                if (Stub) throw new InvalidOperationException("Cannot access attributes on a stub element.");
-
-                Attribute attr = Attributes.Find(a => a.Name == name);
-                if (attr == null) throw new IndexOutOfRangeException(String.Format("Attribute \"{0}\" not found on <{1}>.", name, this));
-
-                return attr.Value;
+                return GetAttribute(name).Value;
             }
             set
             {
@@ -209,7 +226,7 @@ namespace Datamodel
                 return Remove(Attributes.FirstOrDefault(a => a.Name == name));
         }
 
-        bool Contains(string name)
+        public bool Contains(string name)
         {
             return Attributes.Any(a => a.Name == name);
         }
