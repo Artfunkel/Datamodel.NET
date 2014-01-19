@@ -3,7 +3,7 @@
              d:DataContext="{Binding [0], Source={d:DesignInstance IsDesignTimeCreatable=True, Type={x:Type l:DesignTimeData}}}"
              mc:Ignorable="d" d:DesignHeight="400" d:DesignWidth="730">
     <UserControl.CommandBindings>
-        <CommandBinding Command="{x:Static l:App.ChooseElement}" Executed="CommandBinding_Executed"/>
+        <CommandBinding Command="{x:Static l:App.ChooseElement}" Executed="ChooseElement_Executed"/>
     </UserControl.CommandBindings>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -16,25 +16,19 @@
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" Grid.ColumnSpan="2" VerticalAlignment="Top" >
-            <TextBox x:Name="PathBox" Margin="0,4" Padding="18,1,0,1" Text="{Binding SelectedPath, Mode=OneWay, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}, StringFormat=//\{0\}}" BorderBrush="LightGray" />
-            <Image Source="/DmxPad;component/Resources/datamodel.png" SnapsToDevicePixels="True" HorizontalAlignment="Left" Height="16" Width="16" Margin="4,0" Cursor="Hand" 
+            <TextBox x:Name="PathBox" Margin="0,4" Padding="18,1,0,1" Text="{Binding Path}" BorderBrush="LightGray" />
+            <Image Source="/DmxPad;component/Resources/datamodel.png" HorizontalAlignment="Left" Height="16" Width="16" Margin="4,0" Cursor="Hand" 
 				MouseDown="ResetRoot_Click" ToolTip="Return to the root element"/>
         </Grid>
 
-        <c:TreeGridView x:Name="DmxTree" Grid.Row="1" Grid.Column="0"
-			UseLayoutRounding="True" d:DataContext="{Binding}" TitleColumnHeader="Name" Loaded="DmxTree_Loaded" ColumnSpacing="5">
-
+        <c:TreeGridView x:Name="DmxTree" Grid.Row="1" Grid.Column="0" Loaded="DmxTree_Loaded" TitleColumnHeader="Name" ColumnSpacing="5"
+                        ItemsSource="{Binding Datamodel, Converter={StaticResource EnsureElementConverter}}"
+                        ChildItemsSelector="{Binding Converter={StaticResource ChildPathConverter}}">
             <c:TreeGridView.Resources>
                 <Style TargetType="{x:Type c:TreeGridViewItem}">
                     <EventSetter Event="TreeViewItem.Selected" Handler="TreeViewItem_Selected"/>
                 </Style>
             </c:TreeGridView.Resources>
-            <c:TreeGridView.ItemsSource>
-                <Binding Converter="{StaticResource EnsureElementConverter}"/>
-            </c:TreeGridView.ItemsSource>
-            <c:TreeGridView.ChildItemsSelector>
-                <Binding Converter="{StaticResource ChildPathConverter}"/>
-            </c:TreeGridView.ChildItemsSelector>
             <c:TreeGridView.ColumnDefinitions>
                 <c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}">
                     <c:TreeGridContentColumnDefinition.CellStyle>
@@ -51,113 +45,141 @@
                     <ContentControl Content="{Binding}" IsEnabled="False" VerticalContentAlignment="Center"/>
                 </DataTemplate>
             </c:TreeGridView.TitleTemplate>
-
         </c:TreeGridView>
 
         <GridSplitter Grid.Column="1" Grid.Row="1" Width="2" VerticalAlignment="Stretch" HorizontalAlignment="Left" ResizeDirection="Columns"/>
 
-        <Grid x:Name="AttributeProperties" Grid.Column="1" Grid.Row="1" Margin="5,0" Background="{DynamicResource {x:Static SystemColors.WindowColor}}"
-			d:DataContext="{Binding Root}" DataContext="{Binding SelectedItem, ElementName=DmxTree}">
-            <Grid.Resources>
-                <Style TargetType="{x:Type c:LabelledControl}">
-                    <Setter Property="LabelWidth" Value="45"/>
-                    <Setter Property="Margin" Value="3,0"/>
-                </Style>
-                <Style TargetType="{x:Type GroupBox}">
-                    <Setter Property="Margin" Value="0,3"/>
-                    <Setter Property="Padding" Value="5"/>
-                    <Setter Property="HeaderTemplate">
-                        <Setter.Value>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding}" FontWeight="Bold"/>
-                            </DataTemplate>
-                        </Setter.Value>
-                    </Setter>
-                </Style>
-            </Grid.Resources>
-
-            <Grid.Visibility>
-                <Binding Converter="{StaticResource VisibleIfNotNull}" ElementName="DmxTree" FallbackValue="Visible" Path="SelectedItem"/>
-            </Grid.Visibility>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <GroupBox Header="Datamodel" DataContext="{Binding Converter={StaticResource EnsureElementConverter}}">
-                <StackPanel Orientation="Horizontal" DataContext="{Binding Owner}">
-                    <StackPanel.Resources>
-                        <Style TargetType="{x:Type TextBlock}">
-                            <Setter Property="VerticalAlignment" Value="Center"/>
-                            <Setter Property="Margin" Value="5,0"/>
+        <Grid Grid.Column="1" Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition>
+                    <ColumnDefinition.Style>
+                        <Style TargetType="ColumnDefinition">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ComparisonDatamodel}" Value="{x:Null}">
+                                    <Setter Property="Width" Value="0"/>
+                                </DataTrigger>
+                            </Style.Triggers>
                         </Style>
-                    </StackPanel.Resources>
-                    <TextBlock Text="Format:"/>
-                    <TextBox Text="{Binding Format}" Width="90"/>
-                    <TextBox Text="{Binding FormatVersion}" Width="25"/>
-                    <Separator/>
-                    <TextBlock Text="Encoding:"/>
-                    <ComboBox ItemsSource="{x:Static dm:Datamodel.CodecsRegistered}" Width="100">
-                        <ComboBox.SelectedItem>
-                            <MultiBinding Converter="{StaticResource EncodingConverter}">
-                                <Binding Path="Encoding"/>
-                                <Binding Path="EncodingVersion"/>
+                    </ColumnDefinition.Style>
+                </ColumnDefinition>
+            </Grid.ColumnDefinitions>
+            <Grid.Resources>
+                <DataTemplate x:Key="Props">
+                    <Grid x:Name="AttributeProperties" Margin="5,0" Background="{DynamicResource {x:Static SystemColors.WindowColor}}">
+                        <Grid.DataContext>
+                            <MultiBinding Converter="{StaticResource DatamodelPathConverter}">
+                                <Binding/>
+                                <Binding ElementName="PathBox" Path="Text"/>
                             </MultiBinding>
-                        </ComboBox.SelectedItem>
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Converter={StaticResource EncodingDisplay}}"/>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </StackPanel>
-            </GroupBox>
+                        </Grid.DataContext>
+                        <Grid.Resources>
+                            <Style TargetType="{x:Type c:LabelledControl}">
+                                <Setter Property="LabelWidth" Value="45"/>
+                                <Setter Property="Margin" Value="3,0"/>
+                            </Style>
+                            <Style TargetType="{x:Type GroupBox}">
+                                <Setter Property="Margin" Value="0,3"/>
+                                <Setter Property="Padding" Value="5"/>
+                                <Setter Property="HeaderTemplate">
+                                    <Setter.Value>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontWeight="Bold"/>
+                                        </DataTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Grid.Resources>
 
-            <GroupBox Grid.Row="1" Header="Element" DataContext="{Binding Converter={StaticResource EnsureElementConverter}}">
-                <StackPanel>
-                    <c:LabelledControl LabelText="Name:">
-                        <TextBox Text="{Binding Name}" />
-                    </c:LabelledControl>
+                        <Grid.Visibility>
+                            <Binding Converter="{StaticResource VisibleIfNotNull}" ElementName="DmxTree" FallbackValue="Visible" Path="SelectedItem"/>
+                        </Grid.Visibility>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-                    <c:LabelledControl LabelText="Class:">
-                        <TextBox Text="{Binding ClassName}" />
-                    </c:LabelledControl>
+                        <GroupBox Header="{Binding Owner.File.Name}" DataContext="{Binding Converter={StaticResource EnsureElementConverter}}">
+                            <StackPanel Orientation="Horizontal" DataContext="{Binding Owner}">
+                                <StackPanel.Resources>
+                                    <Style TargetType="{x:Type TextBlock}">
+                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                        <Setter Property="Margin" Value="5,0"/>
+                                    </Style>
+                                </StackPanel.Resources>
+                                <TextBlock Text="Format:"/>
+                                <TextBox Text="{Binding Format}" Width="90"/>
+                                <TextBox Text="{Binding FormatVersion}" Width="25"/>
+                                <Separator/>
+                                <TextBlock Text="Encoding:"/>
+                                <ComboBox ItemsSource="{x:Static dm:Datamodel.CodecsRegistered}" Width="100">
+                                    <ComboBox.SelectedItem>
+                                        <MultiBinding Converter="{StaticResource EncodingConverter}">
+                                            <Binding Path="Encoding"/>
+                                            <Binding Path="EncodingVersion"/>
+                                        </MultiBinding>
+                                    </ComboBox.SelectedItem>
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource EncodingDisplay}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </StackPanel>
+                        </GroupBox>
 
-                    <c:LabelledControl LabelText="GUID:">
-                        <TextBlock>
-                            <TextBlock.Inlines>
-                                <Run Text="{Binding ID, Mode=OneWay}" FontFamily="Consolas" />
-                                <Hyperlink Click="GUIDCopy_Click" CommandParameter="{Binding}">Copy</Hyperlink>
-                            </TextBlock.Inlines>
-                        </TextBlock>
-                    </c:LabelledControl>
-                </StackPanel>
-            </GroupBox>
+                        <GroupBox Grid.Row="1" Header="Element" DataContext="{Binding Converter={StaticResource EnsureElementConverter}}">
+                            <StackPanel>
+                                <c:LabelledControl LabelText="Name:">
+                                    <TextBox Text="{Binding Name}" />
+                                </c:LabelledControl>
 
-            <GroupBox Grid.Row="2" Header="Attribute">
-                <Grid Visibility="{Binding Converter={StaticResource AttributeDisplay}, Mode=OneWay}">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    <c:LabelledControl LabelText="Name:" Grid.Row="0">
-                        <TextBox Text="{Binding Name}" />
-                    </c:LabelledControl>
-                    <c:LabelledControl LabelText="Type:" Grid.Row="1">
-                        <TextBlock Text="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>
-                        <!--<ComboBox ItemsSource="{x:Static dm:Datamodel.AttributeTypes}" SelectedItem="{Binding Converter={StaticResource DebugConverter}}" ItemTemplate="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>-->
-                    </c:LabelledControl>
-                    <c:LabelledControl LabelText="Value:" Grid.Row="2" VerticalContentAlignment="Top">
-                        <ContentPresenter Content="{Binding}" ContentTemplateSelector="{StaticResource InspectPaneTemplateSelector}"/>
-                    </c:LabelledControl>
-                    <StackPanel Orientation="Horizontal" Grid.Row="3">
-                        <Button Content="Delete" Click="DeleteButton_Click"/>
-                    </StackPanel>
-                </Grid>
-            </GroupBox>
+                                <c:LabelledControl LabelText="Class:">
+                                    <TextBox Text="{Binding ClassName}" />
+                                </c:LabelledControl>
+
+                                <c:LabelledControl LabelText="GUID:">
+                                    <TextBlock>
+                                        <TextBlock.Inlines>
+                                            <Run Text="{Binding ID, Mode=OneWay}" FontFamily="Consolas" />
+                                            <Hyperlink Click="GUIDCopy_Click" CommandParameter="{Binding}">Copy</Hyperlink>
+                                        </TextBlock.Inlines>
+                                    </TextBlock>
+                                </c:LabelledControl>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Grid.Row="2" Header="Attribute" Visibility="{Binding Converter={StaticResource AttributeDisplay}, Mode=OneWay}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <c:LabelledControl LabelText="Name:" Grid.Row="0">
+                                    <TextBox Text="{Binding Name}" />
+                                </c:LabelledControl>
+                                <c:LabelledControl LabelText="Type:" Grid.Row="1">
+                                    <ContentControl Content="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>
+                                    <!--<ComboBox ItemsSource="{x:Static dm:Datamodel.AttributeTypes}" SelectedItem="{Binding Converter={StaticResource DebugConverter}}" ItemTemplate="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>-->
+                                </c:LabelledControl>
+                                <c:LabelledControl LabelText="Value:" Grid.Row="2" VerticalContentAlignment="Top">
+                                    <ContentPresenter Content="{Binding}" ContentTemplateSelector="{StaticResource InspectPaneTemplateSelector}"/>
+                                </c:LabelledControl>
+                                <StackPanel Orientation="Horizontal" Grid.Row="3">
+                                    <Button Content="Delete" Click="DeleteButton_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </GroupBox>
+                    </Grid>
+                </DataTemplate>
+            </Grid.Resources>
+            
+            <ContentPresenter Grid.Column="0" ContentTemplate="{StaticResource Props}" Content="{Binding Datamodel}"/>
+            <ContentPresenter Grid.Column="1" Name="CompareProps"  ContentTemplate="{StaticResource Props}" Content="{Binding ComparisonDatamodel}"/>
         </Grid>
+
     </Grid>
 </UserControl>

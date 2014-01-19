@@ -16,12 +16,13 @@
         <converter:Encoding x:Key="EncodingConverter"/>
         <converter:EncodingDisplay x:Key="EncodingDisplay"/>
         <converter:AttributeGroupDisplay x:Key="AttributeDisplay"/>
+        <converter:DatamodelPath x:Key="DatamodelPathConverter"/>
 
         <l:InspectPaneTemplateSelector x:Key="InspectPaneTemplateSelector"/>
         <converter:ValueColumnTemplateSelector x:Key="ValueColumnTemplateSelector"/>
 
-        <Image x:Key="DatamodelIcon" x:Shared="False" Source="/DmxPad;component/Resources/datamodel.png" SnapsToDevicePixels="True" />
-        <Image x:Key="CloseIcon" x:Shared="False" Source="/DmxPad;component/Resources/close.png" SnapsToDevicePixels="True" />
+        <Image x:Key="DatamodelIcon" x:Shared="False" Source="/DmxPad;component/Resources/datamodel.png" Stretch="None"/>
+        <Image x:Key="CloseIcon" x:Shared="False" Source="/DmxPad;component/Resources/close.png" Stretch="None"/>
 
         <DataTemplate x:Key="AttrValueTemplate">
             <TextBox Text="{Binding Path=Value}" Padding="0" Margin="0" BorderThickness="0" Background="Transparent"/>
@@ -29,9 +30,9 @@
 
         <DataTemplate DataType="{x:Type dm:Element}">
             <!--<Grid AllowDrop="True" Drop="ElementHeader_Drop" MouseDown="ElementHeader_MouseDown" MouseMove="ElementHeader_StartDrag" KeyDown="ElementHeader_KeyDown">-->
-            <Grid>
-                <ContentControl Content="{Binding Converter={StaticResource AttributeIconConverter}}" HorizontalAlignment="Left" />
-                <TextBlock Text="{Binding Name}" Margin="20,0,0,0" FontStyle="Italic" Height="16" HorizontalAlignment="Left" />
+            <Grid VerticalAlignment="Center">
+                <ContentControl Content="{Binding Converter={StaticResource AttributeIconConverter}}" IsTabStop="False" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                <TextBlock Text="{Binding Name}" Margin="20,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
             </Grid>
         </DataTemplate>
 
@@ -49,7 +50,7 @@
         
         <DataTemplate x:Key="Attr_Element">
             <Grid VerticalAlignment="Top">
-                <TextBlock Text="{Binding}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                <ContentPresenter Content="{Binding}"/>
                 <Button Content="Browse..." Command="{x:Static l:App.ChooseElement}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
             </Grid>
         </DataTemplate>

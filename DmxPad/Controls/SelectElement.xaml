@@ -4,7 +4,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" mc:Ignorable="d"
         xmlns:dmxpad="clr-namespace:DmxPad" xmlns:c="clr-namespace:DmxPad.Controls"
         d:DataContext="{Binding [0], Source={d:DesignInstance IsDesignTimeCreatable=True, Type={x:Type dmxpad:DesignTimeData}}}"
-        Title="Select Element" Height="500 " Width="400" WindowStartupLocation="CenterOwner" WindowStyle="ToolWindow">
+        Title="Select Element" Height="500 " Width="400" WindowStartupLocation="CenterOwner" WindowStyle="ToolWindow" UseLayoutRounding="True">
+    <Window.CommandBindings>
+        <CommandBinding Command="Delete" Executed="Delete_Executed"/>
+    </Window.CommandBindings>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -18,13 +21,15 @@
             </Style>
         </Grid.Resources>
         <c:SearchBox x:Name="Search" SearchTarget="{Binding ElementName=ElementList, Mode=OneWay}"/>
-        <ListBox Grid.Row="1" Name="ElementList" ItemsSource="{Binding Path=AllElements}">
+        <ListBox Grid.Row="1" Name="ElementList" ItemsSource="{Binding Path=Datamodel.AllElements}">
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <ContentControl Content="{Binding}"/>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+        
+        <TextBlock Grid.Row="2" Text="Tip: to empty a value, press Delete." VerticalAlignment="Center" Margin="5,0"/>
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
             <Button IsDefault="True" Content="OK" Click="OK_Click"/>
             <Button IsCancel="True" Content="Cancel"/>

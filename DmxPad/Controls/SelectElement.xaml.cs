@@ -38,5 +38,11 @@ namespace DmxPad.Controls
         {
             DialogResult = true;
         }
+
+        private void Delete_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            ElementList.SelectedItem = null;
+            DialogResult = true;
+        }
     }
 }

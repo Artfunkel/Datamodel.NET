@@ -2,13 +2,15 @@
         xmlns:dm="clr-namespace:Datamodel;assembly=datamodel.net" xmlns:l="clr-namespace:DmxPad" xmlns:c="clr-namespace:DmxPad.Controls" xmlns:p="clr-namespace:DmxPad.Properties"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d"
         Width="800" Height="600" WindowStartupLocation="CenterScreen" d:DataContext="{Binding Source={d:DesignInstance Type=l:DesignTimeData,IsDesignTimeCreatable=True}}" Icon="/DmxPad;component/Resources/dmx.ico"
-        Title="{Binding ElementName=Tabs,Path=SelectedItem.File.FullName,StringFormat=DmxPad - {0},TargetNullValue=DmxPad}">
+        Title="{Binding ElementName=Tabs,Path=SelectedItem.Datamodel.File.FullName,StringFormat=DmxPad - {0},TargetNullValue=DmxPad}"
+        UseLayoutRounding="True">
     <Window.CommandBindings>
         <CommandBinding Command="New" Executed="New_Executed" />
         <CommandBinding Command="Open" Executed="Open_Executed" />
         <CommandBinding Command="Save" Executed="Save_Executed" CanExecute="FileOperations_CanExecute" />
         <CommandBinding Command="SaveAs" Executed="SaveAs_Executed" CanExecute="FileOperations_CanExecute" />
         <CommandBinding Command="Close" Executed="Close_Executed" CanExecute="FileOperations_CanExecute" />
+        <CommandBinding Command="{x:Static l:App.CompareDatamodel}" Executed="CompareDatamodel_Executed" CanExecute="FileOperations_CanExecute"/>
     </Window.CommandBindings>
     <Grid>
         <Grid.RowDefinitions>
@@ -48,28 +50,23 @@
                 <MenuItem Command="Delete" />
             </MenuItem>
             <MenuItem Header="_Tools" >
-                <MenuItem Header="Register File Extensions" Click="RegisterExtensions_Click"/>
+                <MenuItem Header="_Register File Extensions" Click="RegisterExtensions_Click"/>
+                <MenuItem Header="_Compare Datamodel..." Command="{x:Static l:App.CompareDatamodel}"/>
             </MenuItem>
         </Menu>
 
         <TabControl Name="Tabs" ItemsSource="{Binding}" Grid.Row="1" SelectedIndex="0" Margin="5">
             <TabControl.ItemTemplate>
                 <DataTemplate>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock ToolTip="{Binding Path=FilePath}" VerticalAlignment="Center">
-                            <TextBlock.Text>
-                                <MultiBinding StringFormat="{}{0}">
-                                    <Binding Path="File.Name" FallbackValue="new" />
-                                </MultiBinding>
-                            </TextBlock.Text>
-                        </TextBlock>
+                    <StackPanel ToolTip="{Binding Datamodel.File.FullName}" Orientation="Horizontal">
+                        <TextBlock VerticalAlignment="Center" Text="{Binding Datamodel.File.Name, FallbackValue=new}"/>                            
                         <Button Content="{StaticResource CloseIcon}" Padding="0" Height="16" Width="16" Command="Close" Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}" Margin="5,0,0,0" />
                     </StackPanel>
                 </DataTemplate>
             </TabControl.ItemTemplate>
             <TabControl.ContentTemplate>
                 <DataTemplate>
-                    <l:DmxView DataContext="{Binding}" />
+                    <l:DmxView/>
                 </DataTemplate>
             </TabControl.ContentTemplate>
         </TabControl>

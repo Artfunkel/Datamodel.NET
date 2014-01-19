@@ -26,7 +26,7 @@ namespace DmxPad
         {
             InitializeComponent();
         }
-        
+
         static DmxView()
         {
             DataContextProperty.OverrideMetadata(
@@ -36,17 +36,15 @@ namespace DmxPad
 
         private void DmxTree_Loaded(object sender, RoutedEventArgs e)
         {
-            var tgv = ((DmxPad.Controls.TreeGridView)sender);
+            var tgv = ((Controls.TreeGridView)sender);
 
-            var root_item = ((DmxPad.Controls.TreeGridViewItem)tgv.ItemContainerGenerator.ContainerFromItem(tgv.Items[0]));
+            var root_item = ((DmxPad.Controls.TreeGridViewItem)tgv.ItemContainerGenerator.ContainerFromIndex(0));
             if (root_item != null)
             {
                 root_item.IsSelected = true;
                 root_item.IsExpanded = true;
             }
         }
-
-        public Datamodel.Datamodel Datamodel { get { return DataContext as Datamodel.Datamodel; } }
 
         private static void DatamodelChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
         {
@@ -77,68 +75,58 @@ namespace DmxPad
         }
 
         string DisplayRootPath = "";
-        
+
         private void TreeViewItem_Selected(object sender, RoutedEventArgs e)
         {
-            SelectedPath = MakeSelectionPath(e.OriginalSource as TreeViewItem);
+            ((ViewModel)DataContext).Path = MakeSelectionPath(e.OriginalSource as TreeViewItem);
         }
 
         private string MakeSelectionPath(TreeViewItem control)
         {
-            FrameworkElement current_control = control;
             List<string> path_components = new List<string>();
             object array_item = null;
 
-            while (true)
+            for (FrameworkElement current_control = control; !(current_control is TreeView); current_control = (FrameworkElement)VisualTreeHelper.GetParent(current_control))
             {
-                if (current_control is TreeView) break;
-                if ((current_control is TreeViewItem))
-                {
-                    var current_item = current_control.DataContext;
-                    var attr = current_item as Datamodel.Attribute;
+                if (!(current_control is TreeViewItem))
+                    continue;
 
-                    if (attr == null || attr.Value is Element || attr.Value is IEnumerable<Element>)
+                var attr = current_control.DataContext as Datamodel.Attribute;
+
+                if (attr == null)
+                {
+                    array_item = current_control.DataContext;
+                    continue;
+                }
+
+                var array = attr.Value as System.Collections.IEnumerable;
+                if (array != null)
+                {
+                    if (array_item == null)
                     {
-                        if (attr != null)
+                        path_components.Add(attr.Name);
+                        continue;
+                    }
+
+                    int i = 0;
+                    foreach (var cur in array)
+                    {
+                        if (cur == array_item)
                         {
-                            if (array_item == null)
-                                path_components.Add(attr.Name);
-                            else
-                            {
-                                int i = 0;
-                                foreach (var item in attr.Value as System.Collections.IEnumerable)
-                                {
-                                    if (item == array_item)
-                                    {
-                                        path_components.Add(attr.Name + String.Format("[{0}]", i));
-                                        i = -1;
-                                        break;
-                                    }
-                                    i++;
-                                }
-                                if (i != -1) throw new IndexOutOfRangeException();
-                            }
+                            path_components.Add(attr.Name + String.Format("[{0}]", i));
                             array_item = null;
                         }
-                        else
-                        {
-                            array_item = current_item;
-                        }
+                        i++;
                     }
+                    continue;
                 }
-                current_control = VisualTreeHelper.GetParent(current_control) as FrameworkElement;
+
+                path_components.Add(attr.Name);
             }
 
             if (!String.IsNullOrEmpty(DisplayRootPath)) path_components.Add(DisplayRootPath);
-            return String.Join("/", path_components.Reverse<string>());
+            return "//" + String.Join("/", path_components.Reverse<string>());
         }
-
-        public string SelectedPath
-        {
-            get { return selectedPath; }
-            private set { selectedPath = value; NotifyPropertyChanged("SelectedPath"); }
-        }
-        string selectedPath;
 
         bool Dragging;
         Point DragStart;
@@ -176,7 +164,7 @@ namespace DmxPad
         private void ResetRoot_Click(object sender, MouseButtonEventArgs e)
         {
             DisplayRootPath = "";
-            SetRoot(Datamodel.Root);
+            SetRoot(((ViewModel)DataContext).Datamodel.Root);
         }
 
         private void SetRoot(Datamodel.Element elem)
@@ -207,10 +195,10 @@ namespace DmxPad
                 attr.Owner.Remove(attr);
         }
 
-        private void CommandBinding_Executed(object sender, ExecutedRoutedEventArgs e)
+        private void ChooseElement_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var attr = (Datamodel.Attribute)DmxTree.SelectedItem;
-            
+
             var select = new Controls.SelectElement();
             select.Owner = App.Current.MainWindow;
             select.SelectedElement = (Element)attr.Value;
@@ -219,6 +207,7 @@ namespace DmxPad
             if (select.ShowDialog() == true)
             {
                 attr.Value = select.SelectedElement;
+                e.Handled = true;
             }
         }
 
@@ -226,6 +215,7 @@ namespace DmxPad
         {
             var elem = ((Element)((Hyperlink)sender).CommandParameter);
             System.Windows.Clipboard.SetText(elem.ID.ToString());
+            e.Handled = true;
         }
     }
 

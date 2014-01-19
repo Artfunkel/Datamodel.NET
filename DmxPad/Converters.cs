@@ -115,17 +115,17 @@ namespace DmxPad.Converters
             return new Image()
             {
                 Source = new BitmapImage(new Uri(String.Format("/DmxPad;component/Resources/{0}.png", name), UriKind.Relative)),
-                SnapsToDevicePixels = true
+                Stretch = Stretch.None
             };
         }
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value is Datamodel.Attribute)
-                value = (value as Datamodel.Attribute).Value;
+                value = ((Datamodel.Attribute)value).Value;
 
             Image base_icon;
-            if (value == null || value is Element || value is ICollection<Element>)
+            if (value == null || value is Element || value is IEnumerable<Element>)
             {
                 base_icon = GetIcon("element");
                 if (value == null)
@@ -134,7 +134,7 @@ namespace DmxPad.Converters
             else
                 base_icon = GetIcon("attribute");
 
-            if (value != null && value.GetType().IsGenericType && value.GetType().GetGenericTypeDefinition().GetInterface("ICollection`1") != null)
+            if (value != null && Datamodel.Datamodel.IsDatamodelArrayType(value.GetType()))
             {
                 var canvas = new Grid();
                 canvas.Children.Add(base_icon);
@@ -292,7 +292,7 @@ namespace DmxPad.Converters
             var dm = value as Datamodel.Datamodel;
             if (dm != null)
                 return new object[] { dm.Root };
-            
+
             var attr = value as Datamodel.Attribute;
             if (attr != null)
                 return attr.Owner;
@@ -325,7 +325,7 @@ namespace DmxPad.Converters
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var t = value as DmEncoding;
-            return String.Join(" ",t.Item1,t.Item2);
+            return String.Join(" ", t.Item1, t.Item2);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -342,6 +342,65 @@ namespace DmxPad.Converters
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class DatamodelPath : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            var dm = (Datamodel.Datamodel)values[0];
+            if (dm == null) return null;
+
+            var path = (string)values[1];
+            if (path == String.Empty) return null;
+
+            object current;
+            if (path.StartsWith("//"))
+            {
+                current = dm.Root;
+                path = path.Remove(0, 2);
+            }
+            else
+                throw new NotImplementedException();
+
+            foreach (var part in path.Split('/').Where(p => p.Length > 0))
+            {
+                var attr = current as Datamodel.Attribute;
+                if (attr != null && attr.Value is Element)
+                {
+                    current = attr.Value;
+                    attr = null;
+                }
+
+                var elem = current as Element;
+                if (elem == null)
+                    break;
+
+                var name = part;
+                var index = -1;
+                
+                var indexer_pos = part.LastIndexOf('[');
+                if (indexer_pos != -1)
+                {
+                    name = part.Substring(0, indexer_pos);
+                    index = Int32.Parse(part.Substring(indexer_pos + 1, part.Length - indexer_pos - 2));
+                }
+                
+                if (!elem.Contains(name)) return null;
+
+                current = attr = elem.GetAttribute(name);
+                if (index != -1)
+                    current = ((System.Collections.IList)attr.Value)[index];
+
+            }
+
+            return current;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }

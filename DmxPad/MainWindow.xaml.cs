@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Windows;
@@ -17,12 +18,61 @@ using Datamodel;
 
 namespace DmxPad
 {
+    public class ViewModel : INotifyPropertyChanged, IDisposable
+    {
+        public ViewModel(Datamodel.Datamodel datamodel)
+        {
+            Datamodel = datamodel;
+        }
+
+        public Datamodel.Datamodel Datamodel
+        {
+            get { return _Datamodel; }
+            protected set { _Datamodel = value; NotifyPropertyChanged("Datamodel"); }
+        }
+        Datamodel.Datamodel _Datamodel;
+
+        public Element DisplayRoot
+        {
+            get { return _DisplayRoot ?? Datamodel.Root; }
+            set { _DisplayRoot = value; }
+        }
+        Element _DisplayRoot;
+
+        public string Path
+        {
+            get { return _Path; }
+            set { _Path = value; NotifyPropertyChanged("Path"); }
+        }
+        string _Path;
+
+        public Datamodel.Datamodel ComparisonDatamodel
+        {
+            get { return _ComparisonDatamodel; }
+            set { _ComparisonDatamodel = value; NotifyPropertyChanged("ComparisonDatamodel"); }
+        }
+        Datamodel.Datamodel _ComparisonDatamodel;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void NotifyPropertyChanged(string info)
+        {
+            if (PropertyChanged != null)
+                PropertyChanged(this, new PropertyChangedEventArgs(info));
+        }
+
+        public void Dispose()
+        {
+            if (Datamodel != null) Datamodel.Dispose();
+            if (ComparisonDatamodel != null) ComparisonDatamodel.Dispose();
+        }
+    }
+
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
     public partial class MainWindow : Window
     {
-        public ObservableCollection<Datamodel.Datamodel> Datamodels = new ObservableCollection<Datamodel.Datamodel>();
+        public ObservableCollection<ViewModel> Datamodels = new ObservableCollection<ViewModel>();
 
         public MainWindow()
         {
@@ -46,7 +96,7 @@ namespace DmxPad
         private void New_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var dm = new Datamodel.Datamodel("my_format", 1);
-            Datamodels.Add(dm);
+            Datamodels.Add(new ViewModel(dm));
             dm.Root = dm.CreateElement("root");
             Tabs.SelectedItem = dm;
             e.Handled = true;
@@ -84,10 +134,10 @@ namespace DmxPad
         public void Load(params string[] paths)
         {
             var recent = Properties.Settings.Default.Recent;
-            Datamodel.Datamodel new_dm = null;
+            ViewModel new_dm = null;
             foreach (var path in paths)
             {
-                new_dm = Datamodel.Datamodel.Load(path);
+                new_dm = new ViewModel(Datamodel.Datamodel.Load(path));
                 Datamodels.Add(new_dm);
                 recent.Remove(path);
                 recent.Insert(0,path);
@@ -114,8 +164,8 @@ namespace DmxPad
             var sfd = new Microsoft.Win32.SaveFileDialog();
             var dm = Tabs.SelectedItem as Datamodel.Datamodel;
 
-            sfd.InitialDirectory = dm.File.FullName;
-            sfd.FileName = System.IO.Path.GetFileName(dm.File.Name);
+            sfd.InitialDirectory = dm.File.DirectoryName;
+            sfd.FileName = dm.File.Name;
             sfd.Filter = "Datamodel Exchange (*.dmx)|*.dmx|All files (*.*)|*.*";
             if (sfd.ShowDialog() == true)
             {
@@ -139,7 +189,7 @@ namespace DmxPad
 
         private void Close_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            var dm = ((e.OriginalSource as FrameworkElement).DataContext ?? Tabs.SelectedItem) as Datamodel.Datamodel;
+            var dm = (ViewModel)(((FrameworkElement)e.OriginalSource).DataContext ?? Tabs.SelectedItem);
             Datamodels.Remove(dm);
             dm.Dispose();
             e.Handled = true;
@@ -147,7 +197,7 @@ namespace DmxPad
 
         private void FileOperations_CanExecute(object sender, CanExecuteRoutedEventArgs e)
         {
-            e.CanExecute = Tabs.SelectedItem is Datamodel.Datamodel;
+            e.CanExecute = Tabs.SelectedItem is ViewModel;
             e.Handled = true;
         }
         #endregion
@@ -179,14 +229,38 @@ namespace DmxPad
                 System.Windows.MessageBox.Show(err.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private void CompareDatamodel_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            var ofd = new Microsoft.Win32.OpenFileDialog();
+            if (ofd.ShowDialog() == true)
+            {
+                Cursor = Cursors.Wait;
+                try
+                {
+                    ((ViewModel)Tabs.SelectedItem).ComparisonDatamodel = Datamodel.Datamodel.Load(ofd.FileName);
+                }
+#if !DEBUG
+                catch (Exception err)
+                {
+                    System.Windows.MessageBox.Show(err.Message, "DMX load error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+#endif
+                finally
+                {
+                    Cursor = Cursors.Arrow;
+                }
+            }
+            e.Handled = true;
+        }
     }
 
-    public class DesignTimeData : ObservableCollection<Datamodel.Datamodel>
+    class DesignTimeData : ObservableCollection<ViewModel>
     {
         public DesignTimeData()
         {
             var dm = new Datamodel.Datamodel("design_data", 1);
-            Add(dm);
+            Add(new ViewModel(dm));
             dm.Root = dm.CreateElement("root");
             dm.Root["BlankElem"] = null;
             dm.Root["StubElem"] = dm.CreateStubElement(Guid.NewGuid());
