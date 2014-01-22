@@ -92,19 +92,21 @@ namespace DmxPad
                     continue;
 
                 var attr = current_control.DataContext as Datamodel.Attribute;
+                var cattr = current_control.DataContext as ComparisonDatamodel.Attribute;
 
-                if (attr == null)
+                if (attr == null && cattr == null)
                 {
                     array_item = current_control.DataContext;
                     continue;
                 }
+                var name = attr != null ? attr.Name : cattr.Name;
+                var array = (attr != null ? attr.Value : cattr.Value_Combined) as System.Collections.IEnumerable;
 
-                var array = attr.Value as System.Collections.IEnumerable;
                 if (array != null)
                 {
                     if (array_item == null)
                     {
-                        path_components.Add(attr.Name);
+                        path_components.Add(name);
                         continue;
                     }
 
@@ -113,7 +115,7 @@ namespace DmxPad
                     {
                         if (cur == array_item)
                         {
-                            path_components.Add(attr.Name + String.Format("[{0}]", i));
+                            path_components.Add(name + String.Format("[{0}]", i));
                             array_item = null;
                         }
                         i++;
@@ -121,7 +123,7 @@ namespace DmxPad
                     continue;
                 }
 
-                path_components.Add(attr.Name);
+                path_components.Add(name);
             }
 
             if (!String.IsNullOrEmpty(DisplayRootPath)) path_components.Add(DisplayRootPath);
@@ -171,6 +173,9 @@ namespace DmxPad
         {
             DmxTree.ItemContainerGenerator.StatusChanged += ExpandNode;
             DmxTree.ItemsSource = new Element[] { elem };
+
+            PathBox.Text = "//"; // TODO: element ID for non-root elements
+            PathBox_SourceUpdated(PathBox, null);
         }
 
         private void ElementHeader_KeyDown(object sender, KeyEventArgs e)
@@ -217,6 +222,52 @@ namespace DmxPad
             System.Windows.Clipboard.SetText(elem.ID.ToString());
             e.Handled = true;
         }
+
+        private void PathBox_SourceUpdated(object sender, DataTransferEventArgs e)
+        {
+            var path = ((TextBox)sender).Text;
+            // TODO: select item specified by the path Converters.DatamodelPath.Convert
+
+            if (e != null) e.Handled = true;
+        }
+
+        private void PathBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter || e.Key == Key.Return)
+            {
+                ((TextBox)sender).GetBindingExpression(TextBox.TextProperty).UpdateSource();
+                e.Handled = true;
+            }
+        }
+
+        bool ShowChangesOnly = false;
+
+        private void ShowChangesOnly_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            ShowChangesOnly = (bool)e.Parameter;
+            DmxTree_Comparison.Items.Refresh();
+        }
+
+        private bool ShowChangesOnly_Filter(object obj)
+        {
+            if (!ShowChangesOnly) return true;
+
+            var attr = obj as ComparisonDatamodel.Attribute;
+            if (attr != null)
+                return attr.State != ComparisonDatamodel.ComparisonState.Unchanged;
+
+            var elem = obj as ComparisonDatamodel.Element;
+            if (elem != null)
+                return elem.State != ComparisonDatamodel.ComparisonState.Unchanged;
+
+            throw new InvalidOperationException();
+        }
+
+        private void ComparisonViewItem_Loaded(object sender, RoutedEventArgs e)
+        {
+            ((Controls.TreeGridViewItem)sender).Items.Filter = ShowChangesOnly_Filter;
+        }
+
     }
 
     public class InspectPaneTemplateSelector : DataTemplateSelector

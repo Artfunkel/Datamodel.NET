@@ -60,6 +60,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="ComparisonDatamodel.cs" />
     <Compile Include="Controls\LabelledControl.xaml.cs">
       <DependentUpon>LabelledControl.xaml</DependentUpon>
     </Compile>

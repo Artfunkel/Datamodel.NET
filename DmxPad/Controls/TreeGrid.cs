@@ -20,7 +20,9 @@ namespace DmxPad.Controls
         public TreeGridView()
         {
             ColumnDefinitions = new List<TreeGridColumnDefinition>();
+            DataContextChanged += TreeGridView_DataContextChanged;
         }
+
         static TreeGridView()
         {
             DefaultStyleKeyProperty.OverrideMetadata(typeof(TreeGridView), new FrameworkPropertyMetadata(typeof(TreeGridView)));
@@ -41,11 +43,19 @@ namespace DmxPad.Controls
                 foreach (var def in ColumnDefinitions)
                 {
                     grid.ColumnDefinitions.Add(new ColumnDefinition() { SharedSizeGroup = "col_" + def.GetHashCode().ToString() });
-                    var header = new TreeGridViewCell() { Content = def.Header };
+                    var header = new TreeGridViewCell();
+                    header.SetBinding(TreeGridViewCell.ContentProperty, new Binding() { Source = def, Path = new PropertyPath("Header") });
+                    header.SetBinding(TreeGridViewCell.VisibilityProperty, new Binding() { Source = def, Path = new PropertyPath("Visibility") });
                     grid.Children.Add(header);
                     Grid.SetColumn(header, grid.ColumnDefinitions.Count - 1);
                 }
             }
+        }
+
+        void TreeGridView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            foreach (var def in ColumnDefinitions)
+                def.DataContext = DataContext;
         }
 
         protected override bool IsItemItsOwnContainerOverride(object item)
@@ -148,8 +158,30 @@ namespace DmxPad.Controls
         }
     }
 
-    public class TreeGridColumnDefinition : DependencyObject
+    public class TreeGridColumnDefinition : FrameworkContentElement
     {
+        static TreeGridColumnDefinition()
+        {
+            DefaultStyleKeyProperty.OverrideMetadata(typeof(TreeGridColumnDefinition), new FrameworkPropertyMetadata(typeof(TreeGridColumnDefinition)));
+        }
+
+        [Description("A deferred Binding to be applied to the DataContext of grid cells created for this column definition."), Category("Common Properties")]
+        public Binding Binding
+        {
+            get { return _Binding; }
+            set { _Binding = value; }
+        }
+        Binding _Binding;
+
+        [Description("Gets or sets the user interface (UI) visibility of this element."), Category("Appearance")]
+        public Visibility Visibility
+        {
+            get { return (Visibility)GetValue(VisibilityProperty); }
+            set { SetValue(VisibilityProperty, value); }
+        }
+        public static readonly DependencyProperty VisibilityProperty =
+            DependencyProperty.Register("Visibility", typeof(Visibility), typeof(TreeGridColumnDefinition), new PropertyMetadata(Visibility.Visible));
+
         [Description("The DataTemplate used to to create grid cells for this column definition."), Category("Common Properties")]
         public DataTemplate ItemTemplate
         {
@@ -175,7 +207,7 @@ namespace DmxPad.Controls
             get { return (object)GetValue(HeaderProperty); }
             set { SetValue(HeaderProperty, value); }
         }
-        public static readonly DependencyProperty HeaderProperty = DependencyProperty.Register("Header", typeof(object), typeof(TreeGridBoundColumnDefinition), new PropertyMetadata(null));
+        public static readonly DependencyProperty HeaderProperty = DependencyProperty.Register("Header", typeof(object), typeof(TreeGridColumnDefinition), new PropertyMetadata(null));
 
         /// <summary>
         /// Gets or sets the style that is used to render cells in the column.
@@ -189,18 +221,7 @@ namespace DmxPad.Controls
         public static readonly DependencyProperty CellStyleProperty = DependencyProperty.Register("CellStyle", typeof(Style), typeof(TreeGridColumnDefinition), new PropertyMetadata(null));
     }
 
-    public abstract class TreeGridBoundColumnDefinition : TreeGridColumnDefinition
-    {
-        [Description("A deferred Binding used as the DataContext of grid cells created for this column definition."), Category("Common Properties")]
-        public Binding Binding
-        {
-            get { return _Binding; }
-            set { _Binding = value; }
-        }
-        Binding _Binding;
-    }
-
-    public class TreeGridTextColumnDefinition : TreeGridBoundColumnDefinition
+    public class TreeGridTextColumnDefinition : TreeGridContentColumnDefinition
     {
         static TreeGridTextColumnDefinition()
         {
@@ -211,10 +232,13 @@ namespace DmxPad.Controls
 
             ItemTemplateProperty.OverrideMetadata(typeof(TreeGridTextColumnDefinition),
                 new PropertyMetadata(template));
+
+            DefaultStyleKeyProperty.OverrideMetadata(typeof(TreeGridTextColumnDefinition),
+                new FrameworkPropertyMetadata(typeof(TreeGridTextColumnDefinition)));
         }
     }
 
-    public class TreeGridContentColumnDefinition : TreeGridBoundColumnDefinition
+    public class TreeGridContentColumnDefinition : TreeGridColumnDefinition
     {
         static TreeGridContentColumnDefinition()
         {
@@ -225,6 +249,9 @@ namespace DmxPad.Controls
 
             ItemTemplateProperty.OverrideMetadata(typeof(TreeGridContentColumnDefinition),
                 new PropertyMetadata(template));
+
+            DefaultStyleKeyProperty.OverrideMetadata(typeof(TreeGridContentColumnDefinition),
+                new FrameworkPropertyMetadata(typeof(TreeGridContentColumnDefinition)));
         }
     }
 
@@ -268,8 +295,9 @@ namespace DmxPad.Controls
                         var cell = new TreeGridViewCell();
                         cell.Content = template.LoadContent() as FrameworkElement;
                         cell.Style = def.CellStyle;
-                        if (def is TreeGridBoundColumnDefinition)
-                            BindingOperations.SetBinding(cell, FrameworkElement.DataContextProperty, ((TreeGridBoundColumnDefinition)def).Binding);
+                        cell.SetBinding(TreeGridViewCell.VisibilityProperty, new Binding() { Source = def, Path = new PropertyPath("Visibility") });
+                        if (def.Binding != null)
+                            BindingOperations.SetBinding(cell, FrameworkElement.DataContextProperty, ((TreeGridContentColumnDefinition)def).Binding);
                         grid.Children.Add(cell);
                         Grid.SetColumn(cell, grid.ColumnDefinitions.Count - 1);
                     }
@@ -371,7 +399,32 @@ namespace DmxPad.Controls
     }
 
     public class TreeGridViewCell : ContentControl
-    { }
+    {
+        static TreeGridViewCell()
+        {
+            DefaultStyleKeyProperty.OverrideMetadata(typeof(TreeGridViewCell), new FrameworkPropertyMetadata(typeof(TreeGridViewCell)));
+        }
+
+        /// <summary>
+        /// Gets the <see cref="TreeGridView"/> that contains this object.
+        /// </summary>
+        public TreeGridView Owner
+        {
+            get
+            {
+                DependencyObject cur_container = this;
+                do
+                {
+                    cur_container = System.Windows.Media.VisualTreeHelper.GetParent(cur_container);
+                    var tree_item = cur_container as TreeGridView;
+                    if (tree_item != null)
+                        return tree_item;
+                }
+                while (cur_container != null);
+                return null;
+            }
+        }
+    }
 
     internal class ExpanderVisibilityConverter : IValueConverter
     {

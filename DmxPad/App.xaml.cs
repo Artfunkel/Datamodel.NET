@@ -31,5 +31,6 @@ namespace DmxPad
         public static RoutedCommand ChooseElement = new RoutedCommand();
         public static RoutedCommand CompareDatamodel = new RoutedCommand("CompareDatamodel", typeof(App),
             new InputGestureCollection(new KeyGesture[] { new KeyGesture(Key.D, ModifierKeys.Control) }));
+        public static RoutedCommand ShowChangesOnly = new RoutedCommand("ShowChangesOnly", typeof(App));
     }
 }

@@ -45,6 +45,19 @@ namespace DmxPad.Converters
                     return attr.Value;
             }
 
+            var celem = value as ComparisonDatamodel.Element;
+            if (celem != null) return celem.State != ComparisonDatamodel.ComparisonState.Removed ? celem : null;
+
+            var cattr = value as ComparisonDatamodel.Attribute;
+            if (cattr != null && cattr.Value_Combined != null)
+            {
+                var t = cattr.Value_Combined.GetType();
+                var inner_t = Datamodel.Datamodel.GetArrayInnerType(t);
+
+                if (t == typeof(ComparisonDatamodel.Element) || inner_t == typeof(ComparisonDatamodel.Element))
+                    return cattr.Value_Combined;
+            }
+
             return null;
         }
 
@@ -123,9 +136,12 @@ namespace DmxPad.Converters
         {
             if (value is Datamodel.Attribute)
                 value = ((Datamodel.Attribute)value).Value;
+            if (value is ComparisonDatamodel.Attribute)
+                value = ((ComparisonDatamodel.Attribute)value).Value_Combined;
 
             Image base_icon;
-            if (value == null || value is Element || value is IEnumerable<Element>)
+            if (value == null || value is Element || value is IEnumerable<Element> ||
+                value is ComparisonDatamodel.Element || value is IEnumerable<ComparisonDatamodel.Element>)
             {
                 base_icon = GetIcon("element");
                 if (value == null)
@@ -188,7 +204,8 @@ namespace DmxPad.Converters
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is Datamodel.Attribute) value = (value as Datamodel.Attribute).Value;
+            if (value is Datamodel.Attribute) value = ((Datamodel.Attribute)value).Value;
+            if (value is ComparisonDatamodel.Attribute) value = ((ComparisonDatamodel.Attribute)value).Value_Combined;
             if (value == null) return "Element (unset)";
 
             var type = value.GetType();
@@ -199,7 +216,7 @@ namespace DmxPad.Converters
                 type = type.GetGenericArguments()[0];
             }
 
-            if (type == typeof(Element) && !array)
+            if ( (type == typeof(Element) || type == typeof(ComparisonDatamodel.Element)) && !array)
             {
                 var tb = new TextBlock();
                 tb.SetBinding(TextBlock.TextProperty, new Binding()
@@ -296,6 +313,14 @@ namespace DmxPad.Converters
             var attr = value as Datamodel.Attribute;
             if (attr != null)
                 return attr.Owner;
+
+            var cdm = value as ComparisonDatamodel;
+            if (cdm != null)
+                return new object[] { cdm.Root };
+
+            var cattr = value as ComparisonDatamodel.Attribute;
+            if (cattr != null)
+                return cattr.Owner;
 
             return DependencyProperty.UnsetValue;
         }
@@ -405,5 +430,19 @@ namespace DmxPad.Converters
             throw new NotImplementedException();
         }
     }
+
+    public class ComparisonTreeVisibility : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value == null ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
 
 }

@@ -1,12 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
-using IEnumerator = System.Collections.IEnumerator;
-using IEnumerable = System.Collections.IEnumerable;
 
 namespace Datamodel
 {
@@ -32,7 +31,7 @@ namespace Datamodel
 
         private List<Attribute> Attributes = new List<Attribute>();
         private object Attribute_ChangeLock = new object();
-        
+
         internal void AddAttribute(Attribute attr)
         {
             lock (Attribute_ChangeLock)
@@ -270,9 +269,9 @@ namespace Datamodel
         {
             return Attributes.GetEnumerator();
         }
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        IEnumerator IEnumerable.GetEnumerator()
         {
-            return Attributes.GetEnumerator() as System.Collections.IEnumerator;
+            return Attributes.GetEnumerator() as IEnumerator;
         }
         #endregion
 
@@ -285,8 +284,22 @@ namespace Datamodel
         /// <summary>
         /// Compares two <see cref="Element"/>s for equivalence by using their Names.
         /// </summary>
-        public class NameComparer : IEqualityComparer<Element>
+        public class NameComparer : IEqualityComparer, IEqualityComparer<Element>
         {
+            /// <summary>
+            /// Gets a default Element Name equality comparer.
+            /// </summary>
+            public static NameComparer Default
+            {
+                get
+                {
+                    if (_Default == null)
+                        _Default = new NameComparer();
+                    return _Default;
+                }
+            }
+            static NameComparer _Default;
+
             public bool Equals(Element x, Element y)
             {
                 return x.Name == y.Name;
@@ -296,12 +309,36 @@ namespace Datamodel
             {
                 return obj.Name.GetHashCode();
             }
+
+            bool IEqualityComparer.Equals(object x, object y)
+            {
+                return Equals((Element)x, (Element)y);
+            }
+
+            int IEqualityComparer.GetHashCode(object obj)
+            {
+                return GetHashCode((Element)obj);
+            }
         }
         /// <summary>
         /// Compares two <see cref="Element"/>s for equivalence by using their ClassNames.
         /// </summary>
-        public class ClassNameComparer : IEqualityComparer<Element>
+        public class ClassNameComparer : IEqualityComparer, IEqualityComparer<Element>
         {
+            /// <summary>
+            /// Gets a default Element ClassName equality comparer.
+            /// </summary>
+            public static ClassNameComparer Default
+            {
+                get
+                {
+                    if (_Default == null)
+                        _Default = new ClassNameComparer();
+                    return _Default;
+                }
+            }
+            static ClassNameComparer _Default;
+
             public bool Equals(Element x, Element y)
             {
                 return x.ClassName == y.ClassName;
@@ -311,12 +348,36 @@ namespace Datamodel
             {
                 return obj.ClassName.GetHashCode();
             }
+
+            bool IEqualityComparer.Equals(object x, object y)
+            {
+                return Equals((Element)x, (Element)y);
+            }
+
+            int IEqualityComparer.GetHashCode(object obj)
+            {
+                return GetHashCode((Element)obj);
+            }
         }
         /// <summary>
         /// Compares two <see cref="Element"/>s for equivalence by using their IDs.
         /// </summary>
-        public class IDComparer : IEqualityComparer<Element>
+        public class IDComparer : IEqualityComparer, IEqualityComparer<Element>
         {
+            /// <summary>
+            /// Gets a default Element ID equality comparer.
+            /// </summary>
+            public static IDComparer Default
+            {
+                get
+                {
+                    if (_Default == null)
+                        _Default = new IDComparer();
+                    return _Default;
+                }
+            }
+            static IDComparer _Default;
+
             public bool Equals(Element x, Element y)
             {
                 return x.ID == y.ID;
@@ -326,7 +387,19 @@ namespace Datamodel
             {
                 return obj.ID.GetHashCode();
             }
+
+            bool IEqualityComparer.Equals(object x, object y)
+            {
+                return Equals((Element)x, (Element)y);
+            }
+
+            int IEqualityComparer.GetHashCode(object obj)
+            {
+                return GetHashCode((Element)obj);
+            }
         }
+
+
         #endregion
     }
 }

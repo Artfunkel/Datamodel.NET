@@ -46,12 +46,12 @@ namespace DmxPad
         }
         string _Path;
 
-        public Datamodel.Datamodel ComparisonDatamodel
+        public ComparisonDatamodel ComparisonDatamodel
         {
             get { return _ComparisonDatamodel; }
             set { _ComparisonDatamodel = value; NotifyPropertyChanged("ComparisonDatamodel"); }
         }
-        Datamodel.Datamodel _ComparisonDatamodel;
+        ComparisonDatamodel _ComparisonDatamodel;
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(string info)
@@ -63,7 +63,7 @@ namespace DmxPad
         public void Dispose()
         {
             if (Datamodel != null) Datamodel.Dispose();
-            if (ComparisonDatamodel != null) ComparisonDatamodel.Dispose();
+            if (ComparisonDatamodel != null) ComparisonDatamodel.Datamodel_Right.Dispose();
         }
     }
 
@@ -96,9 +96,12 @@ namespace DmxPad
         private void New_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var dm = new Datamodel.Datamodel("my_format", 1);
-            Datamodels.Add(new ViewModel(dm));
             dm.Root = dm.CreateElement("root");
-            Tabs.SelectedItem = dm;
+
+            var vm = new ViewModel(dm);
+            Datamodels.Add(vm);
+            Tabs.SelectedItem = vm;
+            
             e.Handled = true;
         }
         private void OpenRecentItem(object sender, RoutedEventArgs e)
@@ -140,10 +143,10 @@ namespace DmxPad
                 new_dm = new ViewModel(Datamodel.Datamodel.Load(path));
                 Datamodels.Add(new_dm);
                 recent.Remove(path);
-                recent.Insert(0,path);
+                recent.Insert(0, path);
             }
             while (recent.Count > 10)
-                recent.RemoveAt(0);
+                recent.RemoveAt(9);
             Tabs.SelectedItem = new_dm;
             RecentMenu.Items.Refresh();
         }
@@ -233,12 +236,18 @@ namespace DmxPad
         private void CompareDatamodel_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var ofd = new Microsoft.Win32.OpenFileDialog();
+            var vm = (ViewModel)Tabs.SelectedItem;
+            
+            var current_file = vm.Datamodel.File;
+            if (current_file != null)
+                ofd.InitialDirectory = current_file.DirectoryName;
+
             if (ofd.ShowDialog() == true)
             {
                 Cursor = Cursors.Wait;
                 try
                 {
-                    ((ViewModel)Tabs.SelectedItem).ComparisonDatamodel = Datamodel.Datamodel.Load(ofd.FileName);
+                    vm.ComparisonDatamodel = new ComparisonDatamodel(vm.Datamodel, Datamodel.Datamodel.Load(ofd.FileName));
                 }
 #if !DEBUG
                 catch (Exception err)
@@ -260,12 +269,16 @@ namespace DmxPad
         public DesignTimeData()
         {
             var dm = new Datamodel.Datamodel("design_data", 1);
-            Add(new ViewModel(dm));
+            var vm = new ViewModel(dm);
+            Add(vm);
+
             dm.Root = dm.CreateElement("root");
             dm.Root["BlankElem"] = null;
             dm.Root["StubElem"] = dm.CreateStubElement(Guid.NewGuid());
             dm.Root["Str"] = "Hello World";
             dm.Root["Vector"] = new Datamodel.Vector3(0, 0, 1.5f);
+
+            vm.Path = "//root/str";
         }
     }
 }
