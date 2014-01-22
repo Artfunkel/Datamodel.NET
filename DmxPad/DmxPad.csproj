@@ -158,6 +158,25 @@
   <ItemGroup>
     <Resource Include="Resources\dmx.ico" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Resources\Added.png" />
+    <Resource Include="Resources\Removed.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Resources\ChildChanged.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Resources\Changed.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="readme.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Resources\Diff.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Resources\Filter.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

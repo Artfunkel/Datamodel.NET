@@ -240,17 +240,14 @@ namespace DmxPad
             }
         }
 
-        bool ShowChangesOnly = false;
-
         private void ShowChangesOnly_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            ShowChangesOnly = (bool)e.Parameter;
             DmxTree_Comparison.Items.Refresh();
         }
 
         private bool ShowChangesOnly_Filter(object obj)
         {
-            if (!ShowChangesOnly) return true;
+            if (!((ViewModel)DataContext).FilterComparison) return true;
 
             var attr = obj as ComparisonDatamodel.Attribute;
             if (attr != null)

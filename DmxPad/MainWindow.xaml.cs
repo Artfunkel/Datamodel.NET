@@ -53,6 +53,13 @@ namespace DmxPad
         }
         ComparisonDatamodel _ComparisonDatamodel;
 
+        public bool FilterComparison
+        {
+            get { return _FilterComparison; }
+            set { _FilterComparison = value; NotifyPropertyChanged("FilterComparison"); }
+        }
+        bool _FilterComparison = false;
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(string info)
         {

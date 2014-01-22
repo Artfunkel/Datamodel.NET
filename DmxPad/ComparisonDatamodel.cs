@@ -235,55 +235,40 @@ namespace DmxPad
                 Name = Attribute_Left != null ? Attribute_Left.Name : Attribute_Right.Name;
 
                 if (Attribute_Left == null)
+                {
                     State = ComparisonState.Added;
+                    Value_Combined = Attribute_Right.Value;
+                }
                 else if (Attribute_Right == null)
+                {
                     State = ComparisonState.Removed;
+                    Value_Combined = Attribute_Left.Value;
+                }
                 else
                 {
-                    var t_left = Attribute_Left.Value == null ? null : Attribute_Left.Value.GetType();
-                    var t_right = Attribute_Right.Value == null ? null : Attribute_Right.Value.GetType();
-
-                    if (t_left == t_right && t_left != null)
-                    {
-                        var inner = Datamodel.Datamodel.GetArrayInnerType(t_left);
-
-                        if (inner != null)
-                        {
-                            var array_left = (IList)Attribute_Left.Value;
-                            var array_right = (IList)Attribute_Right.Value;
-                            if (array_left.Count != array_right.Count)
-                                State = ComparisonState.Changed;
-                            else
-                            {
-                                IEqualityComparer comparer = inner == typeof(Datamodel.Element) ? (IEqualityComparer)Datamodel.Element.IDComparer.Default : EqualityComparer<object>.Default;
-                                foreach (int i in Enumerable.Range(0, array_left.Count))
-                                {
-                                    if (!comparer.Equals(array_left[i], array_right[i]))
-                                    {
-                                        State = ComparisonState.Changed;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        else if (t_left == typeof(Datamodel.Element) && !Datamodel.Element.IDComparer.Default.Equals((Datamodel.Element)Attribute_Left.Value, (Datamodel.Element)Attribute_Right.Value))
-                        {
-                            State = ComparisonState.Changed;
-                        }
-
-                        if (t_left == typeof(Datamodel.Element))
-                            Value_Combined = new Element(cdm, (Datamodel.Element)Attribute_Left.Value, (Datamodel.Element)Attribute_Right.Value);
-
-                        else if (inner == typeof(Datamodel.Element))
-                            Value_Combined = ((IList<Datamodel.Element>)Attribute_Left.Value)
-                                .Concat((IList<Datamodel.Element>)Attribute_Right.Value)
-                                .Distinct(Datamodel.Element.IDComparer.Default)
-                                .Select(e => new Element(cdm, cdm.Datamodel_Left.AllElements[e.ID], cdm.Datamodel_Right.AllElements[e.ID])).ToArray();
-                        else
-                            Value_Combined = Attribute_Right.Value;
-                    }
-                    else
+                    if (!Datamodel.Attribute.ValueComparer.Default.Equals(Attribute_Left, Attribute_Right))
                         State = ComparisonState.Changed;
+
+                    if (Attribute_Left.Value == null)
+                        Value_Combined = Attribute_Right.Value;
+                    else if (Attribute_Right.Value == null)
+                        Value_Combined = Attribute_Left.Value;
+                    else
+                    {
+                        if (Attribute_Left.Value.GetType() == typeof(Datamodel.Element))
+                            Value_Combined = new Element(cdm, (Datamodel.Element)Attribute_Left.Value, (Datamodel.Element)Attribute_Right.Value);
+                        else
+                        {
+                            var inner = Datamodel.Datamodel.GetArrayInnerType(Attribute_Left.Value.GetType());
+                            if (inner == typeof(Datamodel.Element))
+                                Value_Combined = ((IList<Datamodel.Element>)Attribute_Left.Value)
+                                    .Concat((IList<Datamodel.Element>)Attribute_Right.Value)
+                                    .Distinct(Datamodel.Element.IDComparer.Default)
+                                    .Select(e => new Element(cdm, cdm.Datamodel_Left.AllElements[e.ID], cdm.Datamodel_Right.AllElements[e.ID])).ToArray();
+                            else
+                                Value_Combined = Attribute_Right.Value;
+                        }
+                    }
                 }
             }
         }

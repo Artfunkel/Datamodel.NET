@@ -24,8 +24,11 @@ namespace Datamodel
             if (!stub)
             {
                 owner = datamodel;
-                Owner.AllElements.Add(this);
-                if (Owner.AllElements.Count == 1) Owner.Root = this;
+                lock (Owner.AllElements)
+                {
+                    Owner.AllElements.Add(this);
+                    if (Owner.AllElements.Count == 1) Owner.Root = this;
+                }
             }
         }
 

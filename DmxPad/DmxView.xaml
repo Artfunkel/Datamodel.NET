@@ -43,8 +43,12 @@
             <Button Command="Undo">Undo</Button>
             <Button Command="Redo">Redo</Button>
             <Separator/>
-            <Button Command="{x:Static l:App.CompareDatamodel}">Compare Datamodel...</Button>
-            <ToggleButton Command="{x:Static l:App.ShowChangesOnly}" CommandParameter="{Binding RelativeSource={RelativeSource Self},Path=IsChecked}">Changes only</ToggleButton>
+            <Button Command="{x:Static l:App.CompareDatamodel}" ToolTip="Compare Datamodel... (Ctrl+D)">
+                <Image Source="Resources/Diff.png" />
+            </Button>
+            <ToggleButton Command="{x:Static l:App.ShowChangesOnly}" ToolTip="Show changes only" IsChecked="{Binding FilterComparison}">
+                <Image Source="Resources/Filter.png"/>
+            </ToggleButton>
         </ToolBar>
         
         <Grid Grid.Row="1" Grid.ColumnSpan="2" VerticalAlignment="Top" >
@@ -73,14 +77,12 @@
                         Visibility="{Binding ComparisonDatamodel, Converter={StaticResource ComparisonTreeVisibility}}">
             <c:TreeGridView.ColumnDefinitions>
                 <c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}" CellStyle="{StaticResource TypeColumnCellStyle}"/>
-                <c:TreeGridContentColumnDefinition Header="{Binding ComparisonDatamodel.Datamodel_Right.File.Name}" Binding="{Binding State}">
-                </c:TreeGridContentColumnDefinition>
             </c:TreeGridView.ColumnDefinitions>
             <c:TreeGridView.Resources>
                 <Style TargetType="{x:Type c:TreeGridViewItem}">
                     <EventSetter Event="Loaded" Handler="ComparisonViewItem_Loaded" />
                     <EventSetter Event="Selected" Handler="TreeViewItem_Selected"/>
-                    <Style.Triggers>
+                    <!--<Style.Triggers>
                         <DataTrigger Binding="{Binding State}" Value="{x:Static l:ComparisonDatamodel+ComparisonState.Changed}">
                             <Setter Property="Background" Value="Orange"/>
                         </DataTrigger>
@@ -93,9 +95,17 @@
                         <DataTrigger Binding="{Binding State}" Value="{x:Static l:ComparisonDatamodel+ComparisonState.ChildChanged}">
                             <Setter Property="Background" Value="LightGray"/>
                         </DataTrigger>
-                    </Style.Triggers>
+                    </Style.Triggers>-->
                 </Style>
             </c:TreeGridView.Resources>
+            <c:TreeGridView.TitleTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                        <ContentPresenter Content="{Binding State,Converter={StaticResource ComparisonIcon}}"/>
+                        <ContentPresenter Content="{Binding}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </c:TreeGridView.TitleTemplate>
         </c:TreeGridView>
 
         <GridSplitter Grid.Column="1" Grid.Row="2" Width="2" VerticalAlignment="Stretch" HorizontalAlignment="Left" ResizeDirection="Columns"/>

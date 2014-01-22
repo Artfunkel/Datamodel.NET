@@ -10,6 +10,7 @@ using System.Globalization;
 
 using DmEncoding = System.Tuple<string, int>;
 using Datamodel;
+using ComparisonState = DmxPad.ComparisonDatamodel.ComparisonState;
 
 namespace DmxPad.Converters
 {
@@ -46,7 +47,7 @@ namespace DmxPad.Converters
             }
 
             var celem = value as ComparisonDatamodel.Element;
-            if (celem != null) return celem.State != ComparisonDatamodel.ComparisonState.Removed ? celem : null;
+            if (celem != null) return celem.State != ComparisonState.Removed ? celem : null;
 
             var cattr = value as ComparisonDatamodel.Attribute;
             if (cattr != null && cattr.Value_Combined != null)
@@ -216,7 +217,7 @@ namespace DmxPad.Converters
                 type = type.GetGenericArguments()[0];
             }
 
-            if ( (type == typeof(Element) || type == typeof(ComparisonDatamodel.Element)) && !array)
+            if ((type == typeof(Element) || type == typeof(ComparisonDatamodel.Element)) && !array)
             {
                 var tb = new TextBlock();
                 tb.SetBinding(TextBlock.TextProperty, new Binding()
@@ -406,14 +407,14 @@ namespace DmxPad.Converters
 
                 var name = part;
                 var index = -1;
-                
+
                 var indexer_pos = part.LastIndexOf('[');
                 if (indexer_pos != -1)
                 {
                     name = part.Substring(0, indexer_pos);
                     index = Int32.Parse(part.Substring(indexer_pos + 1, part.Length - indexer_pos - 2));
                 }
-                
+
                 if (!elem.Contains(name)) return null;
 
                 current = attr = elem.GetAttribute(name);
@@ -444,5 +445,47 @@ namespace DmxPad.Converters
         }
     }
 
+    public class ComparisonIcon : IValueConverter
+    {
+        struct ComparisonStateData
+        {
+            public ComparisonStateData(string image, string tooltip)
+            {
+                ImageSource = new BitmapImage(new Uri(String.Format("/DmxPad;component/Resources/{0}.png",image), UriKind.Relative));
+                ToolTip = tooltip;
+            }
 
+            public readonly ImageSource ImageSource;
+            public readonly string ToolTip;
+        }
+        static Dictionary<ComparisonState, ComparisonStateData> StateData = new Dictionary<ComparisonState, ComparisonStateData>()
+        {
+            { ComparisonState.Changed, new ComparisonStateData("Changed", "This item is different") },
+            { ComparisonState.ChildChanged, new ComparisonStateData("ChildChanged", "One or more children of this item are different") },
+            { ComparisonState.Added, new ComparisonStateData("Added", "This item was added") },
+            { ComparisonState.Removed, new ComparisonStateData("Removed", "This item was removed") },
+        };
+
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var state = (ComparisonState)value;
+
+            if (state == ComparisonState.Unchanged)
+                return null;
+
+            var data = StateData[state];
+            return new Image()
+            {
+                Source = data.ImageSource,
+                ToolTip = data.ToolTip,
+                Width = 16,
+                Height = 16,
+            };
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

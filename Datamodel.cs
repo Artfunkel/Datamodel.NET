@@ -78,7 +78,7 @@ namespace Datamodel
         }
         static Dictionary<CodecRegistration, Type> Codecs = new Dictionary<CodecRegistration, Type>();
 
-        public static IEnumerable<Codec_t> CodecsRegistered { get { return Codecs.Select(t => new Codec_t(t.Key.Encoding,t.Key.Version)); } }
+        public static IEnumerable<Codec_t> CodecsRegistered { get { return Codecs.Select(t => new Codec_t(t.Key.Encoding, t.Key.Version)); } }
 
         /// <summary>
         /// Registers a new <see cref="ICodec"/> with an encoding name and one or more encoding versions.
@@ -195,7 +195,7 @@ namespace Datamodel
             var match = System.Text.RegularExpressions.Regex.Match(header, CodecUtilities.HeaderPattern_Regex);
 
             if (!match.Success || match.Groups.Count != 5)
-                throw new InvalidOperationException(String.Format("Could not read DMX header ({0}).",header));
+                throw new InvalidOperationException(String.Format("Could not read DMX header ({0}).", header));
 
             string encoding = match.Groups[1].Value;
             int encoding_version = int.Parse(match.Groups[2].Value);
@@ -217,7 +217,7 @@ namespace Datamodel
 
             dm.Encoding = encoding;
             dm.EncodingVersion = encoding_version;
-            
+
             return dm;
         }
 
@@ -348,6 +348,14 @@ namespace Datamodel
         }
 
         #region Properties
+
+        public bool AllowRandomIDs
+        {
+            get { return _AllowRandomIDs; }
+            set { _AllowRandomIDs = value; NotifyPropertyChanged("AllowRandomIDs"); }
+        }
+        bool _AllowRandomIDs = true;
+
         /// <summary>
         /// Gets or sets a <see cref="FileInfo"/> object associated with this Datamodel.
         /// </summary>
@@ -524,10 +532,13 @@ namespace Datamodel
         /// Creates a new Element with a random ID.
         /// </summary>
         /// <param name="name">The Element's name. Duplicates allowed.</param>
-        /// <param name="id">The Element's ID. Must be unique within the Datamodel.</param>
+        /// <param name="class_name">The Element's class.</param>
         /// <returns>The new Element.</returns>
         public Element CreateElement(string name, string class_name = "DmElement")
         {
+            if (!AllowRandomIDs)
+                throw new InvalidOperationException("Random IDs are not allowed in this Datamodel.");
+
             Guid id;
             do { id = Guid.NewGuid(); }
             while (AllElements[id] != null);
@@ -539,7 +550,7 @@ namespace Datamodel
         /// </summary>
         /// <param name="name">The Element's name. Duplicates allowed.</param>
         /// <param name="id">The Element's ID. Must be unique within the Datamodel.</param>
-        /// <param name="class_name">the Element's class.</param>
+        /// <param name="class_name">The Element's class.</param>
         /// <returns>The new Element.</returns>
         public Element CreateElement(string name, Guid id, string class_name = "DmElement")
         {
@@ -549,15 +560,16 @@ namespace Datamodel
         internal int ElementsAdded = 0; // used to optimise de-stubbing
         internal Element CreateElement(string name, Guid id, bool stub, string classname = "DmElement")
         {
-            if (AllElements.Count == Int32.MaxValue) // jinkies!
-                throw new InvalidOperationException("Maximum Element count reached.");
-
             lock (AllElements.ChangeLock)
             {
+                if (AllElements.Count == Int32.MaxValue) // jinkies!
+                    throw new InvalidOperationException("Maximum Element count reached.");
+
                 if (AllElements[id] != null)
                     throw new ElementIdException(String.Format("Element ID {0} already in use in this Datamodel.", id.ToString()));
+
+                if (!stub) ElementsAdded++;
             }
-            if (!stub) ElementsAdded++;
             return new Element(this, id, name, classname, stub);
         }
         #endregion
