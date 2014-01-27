@@ -114,10 +114,10 @@ namespace Datamodel.Codecs
                 if (!Dummy)
                 {
                     Scraped = new HashSet<Element>();
-                    
+
                     ScrapeElement(dm.Root);
                     Strings = Strings.Distinct().ToList();
-                    
+
                     Scraped = null;
                 }
             }
@@ -178,7 +178,7 @@ namespace Datamodel.Codecs
         public void Encode(Datamodel dm, int encoding_version, Stream stream)
         {
             EncodingVersion = encoding_version;
-            Writer = new BinaryWriter(stream);
+            Writer = new BinaryWriter(stream, Encoding.UTF8);
 
             WriteString_Raw(String.Format(CodecUtilities.HeaderPattern, "binary", EncodingVersion, dm.Format, dm.FormatVersion) + "\n");
 
@@ -332,7 +332,7 @@ namespace Datamodel.Codecs
             Writer.Write(CountChildElems(dm.Root));
 
             WriteIndex(dm.Root);
-            foreach(var e in elem_order)
+            foreach (var e in elem_order)
                 WriteBody(e);
         }
 
@@ -403,7 +403,7 @@ namespace Datamodel.Codecs
             var dm = new Datamodel(format, format_version);
 
             EncodingVersion = encoding_version;
-            Reader = new BinaryReader(stream, Encoding.ASCII);
+            Reader = new BinaryReader(stream, Encoding.UTF8);
             StringDict = new StringDictionary(this, Reader);
 
             var num_elements = Reader.ReadInt32();
