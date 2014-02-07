@@ -19,6 +19,10 @@
         <converter:DatamodelPath x:Key="DatamodelPathConverter"/>
         <converter:ComparisonTreeVisibility x:Key="ComparisonTreeVisibility"/>
         <converter:ComparisonIcon x:Key="ComparisonIcon"/>
+        <converter:AttributeListView x:Key="AttributeListView"/>
+        <converter:DmxTreeItemSource x:Key="DmxTreeItemSource"/>
+        <converter:NotNull x:Key="NotNull"/>
+        <converter:InverseBoolean x:Key="InverseBoolean"/>
 
         <l:InspectPaneTemplateSelector x:Key="InspectPaneTemplateSelector"/>
         <converter:ValueColumnTemplateSelector x:Key="ValueColumnTemplateSelector"/>
@@ -32,14 +36,14 @@
 
         <DataTemplate DataType="{x:Type dm:Element}">
             <Grid VerticalAlignment="Center" ToolTip="{Binding ID}" Background="Transparent">
-                <ContentControl Content="{Binding Converter={StaticResource AttributeIconConverter}}" IsTabStop="False" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                <ContentPresenter Content="{Binding Converter={StaticResource AttributeIconConverter}}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                 <TextBlock Text="{Binding Name}" Margin="20,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
             </Grid>
         </DataTemplate>
 
         <DataTemplate DataType="{x:Type dm:Attribute}">
             <Grid VerticalAlignment="Center">
-                <ContentControl Content="{Binding Converter={StaticResource AttributeIconConverter}}" IsTabStop="False" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                <ContentPresenter Content="{Binding Converter={StaticResource AttributeIconConverter}}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                 <TextBlock Text="{Binding Name}" Margin="20,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
             </Grid>
         </DataTemplate>
@@ -93,16 +97,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="Attr_List">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                
-                <TextBlock Text="{Binding Path=Value.Count,StringFormat={}{0} items}"/>
-                <ListBox Grid.Row="1" ItemsSource="{Binding Path=Value}"/>
-            </Grid>
-            <!--<DataGrid ItemsSource="{Binding}" DisplayMemberPath="Value" HeadersVisibility="Column" MinColumnWidth="80" HorizontalAlignment="Left" VerticalAlignment="Top" />-->
+            <TextBlock Text="{Binding Path=Value.Count,StringFormat={}{0} items}"/>
         </DataTemplate>
 
     </Application.Resources>

@@ -124,25 +124,36 @@ namespace DmxPad.Converters
 
     public class AttributeIcon : IValueConverter
     {
+        static Dictionary<string, ImageSource> IconSources = new Dictionary<string, ImageSource>()
+        {
+            { "element", new BitmapImage(new Uri("/DmxPad;component/Resources/Element.png", UriKind.Relative))},
+            { "attribute", new BitmapImage(new Uri("/DmxPad;component/Resources/Attribute.png", UriKind.Relative))},
+            { "array", new BitmapImage(new Uri("/DmxPad;component/Resources/Array.png", UriKind.Relative))},
+
+        };
         static Image GetIcon(string name)
         {
             return new Image()
             {
-                Source = new BitmapImage(new Uri(String.Format("/DmxPad;component/Resources/{0}.png", name), UriKind.Relative)),
+                Source = IconSources[name],
                 Stretch = Stretch.None
             };
         }
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is Datamodel.Attribute)
-                value = ((Datamodel.Attribute)value).Value;
-            if (value is ComparisonDatamodel.Attribute)
-                value = ((ComparisonDatamodel.Attribute)value).Value_Combined;
+            var attr = value as Datamodel.Attribute;
+            if (attr != null) value = attr.Value;
+            else
+            {
+                var cattr = value as ComparisonDatamodel.Attribute;
+                if (cattr != null)
+                    value = cattr.Value_Combined;
+            }
 
             Image base_icon;
-            if (value == null || value is Element || value is IEnumerable<Element> ||
-                value is ComparisonDatamodel.Element || value is IEnumerable<ComparisonDatamodel.Element>)
+            if (value == null || value is Element || value is IList<Element> ||
+                value is ComparisonDatamodel.Element || value is IList<ComparisonDatamodel.Element>)
             {
                 base_icon = GetIcon("element");
                 if (value == null)
@@ -205,8 +216,15 @@ namespace DmxPad.Converters
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is Datamodel.Attribute) value = ((Datamodel.Attribute)value).Value;
-            if (value is ComparisonDatamodel.Attribute) value = ((ComparisonDatamodel.Attribute)value).Value_Combined;
+            var attr = value as Datamodel.Attribute;
+            if (attr != null) value = attr.Value;
+            else
+            {
+                var cattr = value as ComparisonDatamodel.Attribute;
+                if (cattr != null)
+                    value = cattr.Value_Combined;
+            }
+
             if (value == null) return "Element (unset)";
 
             var type = value.GetType();
@@ -451,7 +469,7 @@ namespace DmxPad.Converters
         {
             public ComparisonStateData(string image, string tooltip)
             {
-                ImageSource = new BitmapImage(new Uri(String.Format("/DmxPad;component/Resources/{0}.png",image), UriKind.Relative));
+                ImageSource = new BitmapImage(new Uri(String.Format("/DmxPad;component/Resources/{0}.png", image), UriKind.Relative));
                 ToolTip = tooltip;
             }
 
@@ -488,4 +506,67 @@ namespace DmxPad.Converters
             throw new NotImplementedException();
         }
     }
+
+    public class AttributeListView : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value != null && Datamodel.Datamodel.IsDatamodelArrayType(value.GetType()) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class DmxTreeItemSource : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            var dm = values[0] as Datamodel.Datamodel;
+
+            if (dm != null)
+                return (bool)values[1] ? (object)dm.AllElements : new object[] { dm.Root };
+
+            var cdm = values[0] as ComparisonDatamodel;
+            if (cdm != null)
+                return (bool)values[1] ? (object)cdm.ComparedElements.Values : new object[] { cdm.Root };
+
+            return null;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class NotNull : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value != null;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public class InverseBoolean : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return !(bool)value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return !(bool)value;
+        }
+    }
+
+
 }

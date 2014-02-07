@@ -28,7 +28,7 @@ namespace DmxPad
         public Datamodel.Datamodel Datamodel
         {
             get { return _Datamodel; }
-            protected set { _Datamodel = value; NotifyPropertyChanged("Datamodel"); }
+            set { _Datamodel = value; NotifyPropertyChanged("Datamodel"); }
         }
         Datamodel.Datamodel _Datamodel;
 
@@ -60,6 +60,13 @@ namespace DmxPad
         }
         bool _FilterComparison = false;
 
+        public bool UseListView
+        {
+            get { return _UseListView; }
+            set { _UseListView = value; NotifyPropertyChanged("UseListView"); }
+        }
+        bool _UseListView = false;
+
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(string info)
         {
@@ -86,16 +93,45 @@ namespace DmxPad
             InitializeComponent();
 
             DataContext = Datamodels;
-            if (Properties.Settings.Default.Recent == null)
-                Properties.Settings.Default.Recent = new System.Collections.Specialized.StringCollection();
+        }
 
+        protected override void OnInitialized(EventArgs e)
+        {
+            Cursor = Cursors.Wait;
             try
             {
-                Load(App.StartArgs.Args);
+                Load_UI(App.StartArgs.Args);
             }
+#if !DEBUG
             catch (Exception err)
             {
                 System.Windows.MessageBox.Show(err.Message, "Startup argument error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+#endif
+            finally
+            {
+                Cursor = Cursors.Arrow;
+            }
+            base.OnInitialized(e);
+        }
+
+        Datamodel.Datamodel Load(string path)
+        {
+            Cursor = Cursors.Wait;
+            try
+            {
+                return Datamodel.Datamodel.Load(path);
+            }
+#if !DEBUG
+            catch (Exception err)
+            {
+                System.Windows.MessageBox.Show(err.Message, "DMX load error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return null;
+            }
+#endif
+            finally
+            {
+                Cursor = Cursors.Arrow;
             }
         }
 
@@ -113,7 +149,7 @@ namespace DmxPad
         }
         private void OpenRecentItem(object sender, RoutedEventArgs e)
         {
-            Load((sender as MenuItem).DataContext as string);
+            Load_UI((sender as MenuItem).DataContext as string);
         }
 
         private void Open_Executed(object sender, ExecutedRoutedEventArgs e)
@@ -121,33 +157,20 @@ namespace DmxPad
             var ofd = new Microsoft.Win32.OpenFileDialog();
             ofd.Multiselect = true;
             if (ofd.ShowDialog() == true)
-            {
-                Cursor = Cursors.Wait;
-                try
-                {
-                    Load(ofd.FileNames);
-                }
-#if !DEBUG
-                catch (Exception err)
-                {
-                    System.Windows.MessageBox.Show(err.Message, "DMX load error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-#endif
-                finally
-                {
-                    Cursor = Cursors.Arrow;
-                }
-            }
+                Load_UI(ofd.FileNames);
+
             e.Handled = true;
         }
 
-        public void Load(params string[] paths)
+        public void Load_UI(params string[] paths)
         {
+            if (Properties.Settings.Default.Recent == null) Properties.Settings.Default.Recent = new System.Collections.Specialized.StringCollection();
             var recent = Properties.Settings.Default.Recent;
+
             ViewModel new_dm = null;
             foreach (var path in paths)
             {
-                new_dm = new ViewModel(Datamodel.Datamodel.Load(path));
+                new_dm = new ViewModel(Load(path));
                 Datamodels.Add(new_dm);
                 recent.Remove(path);
                 recent.Insert(0, path);
@@ -172,7 +195,7 @@ namespace DmxPad
         private void SaveAs_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var sfd = new Microsoft.Win32.SaveFileDialog();
-            var dm = Tabs.SelectedItem as Datamodel.Datamodel;
+            var dm = ((ViewModel)Tabs.SelectedItem).Datamodel;
 
             sfd.InitialDirectory = dm.File.DirectoryName;
             sfd.FileName = dm.File.Name;
@@ -185,10 +208,12 @@ namespace DmxPad
                     dm.Save(sfd.FileName, dm.Encoding, dm.EncodingVersion);
                     dm.File = new System.IO.FileInfo(sfd.FileName);
                 }
+#if !DEBUG
                 catch (Exception err)
                 {
                     System.Windows.MessageBox.Show(err.Message, "Save error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
+#endif
                 finally
                 {
                     Cursor = Cursors.Arrow;
@@ -236,18 +261,32 @@ namespace DmxPad
             }
             catch (Exception err)
             {
+#if DEBUG
+                throw err;
+#else
                 System.Windows.MessageBox.Show(err.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+#endif
             }
         }
 
         private void CompareDatamodel_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            var ofd = new Microsoft.Win32.OpenFileDialog();
             var vm = (ViewModel)Tabs.SelectedItem;
+
+            if (vm.ComparisonDatamodel != null)
+            {
+                vm.ComparisonDatamodel = null;
+                return;
+            }
+
+            var ofd = new Microsoft.Win32.OpenFileDialog();
             
             var current_file = vm.Datamodel.File;
             if (current_file != null)
+            {
                 ofd.InitialDirectory = current_file.DirectoryName;
+                ofd.FileName = current_file.Name;
+            }
 
             if (ofd.ShowDialog() == true)
             {
@@ -269,6 +308,26 @@ namespace DmxPad
             }
             e.Handled = true;
         }
+
+        private void Refresh_Executed(object sender, ExecutedRoutedEventArgs e)
+        {
+            var vm = (ViewModel)Tabs.SelectedItem;
+
+            var new_dm = Load(vm.Datamodel.File.FullName);
+            if (new_dm != null)
+            {
+                vm.Datamodel = new_dm;
+                var cdm = vm.ComparisonDatamodel;
+                if (cdm != null)
+                {
+                    var new_dm_left = cdm.Datamodel_Left.File.FullName != cdm.Datamodel_Right.File.FullName ? new_dm : cdm.Datamodel_Left;
+                    var new_dm_right = Load(cdm.Datamodel_Right.File.FullName) ?? cdm.Datamodel_Right;
+
+                    if (new_dm_right != null)
+                        vm.ComparisonDatamodel = new ComparisonDatamodel(new_dm_left, new_dm_right);
+                }
+            }
+        }
     }
 
     class DesignTimeData : ObservableCollection<ViewModel>
@@ -277,6 +336,7 @@ namespace DmxPad
         {
             var dm = new Datamodel.Datamodel("design_data", 1);
             var vm = new ViewModel(dm);
+            vm.UseListView = true;
             Add(vm);
 
             dm.Root = dm.CreateElement("root");

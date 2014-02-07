@@ -1,6 +1,7 @@
 ﻿<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
     xmlns:diagnostics="clr-namespace:System.Diagnostics;assembly=WindowsBase"
     xmlns:c="clr-namespace:DmxPad.Controls">
     <c:ExpanderMarginConverter x:Key="ExpanderMarginConverter"/>
@@ -34,7 +35,7 @@
                             </Border>
                             <Border Grid.Row="1" Name="Border" BorderThickness="0,1,0,0" Background="{DynamicResource {x:Static SystemColors.ControlLightLightBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}">
                                 <ScrollViewer ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                                    <ItemsPresenter />
+                                    <ItemsPresenter/>
                                 </ScrollViewer>
                             </Border>
                         </Grid>
@@ -49,69 +50,74 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type c:TreeGridViewItem}">
                     <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition SharedSizeGroup="TitleHeaderColumn"/>
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
-                            <RowDefinition/>
-                            <RowDefinition/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <Border Grid.Row="0" Grid.ColumnSpan="2" Background="{TemplateBinding Background}"/>
-                        <c:TreeGridViewCell>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                <ToggleButton Width="10" Height="15"
+                        <Grid Grid.Row="0" Background="{TemplateBinding Background}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition SharedSizeGroup="TitleHeaderColumn"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <c:TreeGridViewCell Grid.Row="0">
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton Width="10" Height="15"
                                                               Visibility="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Items.IsEmpty, Converter={StaticResource ExpanderVisibilityConverter}, Mode=OneWay}" 
                                                               IsChecked="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=IsExpanded}" 
                                                               Margin="{Binding  RelativeSource={RelativeSource TemplatedParent}, Path=Indent, Converter={StaticResource ExpanderMarginConverter}, Mode=OneWay}">
-                                    <ToggleButton.Style>
-                                        <Style TargetType="ToggleButton">
-                                            <Style.Resources>
-                                                <Color x:Key="GlyphColor">#FF444444</Color>
-                                            </Style.Resources>
-                                            <Setter Property="Focusable" Value="False" />
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="ToggleButton">
-                                                        <Grid Width="15" Height="13" Background="Transparent">
-                                                            <VisualStateManager.VisualStateGroups>
-                                                                <VisualStateGroup x:Name="CheckStates">
-                                                                    <VisualState x:Name="Checked">
-                                                                        <Storyboard>
-                                                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Visibility)" Storyboard.TargetName="Collapsed">
-                                                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Hidden}" />
-                                                                            </ObjectAnimationUsingKeyFrames>
-                                                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Visibility)" Storyboard.TargetName="Expanded">
-                                                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Visible}" />
-                                                                            </ObjectAnimationUsingKeyFrames>
-                                                                        </Storyboard>
-                                                                    </VisualState>
-                                                                    <VisualState x:Name="Unchecked" />
-                                                                    <VisualState x:Name="Indeterminate" />
-                                                                </VisualStateGroup>
-                                                            </VisualStateManager.VisualStateGroups>
-                                                            <Path x:Name="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1,1,1,1" Data="M 4 0 L 8 4 L 4 8 Z">
-                                                                <Path.Fill>
-                                                                    <SolidColorBrush Color="{DynamicResource GlyphColor}" />
-                                                                </Path.Fill>
-                                                            </Path>
-                                                            <Path x:Name="Expanded" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1,1,1,1" Data="M 0 4 L 8 4 L 4 8 Z" Visibility="Hidden">
-                                                                <Path.Fill>
-                                                                    <SolidColorBrush Color="{DynamicResource GlyphColor}" />
-                                                                </Path.Fill>
-                                                            </Path>
-                                                        </Grid>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
-                                        </Style>
-                                    </ToggleButton.Style>
-                                </ToggleButton>
-                                <ContentPresenter ContentSource="Title"/>
-                            </StackPanel>
-                        </c:TreeGridViewCell>
-                        <Grid Grid.Column="1" Name="PART_Grid" />
-                        <ItemsPresenter Grid.Row="1" Grid.ColumnSpan="2" Visibility="{TemplateBinding IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                        <ToggleButton.Style>
+                                            <Style TargetType="ToggleButton">
+                                                <Style.Resources>
+                                                    <Color x:Key="GlyphColor">#FF444444</Color>
+                                                </Style.Resources>
+                                                <Setter Property="Focusable" Value="False" />
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ToggleButton">
+                                                            <Grid Width="15" Height="13" Background="Transparent">
+                                                                <VisualStateManager.VisualStateGroups>
+                                                                    <VisualStateGroup x:Name="CheckStates">
+                                                                        <VisualState x:Name="Checked">
+                                                                            <Storyboard>
+                                                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Visibility)" Storyboard.TargetName="Collapsed">
+                                                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Hidden}" />
+                                                                                </ObjectAnimationUsingKeyFrames>
+                                                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Visibility)" Storyboard.TargetName="Expanded">
+                                                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{x:Static Visibility.Visible}" />
+                                                                                </ObjectAnimationUsingKeyFrames>
+                                                                            </Storyboard>
+                                                                        </VisualState>
+                                                                        <VisualState x:Name="Unchecked" />
+                                                                        <VisualState x:Name="Indeterminate" />
+                                                                    </VisualStateGroup>
+                                                                </VisualStateManager.VisualStateGroups>
+                                                                <Path x:Name="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1,1,1,1" Data="M 4 0 L 8 4 L 4 8 Z">
+                                                                    <Path.Fill>
+                                                                        <SolidColorBrush Color="{DynamicResource GlyphColor}" />
+                                                                    </Path.Fill>
+                                                                </Path>
+                                                                <Path x:Name="Expanded" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1,1,1,1" Data="M 0 4 L 8 4 L 4 8 Z" Visibility="Hidden">
+                                                                    <Path.Fill>
+                                                                        <SolidColorBrush Color="{DynamicResource GlyphColor}" />
+                                                                    </Path.Fill>
+                                                                </Path>
+                                                            </Grid>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ToggleButton.Style>
+                                    </ToggleButton>
+                                    <ContentPresenter ContentSource="Title"/>
+                                </StackPanel>
+                            </c:TreeGridViewCell>
+                            <Grid Name="PART_Columns" Grid.Column="1"/>
+                        </Grid>
+                        <ItemsPresenter Grid.Row="1" Visibility="{TemplateBinding IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>

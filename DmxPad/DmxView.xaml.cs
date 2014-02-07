@@ -44,6 +44,8 @@ namespace DmxPad
                 root_item.IsSelected = true;
                 root_item.IsExpanded = true;
             }
+
+            tgv.Items.Filter = ShowChangesOnly_Filter;
         }
 
         private static void DatamodelChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)

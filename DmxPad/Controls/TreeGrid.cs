@@ -44,8 +44,8 @@ namespace DmxPad.Controls
                 {
                     grid.ColumnDefinitions.Add(new ColumnDefinition() { SharedSizeGroup = "col_" + def.GetHashCode().ToString() });
                     var header = new TreeGridViewCell();
-                    header.SetBinding(TreeGridViewCell.ContentProperty, new Binding() { Source = def, Path = new PropertyPath("Header") });
-                    header.SetBinding(TreeGridViewCell.VisibilityProperty, new Binding() { Source = def, Path = new PropertyPath("Visibility") });
+                    header.SetBinding(TreeGridViewCell.ContentProperty, new Binding("Header") { Source = def });
+                    header.SetBinding(TreeGridViewCell.VisibilityProperty, new Binding("Visibility") { Source = def });
                     grid.Children.Add(header);
                     Grid.SetColumn(header, grid.ColumnDefinitions.Count - 1);
                 }
@@ -147,7 +147,7 @@ namespace DmxPad.Controls
 
             double horizontal = ((double)value) / 2;
             double vertical = parameter != null ? double.Parse((string)parameter) / 2 : 0;
-            
+
             return new Thickness(horizontal, vertical, horizontal, vertical);
         }
 
@@ -259,9 +259,14 @@ namespace DmxPad.Controls
     /// Implements a selectable item in a <see cref="TreeGridView"/> control.
     /// </summary>
     [StyleTypedProperty(Property = "ItemContainerStyle", StyleTargetType = typeof(TreeViewItem))]
-    [TemplatePart(Name = "PART_Grid", Type = typeof(Grid))]
+    [TemplatePart(Name = "PART_Columns", Type = typeof(Grid))]
     public class TreeGridViewItem : TreeViewItem
     {
+        public TreeGridViewItem()
+        {
+            if (TitleTemplate == null) SetBinding(TitleTemplateProperty, new Binding("TitleTemplate") { Source = Owner });
+        }
+
         static TreeGridViewItem()
         {
             DefaultStyleKeyProperty.OverrideMetadata(typeof(TreeGridViewItem), new FrameworkPropertyMetadata(typeof(TreeGridViewItem)));
@@ -277,29 +282,38 @@ namespace DmxPad.Controls
             return new TreeGridViewItem();
         }
 
+        T TryGetTemplateChild<T>(string name) where T: DependencyObject
+        {
+            var child = GetTemplateChild(name) as T;
+            if (child == null)
+                System.Diagnostics.Trace.TraceError("The template of TreeGridViewItem {0} does not contain a {1} element with name \"{2}\".", this.GetHashCode(), typeof(T).Name, name);
+            return child;
+        }
+
+        protected Grid PART_Columns;
+
         public override void OnApplyTemplate()
         {
             base.OnApplyTemplate();
 
-            var grid = GetTemplateChild("PART_Grid") as Grid;
-            if (grid == null)
-                System.Diagnostics.Trace.TraceError("The template of TreeGridViewItem {0} does not contain a Grid element with name \"PART_Grid\".", this.GetHashCode());
-            else
+            PART_Columns = TryGetTemplateChild<Grid>("PART_Columns");
+
+            if (PART_Columns != null)
             {
                 foreach (var def in Owner.ColumnDefinitions)
                 {
-                    grid.ColumnDefinitions.Add(new ColumnDefinition() { SharedSizeGroup = "col_" + def.GetHashCode().ToString() });
+                    PART_Columns.ColumnDefinitions.Add(new ColumnDefinition() { SharedSizeGroup = "col_" + def.GetHashCode().ToString() });
                     var template = def.ItemTemplateSelector == null ? def.ItemTemplate : def.ItemTemplateSelector.SelectTemplate(DataContext, this);
                     if (template != null)
                     {
                         var cell = new TreeGridViewCell();
                         cell.Content = template.LoadContent() as FrameworkElement;
                         cell.Style = def.CellStyle;
-                        cell.SetBinding(TreeGridViewCell.VisibilityProperty, new Binding() { Source = def, Path = new PropertyPath("Visibility") });
+                        cell.SetBinding(TreeGridViewCell.VisibilityProperty, new Binding("Visibility") { Source = def });
                         if (def.Binding != null)
                             BindingOperations.SetBinding(cell, FrameworkElement.DataContextProperty, ((TreeGridContentColumnDefinition)def).Binding);
-                        grid.Children.Add(cell);
-                        Grid.SetColumn(cell, grid.ColumnDefinitions.Count - 1);
+                        PART_Columns.Children.Add(cell);
+                        Grid.SetColumn(cell, PART_Columns.ColumnDefinitions.Count - 1);
                     }
                 }
             }
@@ -308,46 +322,23 @@ namespace DmxPad.Controls
         protected override void PrepareContainerForItemOverride(DependencyObject element, object item)
         {
             base.PrepareContainerForItemOverride(element, item);
-            var template = TitleTemplate;
-            if (TitleTemplate == null)
+            var tgi = (TreeGridViewItem)element;
+            if (tgi.Title == null)
             {
-                DependencyObject cur_container = this;
-                while (true)
-                {
-                    cur_container = ItemsControlFromItemContainer(cur_container);
-                    if (cur_container == null)
-                        break;
-                    if (cur_container is TreeGridView)
-                    {
-                        template = ((TreeGridView)cur_container).TitleTemplate;
-                        break;
-                    }
-                    if (cur_container is TreeGridViewItem)
-                    {
-                        template = ((TreeGridViewItem)cur_container).TitleTemplate;
-                        if (template != null) break;
-                    }
-                }
+                var template = TitleTemplate ?? Owner.TitleTemplate;
+                if (template != null)
+                    tgi.Title = template.LoadContent();
             }
-            if (template != null)
-                ((TreeGridViewItem)element).Title = template.LoadContent();
         }
 
         protected override void OnInitialized(EventArgs e)
         {
             base.OnInitialized(e);
 
-            DependencyObject cur_container = this;
-            while (true)
-            {
-                cur_container = ItemsControlFromItemContainer(cur_container);
-                if (cur_container == null || cur_container is TreeGridView)
-                    break;
-                else if (cur_container is TreeGridViewItem)
-                    Indent++;
-            }
-            if (Owner.ChildItemsSelector != null)
-                BindingOperations.SetBinding(this, ItemsSourceProperty, Owner.ChildItemsSelector ?? new Binding(Owner.ChildItemsPath));
+            var parent = ItemsControlFromItemContainer(this) as TreeGridViewItem;
+            if (parent != null) Indent = parent.Indent + 1;
+
+            BindingOperations.SetBinding(this, ItemsSourceProperty, Owner.ChildItemsSelector ?? new Binding(Owner.ChildItemsPath));
         }
         #endregion
 
@@ -374,27 +365,27 @@ namespace DmxPad.Controls
         /// Gets the indentation level of this TreeGridViewItem.
         /// </summary>
         public int Indent { get { return _Indent; } protected set { _Indent = value; } }
-        int _Indent = new int();
+        int _Indent = 0;
 
         /// <summary>
         /// Gets or sets the Title content of this TreeGridViewItem.
         /// </summary>
         public object Title
         {
-            get { return (object)GetValue(TreeViewHeaderProperty); }
-            set { SetValue(TreeViewHeaderProperty, value); }
+            get { return (object)GetValue(TitleProperty); }
+            set { SetValue(TitleProperty, value); }
         }
-        public static readonly DependencyProperty TreeViewHeaderProperty = DependencyProperty.Register("Title", typeof(object), typeof(TreeGridViewItem), new PropertyMetadata(null));
+        public static readonly DependencyProperty TitleProperty = DependencyProperty.Register("Title", typeof(object), typeof(TreeGridViewItem), new PropertyMetadata(null));
 
         /// <summary>
         /// Gets or sets the <see cref="DataTemplate"/> used to generate the Title cell for this TreeGridViewItem.
         /// </summary>
         public DataTemplate TitleTemplate
         {
-            get { return (DataTemplate)GetValue(TreeGridViewHeaderTemplateProperty); }
-            set { SetValue(TreeGridViewHeaderTemplateProperty, value); }
+            get { return (DataTemplate)GetValue(TitleTemplateProperty); }
+            set { SetValue(TitleTemplateProperty, value); }
         }
-        public static readonly DependencyProperty TreeGridViewHeaderTemplateProperty = DependencyProperty.Register("TitleTemplate", typeof(DataTemplate), typeof(TreeGridViewItem), new PropertyMetadata(null));
+        public static readonly DependencyProperty TitleTemplateProperty = DependencyProperty.Register("TitleTemplate", typeof(DataTemplate), typeof(TreeGridViewItem), new PropertyMetadata(null));
         #endregion
     }
 

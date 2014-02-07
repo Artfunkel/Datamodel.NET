@@ -23,7 +23,7 @@
                 <Setter Property="TitleTemplate">
                     <Setter.Value>
                         <DataTemplate>
-                            <ContentControl Content="{Binding}" IsTabStop="False"/>
+                            <ContentPresenter Content="{Binding}"/>
                         </DataTemplate>
                     </Setter.Value>
                 </Setter>
@@ -38,75 +38,113 @@
             </Style>
         </Grid.Resources>
         <ToolBar Grid.ColumnSpan="2">
-            <Button Command="Save">Save</Button>
-            <Separator/>
-            <Button Command="Undo">Undo</Button>
-            <Button Command="Redo">Redo</Button>
-            <Separator/>
-            <Button Command="{x:Static l:App.CompareDatamodel}" ToolTip="Compare Datamodel... (Ctrl+D)">
-                <Image Source="Resources/Diff.png" />
+            <ToolBar.Resources>
+                <Style TargetType="Image">
+                    <Setter Property="Width" Value="16"/>
+                    <Setter Property="Height" Value="16"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.6"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </ToolBar.Resources>
+            <Button Command="Save" ToolTip="Save">
+                <Image Source="Resources/Save.png"/>
             </Button>
-            <ToggleButton Command="{x:Static l:App.ShowChangesOnly}" ToolTip="Show changes only" IsChecked="{Binding FilterComparison}">
+            <Button Command="Refresh" ToolTip="Reload">
+                <Image Source="Resources/Refresh.png"/>
+            </Button>
+            <Separator/>
+            <Button Command="Undo" ToolTip="Undo">
+                <Image Source="Resources/Undo.png"/>
+            </Button>
+            <Button Command="Redo" ToolTip="Redo">
+                <Image Source="Resources/Undo.png" RenderTransformOrigin="0.5,0.5">
+                    <Image.RenderTransform>
+                        <TransformGroup>
+                            <ScaleTransform ScaleX="-1"/>
+                        </TransformGroup>
+                    </Image.RenderTransform>
+                </Image>
+            </Button>
+            <Separator/>
+            <ToggleButton IsChecked="{Binding UseListView}" ToolTip="List View">
+                <Image Source="Resources/ListView.png" />
+            </ToggleButton>
+            <Separator/>
+            <ToggleButton Command="{x:Static l:App.CompareDatamodel}" ToolTip="Compare Datamodel... (Ctrl+D)" IsChecked="{Binding ComparisonDatamodel,Converter={StaticResource NotNull},Mode=OneWay}">
+                <Image Source="Resources/Diff.png" />
+            </ToggleButton>
+            <ToggleButton Command="{x:Static l:App.ShowChangesOnly}" ToolTip="Show changes only" IsChecked="{Binding FilterComparison}" Visibility="{Binding ComparisonDatamodel,Converter={StaticResource VisibleIfNotNull}}">
                 <Image Source="Resources/Filter.png"/>
             </ToggleButton>
         </ToolBar>
-        
-        <Grid Grid.Row="1" Grid.ColumnSpan="2" VerticalAlignment="Top" >
+
+        <Grid Grid.Row="1" Grid.ColumnSpan="2" VerticalAlignment="Top">
             <TextBox x:Name="PathBox" Margin="0,4" Padding="18,1,0,1" BorderBrush="LightGray"
                      Text="{Binding Path, NotifyOnSourceUpdated=True, UpdateSourceTrigger=Explicit}" KeyDown="PathBox_KeyDown" SourceUpdated="PathBox_SourceUpdated" />
             <Image Source="/DmxPad;component/Resources/datamodel.png" HorizontalAlignment="Left" Height="16" Width="16" Margin="4,0" Cursor="Hand" 
 				MouseDown="ResetRoot_Click" ToolTip="Return to the root element"/>
         </Grid>
 
-        <c:TreeGridView x:Name="DmxTree" Grid.Row="2" Grid.Column="0" Loaded="DmxTree_Loaded"
-                        ItemsSource="{Binding Datamodel, Converter={StaticResource EnsureElementConverter}}"
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition/>
+            </Grid.RowDefinitions>
+            
+            <c:SearchBox SearchTarget="{Binding ElementName=DmxTree}"
+                Visibility="{Binding UseListView, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <c:TreeGridView x:Name="DmxTree" Grid.Row="1" Loaded="DmxTree_Loaded"
+                        VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"
                         ChildItemsSelector="{Binding Converter={StaticResource ChildPathConverter}}">
-            <c:TreeGridView.Resources>
-                <Style TargetType="{x:Type c:TreeGridViewItem}">
-                    <EventSetter Event="Selected" Handler="TreeViewItem_Selected"/>
-                </Style>
-            </c:TreeGridView.Resources>
-            <c:TreeGridView.ColumnDefinitions>
-                <c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}" CellStyle="{StaticResource TypeColumnCellStyle}"/>
-            </c:TreeGridView.ColumnDefinitions>
-        </c:TreeGridView>
-        
-        <c:TreeGridView x:Name="DmxTree_Comparison" Grid.Row="2" Grid.Column="0" Loaded="DmxTree_Loaded" TitleColumnHeader="Name" ColumnSpacing="5"
-                        ItemsSource="{Binding ComparisonDatamodel, Converter={StaticResource EnsureElementConverter}}"
-                        ChildItemsSelector="{Binding Converter={StaticResource ChildPathConverter}}"
-                        Visibility="{Binding ComparisonDatamodel, Converter={StaticResource ComparisonTreeVisibility}}">
-            <c:TreeGridView.ColumnDefinitions>
-                <c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}" CellStyle="{StaticResource TypeColumnCellStyle}"/>
-            </c:TreeGridView.ColumnDefinitions>
-            <c:TreeGridView.Resources>
-                <Style TargetType="{x:Type c:TreeGridViewItem}">
-                    <EventSetter Event="Loaded" Handler="ComparisonViewItem_Loaded" />
-                    <EventSetter Event="Selected" Handler="TreeViewItem_Selected"/>
-                    <!--<Style.Triggers>
-                        <DataTrigger Binding="{Binding State}" Value="{x:Static l:ComparisonDatamodel+ComparisonState.Changed}">
-                            <Setter Property="Background" Value="Orange"/>
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding State}" Value="{x:Static l:ComparisonDatamodel+ComparisonState.Added}">
-                            <Setter Property="Background" Value="Green"/>
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding State}" Value="{x:Static l:ComparisonDatamodel+ComparisonState.Removed}">
-                            <Setter Property="Background" Value="Salmon"/>
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding State}" Value="{x:Static l:ComparisonDatamodel+ComparisonState.ChildChanged}">
-                            <Setter Property="Background" Value="LightGray"/>
-                        </DataTrigger>
-                    </Style.Triggers>-->
-                </Style>
-            </c:TreeGridView.Resources>
-            <c:TreeGridView.TitleTemplate>
-                <DataTemplate>
-                    <StackPanel Orientation="Horizontal">
-                        <ContentPresenter Content="{Binding State,Converter={StaticResource ComparisonIcon}}"/>
-                        <ContentPresenter Content="{Binding}"/>
-                    </StackPanel>
-                </DataTemplate>
-            </c:TreeGridView.TitleTemplate>
-        </c:TreeGridView>
+                <c:TreeGridView.ItemsSource>
+                    <MultiBinding Converter="{StaticResource DmxTreeItemSource}">
+                        <Binding Path="Datamodel"/>
+                        <Binding Path="UseListView"/>
+                    </MultiBinding>
+                </c:TreeGridView.ItemsSource>
+                <c:TreeGridView.Resources>
+                    <Style TargetType="{x:Type c:TreeGridViewItem}">
+                        <EventSetter Event="Selected" Handler="TreeViewItem_Selected"/>
+                    </Style>
+                </c:TreeGridView.Resources>
+                <c:TreeGridView.ColumnDefinitions>
+                    <c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}" CellStyle="{StaticResource TypeColumnCellStyle}"/>
+                </c:TreeGridView.ColumnDefinitions>
+            </c:TreeGridView>
+
+            <c:SearchBox SearchTarget="{Binding ElementName=DmxTree_Comparison}"
+                Visibility="{Binding UseListView, Converter={StaticResource BooleanToVisibilityConverter}}" />
+            <c:TreeGridView x:Name="DmxTree_Comparison" Grid.Row="1" Loaded="DmxTree_Loaded" TitleColumnHeader="Name" ColumnSpacing="5"
+                        Visibility="{Binding ComparisonDatamodel, Converter={StaticResource ComparisonTreeVisibility}}"
+                        ChildItemsSelector="{Binding Converter={StaticResource ChildPathConverter}}">
+                <c:TreeGridView.ItemsSource>
+                    <MultiBinding Converter="{StaticResource DmxTreeItemSource}">
+                        <Binding Path="ComparisonDatamodel"/>
+                        <Binding Path="UseListView"/>
+                    </MultiBinding>
+                </c:TreeGridView.ItemsSource>
+                <c:TreeGridView.ColumnDefinitions>
+                    <c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}" CellStyle="{StaticResource TypeColumnCellStyle}"/>
+                </c:TreeGridView.ColumnDefinitions>
+                <c:TreeGridView.Resources>
+                    <Style TargetType="{x:Type c:TreeGridViewItem}">
+                        <EventSetter Event="Loaded" Handler="ComparisonViewItem_Loaded" />
+                        <EventSetter Event="Selected" Handler="TreeViewItem_Selected"/>
+                    </Style>
+                </c:TreeGridView.Resources>
+                <c:TreeGridView.TitleTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <ContentPresenter Content="{Binding State,Converter={StaticResource ComparisonIcon}}"/>
+                            <ContentPresenter Content="{Binding}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </c:TreeGridView.TitleTemplate>
+            </c:TreeGridView>
+        </Grid>
 
         <GridSplitter Grid.Column="1" Grid.Row="2" Width="2" VerticalAlignment="Stretch" HorizontalAlignment="Left" ResizeDirection="Columns"/>
 
@@ -209,7 +247,8 @@
                                         <TextBlock TextTrimming="CharacterEllipsis">
                                             <TextBlock.Inlines>
                                                 <Run Text="{Binding ID, Mode=OneWay, FallbackValue=Unknown}" FontFamily="Consolas" />
-                                                <Run Text=""/> <!-- Ensures proper vertical alignment for the Consolas run above -->
+                                                <Run Text=""/>
+                                                <!-- Ensures proper vertical alignment for the Consolas run above -->
                                             </TextBlock.Inlines>
                                         </TextBlock>
                                         <TextBlock Grid.Column="1">
@@ -232,6 +271,7 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
@@ -242,10 +282,14 @@
                                     <ContentControl Content="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>
                                     <!--<ComboBox ItemsSource="{x:Static dm:Datamodel.AttributeTypes}" SelectedItem="{Binding Converter={StaticResource DebugConverter}}" ItemTemplate="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>-->
                                 </c:LabelledControl>
-                                <c:LabelledControl LabelText="Value:" Grid.Row="2" VerticalContentAlignment="Top">
+                                <c:LabelledControl LabelText="Value:" Grid.Row="2">
                                     <ContentPresenter Content="{Binding}" ContentTemplateSelector="{StaticResource InspectPaneTemplateSelector}"/>
                                 </c:LabelledControl>
-                                <StackPanel Orientation="Horizontal" Grid.Row="3">
+                                <c:LabelledControl LabelText="" Grid.Row="3" VerticalContentAlignment="Top"
+                                                   Visibility="{Binding Value, Converter={StaticResource AttributeListView}}">
+                                    <ListBox ItemsSource="{Binding Value}"/>
+                                </c:LabelledControl>
+                                <StackPanel Orientation="Horizontal" Grid.Row="4">
                                     <Button Content="Delete" Click="DeleteButton_Click"/>
                                 </StackPanel>
                             </Grid>

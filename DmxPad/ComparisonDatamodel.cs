@@ -135,9 +135,8 @@ namespace DmxPad
                     foreach (var attr_left in Element_Left)
                     {
                         Datamodel.Attribute attr_right = null;
-                        try { attr_right = Element_Right.GetAttribute(attr_left.Name); }
-                        catch { }
-
+                        if (Element_Right != null && Element_Right.Contains(attr_left.Name))
+                            attr_right = Element_Right.GetAttribute(attr_left.Name);
                         Attributes.Add(attr_left.Name, new Attribute(this, attr_left, attr_right));
                     }
                 }

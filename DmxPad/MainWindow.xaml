@@ -10,6 +10,7 @@
         <CommandBinding Command="Save" Executed="Save_Executed" CanExecute="FileOperations_CanExecute" />
         <CommandBinding Command="SaveAs" Executed="SaveAs_Executed" CanExecute="FileOperations_CanExecute" />
         <CommandBinding Command="Close" Executed="Close_Executed" CanExecute="FileOperations_CanExecute" />
+        <CommandBinding Command="Refresh" Executed="Refresh_Executed" CanExecute="FileOperations_CanExecute"/>
         <CommandBinding Command="{x:Static l:App.CompareDatamodel}" Executed="CompareDatamodel_Executed" CanExecute="FileOperations_CanExecute"/>
     </Window.CommandBindings>
     <Grid>
@@ -51,7 +52,6 @@
             </MenuItem>
             <MenuItem Header="_Tools" >
                 <MenuItem Header="_Register File Extensions" Click="RegisterExtensions_Click"/>
-                <MenuItem Header="_Compare Datamodel..." Command="{x:Static l:App.CompareDatamodel}"/>
             </MenuItem>
         </Menu>
 
