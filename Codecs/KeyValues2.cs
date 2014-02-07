@@ -59,7 +59,7 @@ namespace Datamodel.Codecs
 
             public KV2Writer(Stream output)
             {
-                Output = new StreamWriter(output, Encoding.ASCII);
+                Output = new StreamWriter(output, Encoding.UTF8);
             }
 
             public void Dispose()

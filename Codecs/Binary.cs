@@ -74,9 +74,10 @@ namespace Datamodel.Codecs
             }
             return StringBuilder.ToString();
         }
+
         protected void WriteString_Raw(string value)
         {
-            Writer.Write(value.Select(c => (byte)c).ToArray());
+            Writer.Write(Encoding.UTF8.GetBytes(value));
             Writer.Write((byte)0);
         }
 
