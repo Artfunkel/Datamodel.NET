@@ -89,22 +89,51 @@
         </Grid>
 
         <Grid Grid.Row="2">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding UseListView}" Value="False">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition/>
             </Grid.RowDefinitions>
-            
-            <c:SearchBox SearchTarget="{Binding ElementName=DmxTree}"
-                Visibility="{Binding UseListView, Converter={StaticResource BooleanToVisibilityConverter}}" />
-            <c:TreeGridView x:Name="DmxTree" Grid.Row="1" Loaded="DmxTree_Loaded"
-                        VirtualizingStackPanel.IsVirtualizing="True" VirtualizingStackPanel.VirtualizationMode="Recycling"
+            <c:SearchBox x:Name="ElementListSearch" SearchTarget="{Binding ElementName=ElementList}" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"/>
+            <ListBox Name="ElementList" Grid.Row="1" ItemsSource="{Binding Datamodel.AllElements}" BorderBrush="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <ContentPresenter Content="{Binding Converter={StaticResource AttributeIconConverter}}"/>
+                            <TextBlock Margin="4,0,0,0">
+                                <Run Text="{Binding Name}"/> [<Run Text="{Binding ClassName}"/>]
+                            </TextBlock>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding UseListView}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition/>
+            </Grid.RowDefinitions>
+
+            <c:TreeGridView x:Name="DmxTree" Grid.Row="1" Loaded="DmxTree_Loaded" ItemsSource="{Binding Datamodel, Converter={StaticResource DmxTreeItemSource}}"
                         ChildItemsSelector="{Binding Converter={StaticResource ChildPathConverter}}">
-                <c:TreeGridView.ItemsSource>
-                    <MultiBinding Converter="{StaticResource DmxTreeItemSource}">
-                        <Binding Path="Datamodel"/>
-                        <Binding Path="UseListView"/>
-                    </MultiBinding>
-                </c:TreeGridView.ItemsSource>
                 <c:TreeGridView.Resources>
                     <Style TargetType="{x:Type c:TreeGridViewItem}">
                         <EventSetter Event="Selected" Handler="TreeViewItem_Selected"/>
@@ -115,17 +144,10 @@
                 </c:TreeGridView.ColumnDefinitions>
             </c:TreeGridView>
 
-            <c:SearchBox SearchTarget="{Binding ElementName=DmxTree_Comparison}"
-                Visibility="{Binding UseListView, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <c:TreeGridView x:Name="DmxTree_Comparison" Grid.Row="1" Loaded="DmxTree_Loaded" TitleColumnHeader="Name" ColumnSpacing="5"
                         Visibility="{Binding ComparisonDatamodel, Converter={StaticResource ComparisonTreeVisibility}}"
+                           ItemsSource="{Binding ComparisonDatamodel, Converter={StaticResource DmxTreeItemSource}}"
                         ChildItemsSelector="{Binding Converter={StaticResource ChildPathConverter}}">
-                <c:TreeGridView.ItemsSource>
-                    <MultiBinding Converter="{StaticResource DmxTreeItemSource}">
-                        <Binding Path="ComparisonDatamodel"/>
-                        <Binding Path="UseListView"/>
-                    </MultiBinding>
-                </c:TreeGridView.ItemsSource>
                 <c:TreeGridView.ColumnDefinitions>
                     <c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}" CellStyle="{StaticResource TypeColumnCellStyle}"/>
                 </c:TreeGridView.ColumnDefinitions>
@@ -287,7 +309,51 @@
                                 </c:LabelledControl>
                                 <c:LabelledControl LabelText="" Grid.Row="3" VerticalContentAlignment="Top"
                                                    Visibility="{Binding Value, Converter={StaticResource AttributeListView}}">
-                                    <ListBox ItemsSource="{Binding Value}"/>
+                                    <ContentPresenter Content="{Binding}" ContentTemplateSelector="{StaticResource CollectionTemplateSelector}">
+                                        <ContentPresenter.Resources>
+                                            <Style TargetType="DataGrid">
+                                                <Setter Property="HeadersVisibility" Value="Column"/>
+                                                <Setter Property="AutoGenerateColumns" Value="False"/>
+                                                <Setter Property="CanUserReorderColumns" Value="False"/>
+                                                <Setter Property="MinColumnWidth" Value="50"/>
+                                            </Style>
+                                            <DataTemplate x:Key="Vector2">
+                                                <DataGrid ItemsSource="{Binding Value}">
+                                                    <DataGrid.Columns>
+                                                        <DataGridTextColumn Header="X" Binding="{Binding X}"/>
+                                                        <DataGridTextColumn Header="Y" Binding="{Binding Y}"/>
+                                                    </DataGrid.Columns>
+                                                </DataGrid>
+                                            </DataTemplate>
+                                            <DataTemplate x:Key="Vector3">
+                                                <DataGrid ItemsSource="{Binding Value}">
+                                                    <DataGrid.Columns>
+                                                        <DataGridTextColumn Header="X" Binding="{Binding X}"/>
+                                                        <DataGridTextColumn Header="Y" Binding="{Binding Y}"/>
+                                                        <DataGridTextColumn Header="Z" Binding="{Binding Z}"/>
+                                                    </DataGrid.Columns>
+                                                </DataGrid>
+                                            </DataTemplate>
+                                            <DataTemplate x:Key="Vector4">
+                                                <DataGrid ItemsSource="{Binding Value}">
+                                                    <DataGrid.Columns>
+                                                        <DataGridTextColumn Header="W" Binding="{Binding W}"/>
+                                                        <DataGridTextColumn Header="X" Binding="{Binding X}"/>
+                                                        <DataGridTextColumn Header="Y" Binding="{Binding Y}"/>
+                                                        <DataGridTextColumn Header="Z" Binding="{Binding Z}"/>
+                                                    </DataGrid.Columns>
+                                                </DataGrid>
+                                            </DataTemplate>
+                                            <DataTemplate x:Key="Solo">
+                                                <DataGrid ItemsSource="{Binding Value}" HeadersVisibility="None">
+                                                    <DataGrid.Columns>
+                                                        <DataGridTextColumn Binding="{Binding}"/>
+                                                    </DataGrid.Columns>
+                                                </DataGrid>
+                                            </DataTemplate>
+                                        </ContentPresenter.Resources>
+                                    </ContentPresenter>
+                                    <!--<ListBox ItemsSource="{Binding Value}"/>-->
                                 </c:LabelledControl>
                                 <StackPanel Orientation="Horizontal" Grid.Row="4">
                                     <Button Content="Delete" Click="DeleteButton_Click"/>

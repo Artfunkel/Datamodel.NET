@@ -14,6 +14,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 
 using Datamodel;
+using DmxPad.Controls;
 
 namespace DmxPad
 {
@@ -25,13 +26,15 @@ namespace DmxPad
         public DmxView()
         {
             InitializeComponent();
+            ElementListSearch.FilterPredicate = (o) => {
+                var elem = (Element)o;
+                return elem.Name.ContainsCI(ElementListSearch.Terms) || elem.ClassName.ContainsCI(ElementListSearch.Terms);
+            };
         }
 
         static DmxView()
         {
-            DataContextProperty.OverrideMetadata(
-                typeof(DmxView),
-                new FrameworkPropertyMetadata(typeof(DmxView)));
+            DataContextProperty.OverrideMetadata(typeof(DmxView), new FrameworkPropertyMetadata(typeof(DmxView)));
         }
 
         private void DmxTree_Loaded(object sender, RoutedEventArgs e)

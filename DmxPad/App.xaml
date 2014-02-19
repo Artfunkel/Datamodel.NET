@@ -23,6 +23,7 @@
         <converter:DmxTreeItemSource x:Key="DmxTreeItemSource"/>
         <converter:NotNull x:Key="NotNull"/>
         <converter:InverseBoolean x:Key="InverseBoolean"/>
+        <converter:CollectionTemplateSelector x:Key="CollectionTemplateSelector"/>
 
         <l:InspectPaneTemplateSelector x:Key="InspectPaneTemplateSelector"/>
         <converter:ValueColumnTemplateSelector x:Key="ValueColumnTemplateSelector"/>

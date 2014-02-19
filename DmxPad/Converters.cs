@@ -520,23 +520,23 @@ namespace DmxPad.Converters
         }
     }
 
-    public class DmxTreeItemSource : IMultiValueConverter
+    public class DmxTreeItemSource : IValueConverter
     {
-        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var dm = values[0] as Datamodel.Datamodel;
+            var dm = value as Datamodel.Datamodel;
 
             if (dm != null)
-                return (bool)values[1] ? (object)dm.AllElements : new object[] { dm.Root };
+                return new object[] { dm.Root };
 
-            var cdm = values[0] as ComparisonDatamodel;
+            var cdm = value as ComparisonDatamodel;
             if (cdm != null)
-                return (bool)values[1] ? (object)cdm.ComparedElements.Values : new object[] { cdm.Root };
+                return new object[] { cdm.Root };
 
             return null;
         }
 
-        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }
@@ -568,5 +568,30 @@ namespace DmxPad.Converters
         }
     }
 
+    public class CollectionTemplateSelector : DataTemplateSelector
+    {
+        public override DataTemplate SelectTemplate(object item, DependencyObject container)
+        {
+            if (item == null) return null;
+            var attr = item as Datamodel.Attribute;
+            if (attr == null) return null;
+            if (!Datamodel.Datamodel.IsDatamodelArrayType(attr.Value.GetType())) return null;
 
+            var host = (FrameworkElement)container;
+
+            var inner = Datamodel.Datamodel.GetArrayInnerType(attr.Value.GetType());
+            string resource_name;
+
+            if (inner == typeof(Vector2))
+                resource_name = "Vector2";
+            else if (inner == typeof(Vector3) || inner == typeof(Angle))
+                resource_name = "Vector3";
+            else if (inner == typeof(Vector4) || inner == typeof(Quaternion))
+                resource_name = "Vector4";
+            else
+                resource_name = "Solo";
+
+            return (DataTemplate)host.Resources[resource_name];
+        }
+    }
 }
