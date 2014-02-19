@@ -59,7 +59,7 @@ namespace Datamodel.Codecs
 
             public KV2Writer(Stream output)
             {
-                Output = new StreamWriter(output, Encoding.UTF8);
+                Output = new StreamWriter(output, Datamodel.TextEncoding);
             }
 
             public void Dispose()
@@ -450,7 +450,7 @@ namespace Datamodel.Codecs
             DM = new Datamodel(format, format_version);
 
             stream.Seek(0, SeekOrigin.Begin);
-            Reader = new StreamReader(stream);
+            Reader = new StreamReader(stream, Datamodel.TextEncoding);
             Reader.ReadLine(); // skip DMX header
             Line = 1;
             string next;

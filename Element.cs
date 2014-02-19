@@ -17,13 +17,13 @@ namespace Datamodel
     {
         internal Element(Datamodel datamodel, Guid id, string name, string class_name, bool stub)
         {
-            this.id = id;
+            this._ID = id;
             Name = name;
             ClassName = class_name;
-            this.stub = stub;
+            this._Stub = stub;
             if (!stub)
             {
-                owner = datamodel;
+                _Owner = datamodel;
                 lock (Owner.AllElements)
                 {
                     Owner.AllElements.Add(this);
@@ -58,41 +58,41 @@ namespace Datamodel
         /// <summary>
         /// Gets the ID of this Element. This must be unique within the Element's <see cref="Datamodel"/>.
         /// </summary>
-        public Guid ID { get { return id; } }
-        readonly Guid id;
+        public Guid ID { get { return _ID; } }
+        readonly Guid _ID;
 
         /// <summary>
         /// Gets or sets the name of this Element.
         /// </summary>
         public string Name
         {
-            get { return name; }
-            set { name = value; NotifyPropertyChanged("Name"); }
+            get { return _Name; }
+            set { _Name = value; NotifyPropertyChanged("Name"); }
         }
-        string name;
+        string _Name;
 
         /// <summary>
         /// Gets or sets the class of this Element. This is a string which loosely defines what <see cref="Attribute"/>s the Element contains.
         /// </summary>
         public string ClassName
         {
-            get { return className; }
-            set { className = value; NotifyPropertyChanged("ClassName"); }
+            get { return _ClassName; }
+            set { _ClassName = value; NotifyPropertyChanged("ClassName"); }
         }
-        string className;
+        string _ClassName;
 
         /// <summary>
         /// Gets or sets whether this Element is a stub.
         /// </summary>
         /// <remarks>A Stub element does (or did) exist, but is not defined in this Element's <see cref="Datamodel"/>. Only its <see cref="ID"/> is known.</remarks>
-        public bool Stub { get { return stub; } }
-        readonly bool stub;
+        public bool Stub { get { return _Stub; } }
+        readonly bool _Stub;
 
         /// <summary>
         /// The <see cref="Datamodel"/> that this Element is part of.
         /// </summary>
-        public Datamodel Owner { get { return owner; } }
-        readonly Datamodel owner;
+        public Datamodel Owner { get { return _Owner; } }
+        readonly Datamodel _Owner;
         #endregion
 
         /// <summary>

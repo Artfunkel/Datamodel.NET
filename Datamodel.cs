@@ -62,6 +62,7 @@ namespace Datamodel
         {
             Datamodel.RegisterCodec(typeof(Codecs.Binary), "binary", 1, 2, 3, 4, 5);
             Datamodel.RegisterCodec(typeof(Codecs.KeyValues2), "keyvalues2", 1);
+            TextEncoding = System.Text.Encoding.UTF8;
         }
 
         #region Codecs
@@ -122,6 +123,13 @@ namespace Datamodel
         #endregion
 
         #region Save / Load
+
+        /// <summary>
+        /// Gets or sets the assumed encoding of text in DMX files. Defaults to UTF8.
+        /// </summary>
+        /// <remarks>Changing this value does not alter Datamodels whiche are already in memory.</remarks>
+        public static System.Text.Encoding TextEncoding { get; set; }
+
         /// <summary>
         /// Writes this Datamodel to a <see cref="Stream"/> with the given encoding and encoding version.
         /// </summary>
@@ -334,8 +342,8 @@ namespace Datamodel
         /// <param name="format_version">The version of the format in use.</param>
         public Datamodel(string format, int format_version)
         {
-            this.format = format;
-            this.formatVersion = format_version;
+            Format = format;
+            FormatVersion = format_version;
             AllElements = new ElementList(this);
         }
 
@@ -359,7 +367,11 @@ namespace Datamodel
         /// <summary>
         /// Gets or sets a <see cref="FileInfo"/> object associated with this Datamodel.
         /// </summary>
-        public FileInfo File { get { return _File; } set { _File = value; } }
+        public FileInfo File
+        {
+            get { return _File; }
+            set { _File = value; NotifyPropertyChanged("File"); }
+        }
         FileInfo _File;
 
         /// <summary>
@@ -367,46 +379,46 @@ namespace Datamodel
         /// </summary>
         public string Format
         {
-            get { return format; }
+            get { return _Format; }
             set
             {
-                if (format.Contains(' '))
+                if (value != null && value.Contains(' '))
                     throw new ArgumentException("Format name cannot contain spaces.");
-                format = value;
+                _Format = value;
                 NotifyPropertyChanged("Format");
             }
         }
-        string format;
+        string _Format;
 
         /// <summary>
         /// The version of the <see cref="Format"/> in use.
         /// </summary>
         public int FormatVersion
         {
-            get { return formatVersion; }
-            set { formatVersion = value; NotifyPropertyChanged("FormatVersion"); }
+            get { return _FormatVersion; }
+            set { _FormatVersion = value; NotifyPropertyChanged("FormatVersion"); }
         }
-        int formatVersion;
+        int _FormatVersion;
 
         /// <summary>
         /// The encoding with which this Datamodel should be stored.
         /// </summary>
         public string Encoding
         {
-            get { return encoding; }
-            set { encoding = value; }
+            get { return _Encoding; }
+            set { _Encoding = value; NotifyPropertyChanged("Encoding"); }
         }
-        string encoding;
+        string _Encoding;
 
         /// <summary>
         /// The version of the <see cref="Encoding"/> in use.
         /// </summary>
         public int EncodingVersion
         {
-            get { return encodingVersion; }
-            set { encodingVersion = value; }
+            get { return _EncodingVersion; }
+            set { _EncodingVersion = value; NotifyPropertyChanged("EncodingVersion"); }
         }
-        int encodingVersion;
+        int _EncodingVersion;
 
         Stream Stream;
         internal IDeferredAttributeCodec Codec;
@@ -416,25 +428,21 @@ namespace Datamodel
         /// </summary>
         public Element Root
         {
-            get { return root; }
+            get { return _Root; }
             set
             {
                 if (value.Owner != this)
                     throw new InvalidOperationException("Cannot add an element from a different Datamodel. Use ImportElement() first.");
-                root = value;
+                _Root = value;
                 NotifyPropertyChanged("Root");
             }
         }
-        Element root;
+        Element _Root;
+
         /// <summary>
         /// All Elements created for this Datamodel. Only Elements which are referenced by the Root element or one of its children are actually considered part of the Datamodel.
         /// </summary>
-        public ElementList AllElements
-        {
-            get { return _AllElements; }
-            protected set { _AllElements = value; }
-        }
-        ElementList _AllElements;
+        public ElementList AllElements { get; protected set; }
         #endregion
 
         #region Element handling

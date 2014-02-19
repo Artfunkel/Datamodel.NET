@@ -62,22 +62,25 @@ namespace Datamodel.Codecs
             return array ? type_list[id].MakeListType() : type_list[id];
         }
 
-        protected StringBuilder StringBuilder = new StringBuilder();
         protected string ReadString_Raw()
         {
-            StringBuilder.Clear();
-            while (true)
+            List<byte> raw = new List<byte>();
+            while(true)
             {
-                char c = Reader.ReadChar();
-                if (c == 0) break;
-                StringBuilder.Append(c);
+                byte cur = Reader.ReadByte();
+                if (cur == 0) break;
+                else raw.Add(cur);
             }
-            return StringBuilder.ToString();
+
+            var user_encoding = Datamodel.TextEncoding.GetString(raw.ToArray());
+            if (user_encoding.Contains('�'))
+                return Encoding.Default.GetString(raw.ToArray());
+            else return user_encoding;
         }
 
         protected void WriteString_Raw(string value)
         {
-            Writer.Write(Encoding.UTF8.GetBytes(value));
+            Writer.Write(Datamodel.TextEncoding.GetBytes(value));
             Writer.Write((byte)0);
         }
 
@@ -179,7 +182,7 @@ namespace Datamodel.Codecs
         public void Encode(Datamodel dm, int encoding_version, Stream stream)
         {
             EncodingVersion = encoding_version;
-            Writer = new BinaryWriter(stream, Encoding.UTF8);
+            Writer = new BinaryWriter(stream, Datamodel.TextEncoding);
 
             WriteString_Raw(String.Format(CodecUtilities.HeaderPattern, "binary", EncodingVersion, dm.Format, dm.FormatVersion) + "\n");
 
@@ -404,7 +407,7 @@ namespace Datamodel.Codecs
             var dm = new Datamodel(format, format_version);
 
             EncodingVersion = encoding_version;
-            Reader = new BinaryReader(stream, Encoding.UTF8);
+            Reader = new BinaryReader(stream, Datamodel.TextEncoding);
             StringDict = new StringDictionary(this, Reader);
 
             var num_elements = Reader.ReadInt32();

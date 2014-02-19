@@ -17,7 +17,7 @@ namespace Datamodel
             Name = name;
             Value = value;
             Offset = offset;
-            this.owner = owner;
+            this._Owner = owner;
             Owner.AddAttribute(this);
         }
 
@@ -27,16 +27,16 @@ namespace Datamodel
         /// </summary>
         public string Name
         {
-            get { return name; }
-            set { name = value; NotifyPropertyChanged("Name"); }
+            get { return _Name; }
+            set { _Name = value; NotifyPropertyChanged("Name"); }
         }
-        string name;
+        string _Name;
 
         /// <summary>
         /// The <see cref="Element"/> which this Attribute is part of.
         /// </summary>
-        public Element Owner { get { return owner; } }
-        Element owner;
+        public Element Owner { get { return _Owner; } }
+        Element _Owner;
 
         /// <summary>
         /// The value held by this Attribute.
@@ -53,7 +53,7 @@ namespace Datamodel
                     {
                         lock (dm.Codec)
                         {
-                            value = dm.Codec.DeferredDecodeAttribute(dm, Offset);
+                            _Value = dm.Codec.DeferredDecodeAttribute(dm, Offset);
                         }
                     }
                     catch (Exception err)
@@ -68,14 +68,14 @@ namespace Datamodel
                 {
                     lock (dm.AllElements.ChangeLock)
                     {
-                        var elem = value as Element;
+                        var elem = _Value as Element;
                         if (elem != null)
                         {
-                            if (elem.Stub) value = dm.AllElements[elem.ID] ?? value;
+                            if (elem.Stub) _Value = dm.AllElements[elem.ID] ?? _Value;
                         }
                         else
                         {
-                            var elem_list = value as List<Element>;
+                            var elem_list = _Value as List<Element>;
                             if (elem_list != null)
                                 for (int i = 0; i < elem_list.Count; i++)
                                 {
@@ -88,16 +88,16 @@ namespace Datamodel
                 }
                 LastStubSearch = dm.ElementsAdded;
 
-                return value;
+                return _Value;
             }
             set
             {
-                this.value = value;
+                _Value = value;
                 Offset = 0;
                 NotifyPropertyChanged("Value");
             }
         }
-        object value;
+        object _Value;
         #endregion
 
         long Offset;
