@@ -62,7 +62,7 @@ namespace Datamodel
         {
             Datamodel.RegisterCodec(typeof(Codecs.Binary), "binary", 1, 2, 3, 4, 5);
             Datamodel.RegisterCodec(typeof(Codecs.KeyValues2), "keyvalues2", 1);
-            TextEncoding = System.Text.Encoding.UTF8;
+            TextEncoding = new System.Text.UTF8Encoding(false);
         }
 
         #region Codecs
