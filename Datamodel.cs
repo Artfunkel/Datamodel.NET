@@ -5,6 +5,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.IO;
+using System.Security;
+using System.Runtime.Serialization;
 
 using Codec_t = System.Tuple<string, int>;
 using Datamodel.Codecs;
@@ -12,7 +14,7 @@ using Datamodel.Codecs;
 namespace Datamodel
 {
     /// <summary>
-    /// A thread-safe collection of nested <see cref="Element"/>s with a named format and a root element.
+    /// Represents a thread-safe tree of <see cref="Element"/>s.
     /// </summary>
     public class Datamodel : INotifyPropertyChanged, IDisposable
     {
@@ -152,7 +154,6 @@ namespace Datamodel
             using (var stream = System.IO.File.Create(path))
             {
                 Save(stream, encoding, encoding_version);
-                File = new FileInfo(path);
             }
         }
 
@@ -164,6 +165,15 @@ namespace Datamodel
         public static Datamodel Load(Stream stream, DeferredMode defer_mode = DeferredMode.Automatic)
         {
             return Load_Internal(stream, defer_mode);
+        }
+        /// <summary>
+        /// Loads a Datamodel from a byte array.
+        /// </summary>
+        /// <param name="stream">The input Stream.</param>
+        /// <param name="defer_mode">How to handle deferred loading.</param>
+        public static Datamodel Load(byte[] data, DeferredMode defer_mode = DeferredMode.Automatic)
+        {
+            return Load_Internal(new MemoryStream(data, true), defer_mode);
         }
 
         /// <summary>
@@ -178,7 +188,6 @@ namespace Datamodel
             try
             {
                 dm = Load_Internal(stream, defer_mode);
-                dm.File = new FileInfo(path);
                 return dm;
             }
             finally
@@ -363,16 +372,6 @@ namespace Datamodel
             set { _AllowRandomIDs = value; NotifyPropertyChanged("AllowRandomIDs"); }
         }
         bool _AllowRandomIDs = true;
-
-        /// <summary>
-        /// Gets or sets a <see cref="FileInfo"/> object associated with this Datamodel.
-        /// </summary>
-        public FileInfo File
-        {
-            get { return _File; }
-            set { _File = value; NotifyPropertyChanged("File"); }
-        }
-        FileInfo _File;
 
         /// <summary>
         /// The internal format of the Datamodel.
@@ -599,26 +598,39 @@ namespace Datamodel
     /// <summary>
     /// A <see cref="Type"/> unsupported by the Datamodel spec was used.
     /// </summary>
+    [Serializable]
     public class AttributeTypeException : Exception
     {
         internal AttributeTypeException(string message)
             : base(message)
+        { }
+
+        [SecuritySafeCritical]
+        protected AttributeTypeException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
         { }
     }
 
     /// <summary>
     /// An <see cref="Element.ID"/> collision occurred.
     /// </summary>
+    [Serializable]
     public class ElementIdException : Exception
     {
         internal ElementIdException(string message)
             : base(message)
+        { }
+
+        [SecuritySafeCritical]
+        protected ElementIdException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
         { }
     }
 
     /// <summary>
     /// An error occured in an <see cref="ICodec"/>.
     /// </summary>
+    [Serializable]
     public class CodecException : Exception
     {
         public CodecException(string message)
@@ -627,6 +639,11 @@ namespace Datamodel
 
         public CodecException(string message, Exception innerException)
             : base(message, innerException)
+        { }
+
+        [SecuritySafeCritical]
+        protected CodecException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
         { }
     }
     #endregion

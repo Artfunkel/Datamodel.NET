@@ -187,9 +187,13 @@ namespace Datamodel
 
     public abstract class VectorBase : IEnumerable<float>, INotifyPropertyChanged
     {
+        /// <summary>
+        /// Gets the number of ordinates in this vector.
+        /// </summary>
+        public abstract int Size { get; }
 
         /// <summary>
-        /// Raised when a value in the enumerable changes.
+        /// Raised when an ordinate changes.
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(string info)
@@ -202,7 +206,7 @@ namespace Datamodel
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return (IEnumerator)GetEnumerator();
+            return GetEnumerator();
         }
 
         public override string ToString()
@@ -210,28 +214,23 @@ namespace Datamodel
             return String.Join(" ", this.ToArray());
         }
 
-        public static bool operator ==(VectorBase x, VectorBase y)
-        {
-            if (x.GetType() != y.GetType()) return false;
-
-            var ex = x.GetEnumerator();
-            var ey = y.GetEnumerator();
-            while (ex.MoveNext())
-            {
-                ey.MoveNext();
-                if (ex.Current != ey.Current) return false;
-            }
-            return true;
-        }
-
-        public static bool operator !=(VectorBase x, VectorBase y)
-        {
-            return !(x == y);
-        }
-
         public override bool Equals(object obj)
         {
-            return obj.GetType() == this.GetType() ? obj as VectorBase == this as VectorBase : base.Equals(obj);
+            var vec = obj as VectorBase;
+            if (vec == null) return false;
+
+            if (vec.Size != this.Size) return false;
+
+            var this_e = this.GetEnumerator();
+            var vec_e = vec.GetEnumerator();
+
+            for (int i = 0; i < this.Size; i++)
+            {
+                this_e.MoveNext();
+                vec_e.MoveNext();
+                if (this_e.Current != vec_e.Current) return false;
+            }
+            return true;
         }
 
         public override int GetHashCode()
@@ -245,6 +244,8 @@ namespace Datamodel
 
     public class Vector2 : VectorBase
     {
+        public override int Size { get { return 2; } }
+
         public float X { get { return x; } set { x = value; NotifyPropertyChanged("X"); } }
         public float Y { get { return y; } set { y = value; NotifyPropertyChanged("Y"); } }
 
@@ -275,7 +276,8 @@ namespace Datamodel
 
         public override IEnumerator<float> GetEnumerator()
         {
-            return new float[] { X, Y }.ToList().GetEnumerator();
+            yield return X;
+            yield return Y;
         }
 
         public static Vector2 operator -(Vector2 a, Vector2 b)
@@ -301,6 +303,8 @@ namespace Datamodel
 
     public class Vector3 : Vector2
     {
+        public override int Size { get { return 3; } }
+
         public float Z { get { return z; } set { z = value; NotifyPropertyChanged("Z"); } }
         float z;
 
@@ -329,7 +333,9 @@ namespace Datamodel
 
         public override IEnumerator<float> GetEnumerator()
         {
-            return new float[] { X, Y, Z }.ToList().GetEnumerator();
+            yield return X;
+            yield return Y;
+            yield return Z;
         }
 
         public static Vector3 operator -(Vector3 a, Vector3 b)
@@ -389,6 +395,8 @@ namespace Datamodel
 
     public class Vector4 : Vector3
     {
+        public override int Size { get { return 4; } }
+
         public float W { get { return w; } set { w = value; NotifyPropertyChanged("W"); } }
         float w;
 
@@ -419,7 +427,10 @@ namespace Datamodel
 
         public override IEnumerator<float> GetEnumerator()
         {
-            return new float[] { X, Y, Z, W }.ToList().GetEnumerator();
+            yield return X;
+            yield return Y;
+            yield return Z;
+            yield return W;
         }
 
         public static Vector4 operator -(Vector4 a, Vector4 b)
@@ -459,6 +470,8 @@ namespace Datamodel
 
     public class Matrix : VectorBase
     {
+        public override int Size { get { return 4 * 4; } }
+
         public Vector4 Row0 { get { return row0; } set { row0 = value; NotifyPropertyChanged("Row0"); } }
         public Vector4 Row1 { get { return row1; } set { row1 = value; NotifyPropertyChanged("Row1"); } }
         public Vector4 Row2 { get { return row2; } set { row2 = value; NotifyPropertyChanged("Row2"); } }

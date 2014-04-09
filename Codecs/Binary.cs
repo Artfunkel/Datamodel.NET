@@ -3,15 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.IO;
-using System.Reflection;
 
 namespace Datamodel.Codecs
 {
     class Binary : IDeferredAttributeCodec, IDisposable
     {
         protected BinaryReader Reader;
-        protected BinaryWriter Writer;
-        static readonly Dictionary<Type, MethodInfo> WriteMethods = new Dictionary<Type, MethodInfo>();
 
         static readonly Dictionary<int, Type[]> SupportedAttributes = new Dictionary<int, Type[]>();
 
@@ -24,7 +21,6 @@ namespace Datamodel.Codecs
         public void Dispose()
         {
             if (Reader != null) Reader.Dispose();
-            if (Writer != null) Writer.Dispose();
         }
 
         static byte TypeToId(Type type, int version)
@@ -65,7 +61,7 @@ namespace Datamodel.Codecs
         protected string ReadString_Raw()
         {
             List<byte> raw = new List<byte>();
-            while(true)
+            while (true)
             {
                 byte cur = Reader.ReadByte();
                 if (cur == 0) break;
@@ -78,21 +74,18 @@ namespace Datamodel.Codecs
             else return user_encoding;
         }
 
-        protected void WriteString_Raw(string value)
-        {
-            Writer.Write(Datamodel.TextEncoding.GetBytes(value));
-            Writer.Write((byte)0);
-        }
-
         class StringDictionary
         {
             Binary Codec;
+            BinaryWriter Writer;
+            int EncodingVersion;
+
             List<string> Strings = new List<string>();
             public bool Dummy;
 
             // binary 4 uses int for dictionary length, but short for dictionary indices. Whoops!
-            public byte LengthSize { get { return (byte)(Codec.EncodingVersion < 4 ? sizeof(short) : sizeof(int)); } }
-            public byte IndiceSize { get { return (byte)(Codec.EncodingVersion < 5 ? sizeof(short) : sizeof(int)); } }
+            public byte LengthSize { get { return (byte)(EncodingVersion < 4 ? sizeof(short) : sizeof(int)); } }
+            public byte IndiceSize { get { return (byte)(EncodingVersion < 5 ? sizeof(short) : sizeof(int)); } }
 
             /// <summary>
             /// Constructs a new <see cref="StringDictionary"/> from a Binary stream.
@@ -100,7 +93,8 @@ namespace Datamodel.Codecs
             public StringDictionary(Binary codec, BinaryReader reader)
             {
                 Codec = codec;
-                Dummy = Codec.EncodingVersion == 1;
+                EncodingVersion = codec.EncodingVersion;
+                Dummy = EncodingVersion == 1;
                 if (!Dummy)
                 {
                     foreach (var i in Enumerable.Range(0, LengthSize == sizeof(short) ? Codec.Reader.ReadInt16() : Codec.Reader.ReadInt32()))
@@ -111,10 +105,12 @@ namespace Datamodel.Codecs
             /// <summary>
             /// Constructs a new <see cref="StringDictionary"/> from a <see cref="Datamodel"/> object.
             /// </summary>
-            public StringDictionary(Binary codec, Datamodel dm)
+            public StringDictionary(int encoding_version, BinaryWriter writer, Datamodel dm)
             {
-                Codec = codec;
-                Dummy = Codec.EncodingVersion == 1;
+                EncodingVersion = encoding_version;
+                Writer = writer;
+
+                Dummy = EncodingVersion == 1;
                 if (!Dummy)
                 {
                     Scraped = new HashSet<Element>();
@@ -155,12 +151,12 @@ namespace Datamodel.Codecs
             public void WriteString(string value)
             {
                 if (Dummy)
-                    Codec.WriteString_Raw(value);
+                    Writer.Write(value);
                 else
                 {
                     var index = Strings.IndexOf(value);
-                    if (IndiceSize == sizeof(short)) Codec.Writer.Write((short)index);
-                    else Codec.Writer.Write(index);
+                    if (IndiceSize == sizeof(short)) Writer.Write((short)index);
+                    else Writer.Write(index);
                 }
             }
 
@@ -169,175 +165,20 @@ namespace Datamodel.Codecs
                 if (Dummy) return;
 
                 if (LengthSize == sizeof(short))
-                    Codec.Writer.Write((short)Strings.Count);
+                    Writer.Write((short)Strings.Count);
                 else
-                    Codec.Writer.Write(Strings.Count);
+                    Writer.Write(Strings.Count);
 
                 foreach (var str in Strings)
-                    Codec.WriteString_Raw(str);
+                    Writer.Write(str);
             }
         }
         StringDictionary StringDict;
 
         public void Encode(Datamodel dm, int encoding_version, Stream stream)
         {
-            EncodingVersion = encoding_version;
-            Writer = new BinaryWriter(stream, Datamodel.TextEncoding);
-
-            WriteString_Raw(String.Format(CodecUtilities.HeaderPattern, "binary", EncodingVersion, dm.Format, dm.FormatVersion) + "\n");
-
-            var dict = new StringDictionary(this, dm);
-            var elem_order = new List<Element>();
-            var elem_indices = new Dictionary<Element, int>();
-
-            Action<Element> WriteIndex = null;
-            WriteIndex = elem =>
-                {
-                    elem_indices[elem] = elem_indices.Count;
-                    elem_order.Add(elem);
-
-                    dict.WriteString(elem.ClassName);
-                    if (EncodingVersion >= 4) dict.WriteString(elem.Name);
-                    else WriteString_Raw(elem.Name);
-                    Writer.Write(elem.ID.ToByteArray());
-
-                    foreach (var attr in elem)
-                    {
-                        var child_elem = attr.Value as Element;
-                        if (child_elem != null)
-                        {
-                            if (!elem_indices.ContainsKey(child_elem))
-                                WriteIndex(child_elem);
-                        }
-                        else
-                        {
-                            var elem_list = attr.Value as IList<Element>;
-                            if (elem_list != null)
-                                foreach (var item in elem_list.Where(e => e != null && !elem_indices.ContainsKey(e)))
-                                    WriteIndex(item);
-                        }
-                    }
-                };
-
-            Action<Element> WriteBody = elem =>
-            {
-                if (elem.Stub)
-                {
-                    if (EncodingVersion < 5)
-                        Writer.Write(-1);
-                    else
-                    {
-                        Writer.Write(-2);
-                        Writer.Write(elem.ID.ToString().ToArray()); // yes, ToString()!
-                        Writer.Write((byte)0);
-                    }
-                    return;
-                }
-                Writer.Write(elem.Count);
-                foreach (var attr in elem)
-                {
-                    dict.WriteString(attr.Name);
-                    var attr_type = attr.Value == null ? typeof(Element) : attr.Value.GetType();
-                    Writer.Write(TypeToId(attr_type, EncodingVersion));
-
-                    Action<object, bool> WriteValue = (out_value, in_array) =>
-                        {
-                            if (attr_type == typeof(Element))
-                            {
-                                var child_elem = (Element)out_value;
-                                if (child_elem == null)
-                                    Writer.Write(-1);
-                                else if (child_elem.Stub)
-                                {
-                                    Writer.Write(-2);
-                                    byte[] bits = child_elem.ID.ToByteArray();
-                                    Writer.Write(BitConverter.IsLittleEndian ? bits : bits.Reverse().ToArray());
-                                }
-                                else
-                                    Writer.Write(elem_indices[child_elem]);
-                                return;
-                            }
-
-                            if (attr_type == typeof(string))
-                            {
-                                if (EncodingVersion < 4 || in_array)
-                                    WriteString_Raw((string)out_value);
-                                else
-                                    dict.WriteString((string)out_value);
-                                return;
-                            }
-
-                            if (attr_type == typeof(bool))
-                                out_value = (bool)out_value ? (byte)1 : (byte)0;
-
-                            else if (attr_type == typeof(byte[]))
-                                Writer.Write(((byte[])out_value).Length);
-
-                            else if (attr_type == typeof(TimeSpan))
-                                out_value = (int)(((TimeSpan)out_value).TotalSeconds * 10000);
-
-                            else if (attr_type == typeof(System.Drawing.Color))
-                            {
-                                var color = (System.Drawing.Color)out_value;
-                                out_value = new byte[] { color.R, color.G, color.B, color.A };
-                            }
-                            else if (attr_type.IsSubclassOf(typeof(VectorBase)))
-                                out_value = ((VectorBase)out_value).SelectMany(f => BitConverter.GetBytes(f)).ToArray();
-
-                            var out_type = out_value.GetType();
-
-                            if (out_type == typeof(byte))
-                                Writer.Write((byte)out_value);
-                            else if (out_type == typeof(byte[]))
-                                Writer.Write((byte[])out_value);
-                            else if (out_type == typeof(int))
-                                Writer.Write((int)out_value);
-                            else if (out_type == typeof(float))
-                                Writer.Write((float)out_value);
-                            else throw new InvalidOperationException("Unrecognised output Type.");
-                        };
-
-                    if (attr.Value == null || !Datamodel.IsDatamodelArrayType(attr.Value.GetType()))
-                        WriteValue(attr.Value, false);
-                    else
-                    {
-                        var array = (System.Collections.IList)attr.Value;
-                        Writer.Write(array.Count);
-                        attr_type = Datamodel.GetArrayInnerType(array.GetType());
-                        foreach (var item in array)
-                            WriteValue(item, true);
-                    }
-                }
-            };
-
-
-            dict.WriteSelf();
-
-            Func<Element, int> CountChildElems = null;
-            var counted = new HashSet<Element>();
-            CountChildElems = (elem) =>
-                {
-                    int num_elems = 1;
-                    counted.Add(elem);
-                    foreach (var child in elem.Select(a => a.Value))
-                    {
-                        if (child == null) continue;
-
-                        var t = child.GetType();
-                        if (t == typeof(Element) && !counted.Contains(child))
-                            num_elems += CountChildElems(child as Element);
-                        else if (Datamodel.IsDatamodelArrayType(t) && Datamodel.GetArrayInnerType(t) == typeof(Element))
-                            foreach (var child_elem in (child as IEnumerable<Element>).Where(c => c != null && !counted.Contains(c)))
-                                num_elems += CountChildElems(child_elem);
-                    }
-                    return num_elems;
-                };
-
-            Writer.Write(CountChildElems(dm.Root));
-
-            WriteIndex(dm.Root);
-            foreach (var e in elem_order)
-                WriteBody(e);
+            using (var writer = new DmxBinaryWriter(stream))
+                new Encoder(this, writer, dm, encoding_version).Encode();
         }
 
         object ReadValue(Datamodel dm, Type type, bool raw_string)
@@ -425,6 +266,8 @@ namespace Datamodel.Codecs
             // read attributes (or not, if we're deferred)
             foreach (var elem in dm.AllElements)
             {
+                System.Diagnostics.Debug.Assert(!elem.Stub);
+
                 var num_attrs = Reader.ReadInt32();
 
                 foreach (var i in Enumerable.Range(0, num_attrs))
@@ -532,6 +375,223 @@ namespace Datamodel.Codecs
                 length = System.Runtime.InteropServices.Marshal.SizeOf(type);
 
             Reader.BaseStream.Seek(length * count, SeekOrigin.Current);
+        }
+
+        struct Encoder
+        {
+            Dictionary<Element, int> ElementIndices;
+            List<Element> ElementOrder;
+            BinaryWriter Writer;
+            StringDictionary StringDict;
+            Datamodel Datamodel;
+
+            int EncodingVersion;
+
+            public Encoder(Binary codec, BinaryWriter writer, Datamodel dm, int version)
+            {
+                EncodingVersion = version;
+                Writer = writer;
+                Datamodel = dm;
+
+                StringDict = new StringDictionary(version, writer, dm);
+                ElementIndices = new Dictionary<Element, int>();
+                ElementOrder = new List<Element>();
+
+            }
+
+            public void Encode()
+            {
+                Writer.Write(String.Format(CodecUtilities.HeaderPattern, "binary", EncodingVersion, Datamodel.Format, Datamodel.FormatVersion) + "\n");
+
+                StringDict.WriteSelf();
+
+                Writer.Write(CountChildren(Datamodel.Root, new HashSet<Element>()));
+
+                WriteIndex(Datamodel.Root);
+                foreach (var e in ElementOrder)
+                    WriteBody(e);
+            }
+
+            int CountChildren(Element elem, HashSet<Element> counted)
+            {
+                if (elem.Stub) return 0;
+                int num_elems = 1;
+                counted.Add(elem);
+                foreach (var child in elem.Select(a => a.Value))
+                {
+                    if (child == null) continue;
+
+                    var t = child.GetType();
+                    if (t == typeof(Element) && !counted.Contains(child))
+                        num_elems += CountChildren(child as Element, counted);
+                    else if (Datamodel.IsDatamodelArrayType(t) && Datamodel.GetArrayInnerType(t) == typeof(Element))
+                        foreach (var child_elem in (child as IEnumerable<Element>).Where(c => c != null && !counted.Contains(c)))
+                            num_elems += CountChildren(child_elem, counted);
+                }
+                return num_elems;
+            }
+
+            void WriteIndex(Element elem)
+            {
+                if (elem.Stub) return;
+
+                ElementIndices[elem] = ElementIndices.Count;
+                ElementOrder.Add(elem);
+
+                StringDict.WriteString(elem.ClassName);
+                if (EncodingVersion >= 4) StringDict.WriteString(elem.Name);
+                else Writer.Write(elem.Name);
+                Writer.Write(elem.ID.ToByteArray());
+
+                foreach (var attr in elem)
+                {
+                    var child_elem = attr.Value as Element;
+                    if (child_elem != null)
+                    {
+                        if (!ElementIndices.ContainsKey(child_elem))
+                            WriteIndex(child_elem);
+                    }
+                    else
+                    {
+                        var elem_list = attr.Value as IList<Element>;
+                        if (elem_list != null)
+                        {
+                            var elem_indices = ElementIndices; // workaround for .Net 4 lambad limitation in structs
+                            foreach (var item in elem_list.Where(e => e != null && !elem_indices.ContainsKey(e)))
+                                WriteIndex(item);
+                        }
+                    }
+                }
+            }
+
+            void WriteBody(Element elem)
+            {
+                Writer.Write(elem.Count);
+                foreach (var attr in elem)
+                {
+                    StringDict.WriteString(attr.Name);
+                    var attr_type = attr.Value == null ? typeof(Element) : attr.Value.GetType();
+                    Writer.Write(TypeToId(attr_type, EncodingVersion));
+
+                    if (attr.Value == null || !Datamodel.IsDatamodelArrayType(attr.Value.GetType()))
+                        WriteAttribute(attr.Value, false);
+                    else
+                    {
+                        var array = (System.Collections.IList)attr.Value;
+                        Writer.Write(array.Count);
+                        attr_type = Datamodel.GetArrayInnerType(array.GetType());
+                        foreach (var item in array)
+                            WriteAttribute(item, true);
+                    }
+                }
+            }
+
+            void WriteAttribute(object value, bool in_array)
+            {
+                if (value == null)
+                {
+                    Writer.Write(-1);
+                    return;
+                }
+
+                var child_elem = value as Element;
+                if (child_elem != null)
+                {
+                    if (child_elem.Stub)
+                    {
+                        Writer.Write(-2);
+                        Writer.Write(child_elem.ID.ToString().ToArray()); // yes, ToString()!
+                        Writer.Write((byte)0);
+                    }
+                    else
+                        Writer.Write(ElementIndices[child_elem]);
+                    return;
+                }
+
+                var str_value = value as string;
+                if (str_value != null)
+                {
+                    if (EncodingVersion < 4 || in_array)
+                        Writer.Write(str_value);
+                    else
+                        StringDict.WriteString(str_value);
+                    return;
+                }
+
+                var bool_value = value as bool?;
+                if (bool_value.HasValue)
+                {
+                    Writer.Write(bool_value == true ? (byte)1 : (byte)0);
+                    return;
+                }
+
+                var byte_value = value as byte[];
+                if (byte_value != null)
+                {
+                    Writer.Write(byte_value.Length);
+                    Writer.Write(byte_value);
+                    return;
+                }
+
+                var timespan_value = value as TimeSpan?;
+                if (timespan_value != null)
+                {
+                    Writer.Write((int)(timespan_value.Value.TotalSeconds * 10000));
+                    return;
+                }
+
+                var colour_value = value as System.Drawing.Color?;
+                if (colour_value != null)
+                {
+                    Writer.Write(new byte[] { colour_value.Value.R, colour_value.Value.G, colour_value.Value.B, colour_value.Value.A });
+                    return;
+                }
+
+                var vector_value = value as VectorBase;
+                if (vector_value != null)
+                {
+                    Writer.Write(vector_value.SelectMany(f => BitConverter.GetBytes(f)).ToArray());
+                    return;
+                }
+
+                var int_value = value as int?;
+                if (int_value != null)
+                {
+                    Writer.Write(int_value.Value);
+                    return;
+                }
+                var float_value = value as float?;
+                if (float_value != null)
+                {
+                    Writer.Write(float_value.Value);
+                    return;
+                }
+
+                throw new InvalidOperationException("Unrecognised output Type.");
+            }
+        }
+
+        class DmxBinaryWriter : BinaryWriter
+        {
+            public DmxBinaryWriter(Stream output)
+                : base(output, Datamodel.TextEncoding)
+            { }
+
+            /// <summary>
+            /// Writes a null-terminated string to the underlying stream using <see cref="Datamodel.TextEncoding"/>.
+            /// </summary>
+            /// <param name="value"></param>
+            [System.Security.SecuritySafeCritical]
+            public override void Write(string value)
+            {
+                base.Write(Datamodel.TextEncoding.GetBytes(value));
+                base.Write((byte)0);
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                return; // don't mess with the base stream!
+            }
         }
     }
 }

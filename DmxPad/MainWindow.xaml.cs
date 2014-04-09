@@ -13,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.IO;
 
 using Datamodel;
 
@@ -45,6 +46,20 @@ namespace DmxPad
             set { _Path = value; NotifyPropertyChanged("Path"); }
         }
         string _Path;
+
+        public FileInfo File
+        {
+            get { return _File; }
+            set { _File = value; NotifyPropertyChanged("File"); }
+        }
+        FileInfo _File;
+
+        public FileInfo ComparisonFile
+        {
+            get { return _ComparisonFile; }
+            set { _ComparisonFile = value; NotifyPropertyChanged("ComparisonFile"); }
+        }
+        FileInfo _ComparisonFile;
 
         public ComparisonDatamodel ComparisonDatamodel
         {
@@ -170,7 +185,7 @@ namespace DmxPad
             ViewModel new_dm = null;
             foreach (var path in paths)
             {
-                new_dm = new ViewModel(Load(path));
+                new_dm = new ViewModel(Load(path)) { File = new FileInfo(path) };
                 Datamodels.Add(new_dm);
                 recent.Remove(path);
                 recent.Insert(0, path);
@@ -183,30 +198,30 @@ namespace DmxPad
 
         private void Save_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            var dm = Tabs.SelectedItem as Datamodel.Datamodel;
-            if (String.IsNullOrEmpty(dm.File.FullName))
+            var vm = (ViewModel)e.Parameter;
+            if (vm.File == null)
             {
                 SaveAs_Executed(sender, e);
             }
             else
-                dm.Save(dm.File.FullName, dm.Encoding, dm.EncodingVersion);
+                vm.Datamodel.Save(vm.File.FullName, vm.Datamodel.Encoding, vm.Datamodel.EncodingVersion);
         }
 
         private void SaveAs_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var sfd = new Microsoft.Win32.SaveFileDialog();
-            var dm = ((ViewModel)Tabs.SelectedItem).Datamodel;
+            var vm = (ViewModel)e.Parameter;
 
-            sfd.InitialDirectory = dm.File.DirectoryName;
-            sfd.FileName = dm.File.Name;
+            sfd.InitialDirectory = vm.File.Directory.FullName;
+            sfd.FileName = vm.File.Name;
             sfd.Filter = "Datamodel Exchange (*.dmx)|*.dmx|All files (*.*)|*.*";
             if (sfd.ShowDialog() == true)
             {
                 Cursor = Cursors.Wait;
                 try
                 {
-                    dm.Save(sfd.FileName, dm.Encoding, dm.EncodingVersion);
-                    dm.File = new System.IO.FileInfo(sfd.FileName);
+                    vm.Datamodel.Save(sfd.FileName, vm.Datamodel.Encoding, vm.Datamodel.EncodingVersion);
+                    vm.File = new System.IO.FileInfo(sfd.FileName);
                 }
 #if !DEBUG
                 catch (Exception err)
@@ -281,7 +296,7 @@ namespace DmxPad
 
             var ofd = new Microsoft.Win32.OpenFileDialog();
             
-            var current_file = vm.Datamodel.File;
+            var current_file = vm.File;
             if (current_file != null)
             {
                 ofd.InitialDirectory = current_file.DirectoryName;
@@ -294,6 +309,7 @@ namespace DmxPad
                 try
                 {
                     vm.ComparisonDatamodel = new ComparisonDatamodel(vm.Datamodel, Datamodel.Datamodel.Load(ofd.FileName));
+                    vm.ComparisonFile = new FileInfo(ofd.FileName);
                 }
 #if !DEBUG
                 catch (Exception err)
@@ -313,15 +329,15 @@ namespace DmxPad
         {
             var vm = (ViewModel)Tabs.SelectedItem;
 
-            var new_dm = Load(vm.Datamodel.File.FullName);
+            var new_dm = Load(vm.File.FullName);
             if (new_dm != null)
             {
                 vm.Datamodel = new_dm;
                 var cdm = vm.ComparisonDatamodel;
                 if (cdm != null)
                 {
-                    var new_dm_left = cdm.Datamodel_Left.File.FullName != cdm.Datamodel_Right.File.FullName ? new_dm : cdm.Datamodel_Left;
-                    var new_dm_right = Load(cdm.Datamodel_Right.File.FullName) ?? cdm.Datamodel_Right;
+                    var new_dm_left = vm.File != vm.ComparisonFile ? new_dm : cdm.Datamodel_Left;
+                    var new_dm_right = Load(vm.ComparisonFile.FullName) ?? cdm.Datamodel_Right;
 
                     if (new_dm_right != null)
                         vm.ComparisonDatamodel = new ComparisonDatamodel(new_dm_left, new_dm_right);

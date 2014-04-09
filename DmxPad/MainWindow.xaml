@@ -2,7 +2,7 @@
         xmlns:dm="clr-namespace:Datamodel;assembly=datamodel.net" xmlns:l="clr-namespace:DmxPad" xmlns:c="clr-namespace:DmxPad.Controls" xmlns:p="clr-namespace:DmxPad.Properties"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d"
         Width="1024" Height="800" WindowStartupLocation="CenterScreen" d:DataContext="{Binding Source={d:DesignInstance Type=l:DesignTimeData,IsDesignTimeCreatable=True}}" Icon="/DmxPad;component/Resources/dmx.ico"
-        Title="{Binding ElementName=Tabs,Path=SelectedItem.Datamodel.File.FullName,StringFormat=DmxPad - {0},TargetNullValue=DmxPad}"
+        Title="{Binding ElementName=Tabs,Path=SelectedItem.File.FullName,StringFormat=DmxPad - {0},TargetNullValue=DmxPad}"
         UseLayoutRounding="True">
     <Window.CommandBindings>
         <CommandBinding Command="New" Executed="New_Executed" />
@@ -37,8 +37,8 @@
                     </MenuItem.ItemTemplate>
                 </MenuItem>
                 <Separator />
-                <MenuItem Command="Save" />
-                <MenuItem Command="SaveAs" />
+                <MenuItem Command="Save" CommandParameter="{Binding}" />
+                <MenuItem Command="SaveAs" CommandParameter="{Binding}" />
                 <Separator />
                 <MenuItem Header="E_xit" InputGestureText="Alt+F4" Click="Exit_Click" />
             </MenuItem>
@@ -58,8 +58,8 @@
         <TabControl Name="Tabs" ItemsSource="{Binding}" Grid.Row="1" SelectedIndex="0" Margin="5">
             <TabControl.ItemTemplate>
                 <DataTemplate>
-                    <StackPanel ToolTip="{Binding Datamodel.File.FullName}" Orientation="Horizontal">
-                        <TextBlock VerticalAlignment="Center" Text="{Binding Datamodel.File.Name, FallbackValue=new}"/>                            
+                    <StackPanel ToolTip="{Binding File.FullName}" Orientation="Horizontal">
+                        <TextBlock VerticalAlignment="Center" Text="{Binding File.Name, FallbackValue=new}"/>                            
                         <Button Content="{StaticResource CloseIcon}" Padding="0" Height="16" Width="16" Command="Close" Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}" Margin="5,0,0,0" />
                     </StackPanel>
                 </DataTemplate>

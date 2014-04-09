@@ -10,8 +10,9 @@ using System.Text;
 namespace Datamodel
 {
     /// <summary>
-    /// A thread-safe collection of <see cref="Attribute"/>s with an associated name, class name, and unique ID.
+    /// A thread-safe collection of <see cref="Attribute"/>s. Declares a name, class name, and unique (to the owning <see cref="Datamodel"/>) ID.
     /// </summary>
+    /// <remarks>Recursion is allowed, i.e. an <see cref="Attribute"/> can refer to an <see cref="Element"/> which is higher up the tree.</remarks>
     /// <seealso cref="Attribute"/>
     public class Element : IEnumerable<Attribute>, INotifyPropertyChanged, INotifyCollectionChanged
     {
@@ -173,7 +174,7 @@ namespace Datamodel
                 if (Stub) throw new InvalidOperationException("Cannot set attributes on a stub element.");
 
                 if (value != null && !Datamodel.IsDatamodelType(value.GetType()))
-                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. Array values must implement IList<T>.", value.GetType().FullName));
+                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (NB: Arrays must implement IList<T>).", value.GetType().FullName));
 
                 if (value is Element)
                 {
