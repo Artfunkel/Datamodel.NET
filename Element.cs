@@ -38,10 +38,18 @@ namespace Datamodel
 
         internal void AddAttribute(Attribute attr)
         {
+            if (attr.Name == "id" || attr.Name == "name")
+                throw new InvalidOperationException(String.Format("Attribute name \"{0}\" is reserved.", attr.Name));
+
+#if TRACE
+            if (StringComparer.CurrentCultureIgnoreCase.Compare(attr.Name, "ID") == 0 || StringComparer.CurrentCultureIgnoreCase.Compare(attr.Name, "Name") == 0)
+                System.Diagnostics.Trace.TraceWarning("Creating Datamodel attribute with name \"{0}\". This name is similar to a reserved name; consider changing it.");
+#endif       
+
             lock (Attribute_ChangeLock)
             {
                 if (Attributes.Count == Int32.MaxValue)
-                    throw new InvalidOperationException(String.Format("Maximum Attribute count reached for Element {0}.", ID));
+                    throw new IndexOutOfRangeException(String.Format("Maximum Attribute count reached for Element {0}.", ID));
 
                 Attributes.Add(attr);
                 attr.PropertyChanged += AttributeChanged;
@@ -140,6 +148,7 @@ namespace Datamodel
         /// <param name="name">The name to search for.</param>
         /// <returns>The <see cref="Attribute"/> object with the given name.</returns>
         /// <exception cref="ArgumentNullException">Thrown when name is null.</exception>
+        /// <exception cref="InvalidOperationException">Thown if the Element is a stub.</exception>
         /// <exception cref="KeyNotFoundException">Thrown when there is no attribute with the given name.</exception>
         public Attribute GetAttribute(string name)
         {
@@ -154,14 +163,30 @@ namespace Datamodel
         }
 
         /// <summary>
-        /// Gets or sets the value of the <see cref="Attribute"/> with the given name. Raises an exception if no such Attribute exists.
+        /// Determines whether this <see cref="Element"/> contains an <see cref="Attribute"/> with the given name.
+        /// </summary>
+        /// <param name="name">The <see cref="Attribute"/> name to search for.</param>
+        /// <exception cref="ArgumentNullException">Thrown when name is null.</exception>
+        /// <exception cref="InvalidOperationException">Thown if the Element is a stub.</exception>
+        public bool HasAttribute(string name)
+        {
+            if (name == null) throw new ArgumentNullException("name");
+            if (Stub) throw new InvalidOperationException("Cannot access attributes on a stub element.");
+
+            return Attributes.Any(a => a.Name == name);
+        }
+
+        /// <summary>
+        /// Gets or sets the value of the <see cref="Attribute"/> with the given name.
         /// </summary>
         /// <param name="name">The name to search for. Cannot be null.</param>
         /// <returns>The value associated with the given name.</returns>
         /// <exception cref="ArgumentNullException">Thrown when the value of name is null.</exception>
-        /// <exception cref="KeyNotFoundException">Thrown when there is no attribute with the given name.</exception>
-        /// <exception cref="InvalidOperationException">Thrown when an attempt is made to set an attribute on a <see cref="Stub"/> Element, or when the value is an Element from a different <see cref="Datamodel"/>.</exception>
-        /// <exception cref="AttributeTypeException">Thrown when the value is not a valid Datamodel attribute type.</exception>
+        /// <exception cref="KeyNotFoundException">Thrown when an attempt is made to get an Attribute name that is not defined on this Element.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when an attempt is made to set an attribute on a <see cref="Stub"/> Element.</exception>
+        /// <exception cref="ElementOwnershipException">Thrown when an attempt is made to set the value of the attribute to an Element from a different <see cref="Datamodel"/>.</exception>
+        /// <exception cref="AttributeTypeException">Thrown when an attempt is made to set a value that is not of a valid Datamodel attribute type.</exception>
+        /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Attributes allowed in an Element has been reached.</exception>
         public object this[string name]
         {
             get
@@ -174,14 +199,11 @@ namespace Datamodel
                 if (Stub) throw new InvalidOperationException("Cannot set attributes on a stub element.");
 
                 if (value != null && !Datamodel.IsDatamodelType(value.GetType()))
-                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (NB: Arrays must implement IList<T>).", value.GetType().FullName));
+                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", value.GetType().FullName));
 
-                if (value is Element)
-                {
-                    var elem = value as Element;
-                    if (elem.Owner != null && elem.Owner != Owner)
-                        throw new InvalidOperationException("Cannot add an Element from a different Datamodel. Use Datamodel.ImportElement() or Datamodel.CreateStub() instead.");
-                }
+                var elem = value as Element;
+                if (elem != null && elem.Owner != null && elem.Owner != Owner)
+                        throw new ElementOwnershipException("Cannot add an Element from a different Datamodel. Use Datamodel.ImportElement() or Datamodel.CreateStub() instead.");
 
                 Attribute old_attr, new_attr;
                 lock (Attribute_ChangeLock)
@@ -189,18 +211,19 @@ namespace Datamodel
                     old_attr = Attributes.Find(a => a.Name == name);
                     new_attr = new Attribute(this, name, value, 0); // the constructor adds to the store itself
                 }
-
-                NotifyCollectionChangedEventArgs change_args;
                 if (old_attr != null)
-                {
                     Attributes.Remove(old_attr);
-                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr, old_attr);
-                }
-                else
-                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr);
 
                 if (CollectionChanged != null)
+                {
+                    NotifyCollectionChangedEventArgs change_args;
+                    if (old_attr != null)
+                        change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr, old_attr);
+                    else
+                        change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr);
+
                     CollectionChanged(this, change_args);
+                }
             }
         }
 

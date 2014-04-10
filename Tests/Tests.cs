@@ -4,6 +4,7 @@ using System.Linq;
 using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Datamodel;
+using DM = Datamodel.Datamodel;
 
 namespace Datamodel_Tests
 {
@@ -99,11 +100,14 @@ namespace Datamodel_Tests
                 dm.Root[name] = list;
                 Assert.AreSame(list, dm.Root[name]);
             }
+
+            dm.Root["Element"] = dm.Root;
+            dm.Root["ElementStub"] = dm.CreateStubElement(Guid.NewGuid());
         }
 
         protected void ValidatePopulated(int attr_version)
         {
-            var dm = Datamodel.Datamodel.Load(DmxConvertPath);
+            var dm = DM.Load(DmxConvertPath);
             Assert.AreEqual(RootGuid, dm.Root.ID);
             foreach (var value in TestValues)
             {
@@ -188,7 +192,7 @@ namespace Datamodel_Tests
         [TestMethod]
         public void TF2_Binary_5()
         {
-            var dm = Datamodel.Datamodel.Load(Binary_5_File);
+            var dm = DM.Load(Binary_5_File);
             PrintContents(dm);
             Get_TF2(dm);
             SaveAndConvert(dm, "binary", 5);
@@ -199,7 +203,7 @@ namespace Datamodel_Tests
         [TestMethod]
         public void TF2_Binary_4()
         {
-            var dm = Datamodel.Datamodel.Load(Binary_4_File);
+            var dm = DM.Load(Binary_4_File);
             PrintContents(dm);
             Get_TF2(dm);
             SaveAndConvert(dm, "binary", 4);
@@ -210,12 +214,25 @@ namespace Datamodel_Tests
         [TestMethod]
         public void TF2_KeyValues2_1()
         {
-            var dm = Datamodel.Datamodel.Load(KeyValues2_1_File);
+            var dm = DM.Load(KeyValues2_1_File);
             PrintContents(dm);
             Get_TF2(dm);
             SaveAndConvert(dm, "keyvalues2", 1);
 
             Cleanup();
+        }
+
+        [TestMethod]
+        public void Import()
+        {
+            var dm = new DM("model",1);
+            Populate(dm, 2);
+
+            var dm2 = new DM("model", 1);
+            dm2.Root = dm2.ImportElement(dm.Root, true, true);
+            
+            SaveAndConvert(dm, "keyvalues2", 1);
+            SaveAndConvert(dm, "binary", 5);
         }
     }
 
@@ -231,7 +248,7 @@ namespace Datamodel_Tests
             Timer.Start();
             foreach (var i in Enumerable.Range(0, Load_Iterations + 1))
             {
-                Datamodel.Datamodel.Load(f, Datamodel.Codecs.DeferredMode.Disabled);
+                DM.Load(f, Datamodel.Codecs.DeferredMode.Disabled);
                 if (i > 0)
                 {
                     Console.WriteLine(Timer.ElapsedMilliseconds);

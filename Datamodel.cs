@@ -226,7 +226,7 @@ namespace Datamodel
             if (defer_mode == DeferredMode.Automatic && codec is IDeferredAttributeCodec)
             {
                 dm.Stream = stream;
-                dm.Codec = codec as IDeferredAttributeCodec;
+                dm.Codec = (IDeferredAttributeCodec)codec;
             }
 
             dm.Format = format;
@@ -314,7 +314,7 @@ namespace Datamodel
                     if (store.Remove(item))
                     {
                         foreach (var attr in store.AsParallel().SelectMany(e => e.Where(a => a.Value == item)))
-                            attr.Value = (mode == RemoveMode.MakeStubs) ? Owner.CreateStubElement((attr.Value as Element).ID) : (Element)null;
+                            attr.Value = (mode == RemoveMode.MakeStubs) ? Owner.CreateStubElement(((Element)attr.Value).ID) : (Element)null;
 
                         if (Owner.Root == item) Owner.Root = null;
 
@@ -347,7 +347,7 @@ namespace Datamodel
         /// <summary>
         /// Creates a new Datamodel.
         /// </summary>
-        /// <param name="format">The internal format of the Datamodel. This is not the same as the encoding used to save or load the Datamodel.</param>
+        /// <param name="format">The format of the Datamodel. This is not the same as the encoding used to save or load the Datamodel.</param>
         /// <param name="format_version">The version of the format in use.</param>
         public Datamodel(string format, int format_version)
         {
@@ -366,6 +366,9 @@ namespace Datamodel
 
         #region Properties
 
+        /// <summary>
+        /// Gets or sets whether new Elements with random IDs can be created by this Datamodel.
+        /// </summary>
         public bool AllowRandomIDs
         {
             get { return _AllowRandomIDs; }
@@ -374,7 +377,7 @@ namespace Datamodel
         bool _AllowRandomIDs = true;
 
         /// <summary>
-        /// The internal format of the Datamodel.
+        /// Gets or sets the format of the Datamodel.
         /// </summary>
         public string Format
         {
@@ -390,7 +393,7 @@ namespace Datamodel
         string _Format;
 
         /// <summary>
-        /// The version of the <see cref="Format"/> in use.
+        /// Gets or sets the version of the <see cref="Format"/> in use.
         /// </summary>
         public int FormatVersion
         {
@@ -400,7 +403,7 @@ namespace Datamodel
         int _FormatVersion;
 
         /// <summary>
-        /// The encoding with which this Datamodel should be stored.
+        /// Gets or sets the encoding with which this Datamodel should be stored.
         /// </summary>
         public string Encoding
         {
@@ -410,7 +413,7 @@ namespace Datamodel
         string _Encoding;
 
         /// <summary>
-        /// The version of the <see cref="Encoding"/> in use.
+        /// Gets or sets the version of the <see cref="Encoding"/> in use.
         /// </summary>
         public int EncodingVersion
         {
@@ -423,15 +426,16 @@ namespace Datamodel
         internal IDeferredAttributeCodec Codec;
 
         /// <summary>
-        /// The first Element of the Datamodel. Only Elements referenced by the Root element or one of its children are considered a part of the Datamodel.
+        /// Gets or sets the first Element of the Datamodel. Only Elements referenced by the Root element or one of its children are considered a part of the Datamodel.
         /// </summary>
+        /// <exception cref="ElementOwnershipException">Thown when an attempt is made to assign an Element from another Datamodel to this property.</exception>
         public Element Root
         {
             get { return _Root; }
             set
             {
-                if (value.Owner != this)
-                    throw new InvalidOperationException("Cannot add an element from a different Datamodel. Use ImportElement() first.");
+                if (value != null && value.Owner != this)
+                    throw new ElementOwnershipException("Cannot add an element from a different Datamodel. Use ImportElement() first.");
                 _Root = value;
                 NotifyPropertyChanged("Root");
             }
@@ -439,27 +443,65 @@ namespace Datamodel
         Element _Root;
 
         /// <summary>
-        /// All Elements created for this Datamodel. Only Elements which are referenced by the Root element or one of its children are actually considered part of the Datamodel.
+        /// Gets all Elements owned by this Datamodel. Only Elements which are referenced by the Root element or one of its children are actually considered part of the Datamodel.
         /// </summary>
         public ElementList AllElements { get; protected set; }
         #endregion
 
         #region Element handling
         /// <summary>
-        /// Copies one or more <see cref="Element"/>s from another Datamodel into this one.
+        /// Copies another Datamodel's <see cref="Element"/> into this one.
         /// </summary>
         /// <remarks>An imported Element will automatically replace any stub Elements which share its ID.</remarks>
         /// <param name="foreign_element">The Element to import. Must be owned by a different Datamodel.</param>
-        /// <param name="deep">Whether to import child Elements.</param>
-        /// <param name="overwrite">If true, a foreign, non-stub Element will replace any local Element with the same ID. If false, the local Element will be used instead.</param>
-        /// <returns>The new Element.</returns>
+        /// <param name="deep">Whether to import child Elements as well.</param>
+        /// <param name="overwrite">If true, foreign Elements will replace local stub Elements which share their ID. If false, the same foregin Elements will be skipped.</param>
+        /// <returns>A copy of the input Element owned by this Datamodel.</returns>
+        /// <exception cref="ArgumentNullException">Thrown if foreign_element is null.</exception>
+        /// <exception cref="ElementOwnershipException">Thrown if foreign_element is already owned by this Datamodel.</exception>
+        /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Elements allowed in a Datamodel has been reached.</exception>
         /// <seealso cref="Element.Stub"/>
         /// <seealso cref="Element.ID"/>
         public Element ImportElement(Element foreign_element, bool deep, bool overwrite)
         {
             if (foreign_element == null) throw new ArgumentNullException("element");
-            if (foreign_element.Owner == this) throw new ArgumentException("Element is already a part of this Datamodel.");
+            if (foreign_element.Owner == this) throw new ElementOwnershipException("Element is already a part of this Datamodel.");
             return ImportElement_internal(foreign_element, deep, overwrite);
+        }
+
+        object CopyValue(object value, bool deep, bool overwrite)
+        {
+            if (value == null) return null;
+            var attr_type = value.GetType();
+
+            // do nothing for a value type or string...
+            if (attr_type.IsValueType || attr_type == typeof(string))
+                return value;
+
+            // ...copy a reference type
+            else if (attr_type == typeof(Element))
+                return deep ? ImportElement_internal((Element)value, true, overwrite) : CreateStubElement(((Element)value).ID);
+            else if (attr_type == typeof(Vector2))
+                return new Vector2((Vector2)value);
+            else if (attr_type == typeof(Vector3))
+                return new Vector3((Vector3)value);
+            else if (attr_type == typeof(Vector4))
+                return new Vector4((Vector4)value);
+            else if (attr_type == typeof(Angle))
+                return new Angle((Angle)value);
+            else if (attr_type == typeof(Quaternion))
+                return new Quaternion((Quaternion)value);
+            else if (attr_type == typeof(Matrix))
+                return new Matrix((Matrix)value);
+            else if (attr_type == typeof(byte[]))
+            {
+                var inbytes = (byte[])value;
+                var outbytes = new byte[inbytes.Length];
+                inbytes.CopyTo(outbytes, 0);
+                return outbytes;
+            }
+
+            else throw new ArgumentException("CopyValue: unhandled type.");
         }
 
         Element ImportElement_internal(Element foreign_element, bool deep, bool overwrite)
@@ -472,54 +514,29 @@ namespace Datamodel
             if (result != null)
             {
                 if (overwrite && !foreign_element.Stub)
-                    AllElements.Remove(result, ElementList.RemoveMode.MakeStubs);
-                else
-                    return result;
+                    AllElements.Remove(result, ElementList.RemoveMode.MakeStubs); // allow attributes to substitute this Element for the old one
+                return result;
             }
             result = CreateElement(foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
-
-            Func<object, object> copy_value = value =>
-                {
-                    var attr_type = value.GetType();
-
-                    if (attr_type.IsValueType || attr_type == typeof(string))
-                        return value;
-                    else if (attr_type == typeof(Element))
-                        return deep ? ImportElement_internal(value as Element, true, overwrite) : CreateStubElement((value as Element).ID);
-                    else if (attr_type == typeof(Vector2))
-                        return new Vector2(value as Vector2);
-                    else if (attr_type == typeof(Vector3))
-                        return new Vector3(value as Vector3);
-                    else if (attr_type == typeof(Vector4))
-                        return new Vector2(value as Vector4);
-                    else if (attr_type == typeof(Angle))
-                        return new Angle(value as Angle);
-                    else if (attr_type == typeof(Quaternion))
-                        return new Quaternion(value as Quaternion);
-                    else if (attr_type == typeof(Matrix))
-                        return new Matrix(value as Matrix);
-                    else if (attr_type == typeof(byte[]))
-                        return (value as byte[]).ToArray();
-
-                    else throw new ArgumentException("Unhandled Type.");
-                };
-
+            
             // Copy attributes
             foreach (var attr in foreign_element)
             {
-                if (IsDatamodelArrayType(attr.Value.GetType()))
+                if (attr.Value == null)
+                    result[attr.Name] = null;
+                else if (IsDatamodelArrayType(attr.Value.GetType()))
                 {
-                    var list = attr.Value as System.Collections.ICollection;
+                    var list = (System.Collections.ICollection)attr.Value;
                     var inner_type = GetArrayInnerType(list.GetType());
 
                     var copied_array = CodecUtilities.MakeList(inner_type, list.Count);
                     foreach (var item in list)
-                        copied_array.Add(copy_value(item));
+                        copied_array.Add(CopyValue(item, deep, overwrite));
 
                     result[attr.Name] = copied_array;
                 }
                 else
-                    result[attr.Name] = copy_value(attr.Value);
+                    result[attr.Name] = CopyValue(attr.Value, deep, overwrite);
             }
             return result;
         }
@@ -529,7 +546,8 @@ namespace Datamodel
         /// </summary>
         /// <seealso cref="Element.Stub"/>
         /// <param name="id">The ID of the stub. Must be unique within the Datamodel.</param>
-        /// <returns>The new Element</returns>
+        /// <returns>A new stub Element owned by this Datamodel.</returns>
+        /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Elements allowed in a Datamodel has been reached.</exception>
         public Element CreateStubElement(Guid id)
         {
             return CreateElement("Stub element", id, true);
@@ -540,7 +558,9 @@ namespace Datamodel
         /// </summary>
         /// <param name="name">The Element's name. Duplicates allowed.</param>
         /// <param name="class_name">The Element's class.</param>
-        /// <returns>The new Element.</returns>
+        /// <returns>A new Element owned by this Datamodel.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when Datamodel.AllowRandomIDs is false.</exception>
+        /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Elements allowed in a Datamodel has been reached.</exception>
         public Element CreateElement(string name, string class_name = "DmElement")
         {
             if (!AllowRandomIDs)
@@ -558,7 +578,8 @@ namespace Datamodel
         /// <param name="name">The Element's name. Duplicates allowed.</param>
         /// <param name="id">The Element's ID. Must be unique within the Datamodel.</param>
         /// <param name="class_name">The Element's class.</param>
-        /// <returns>The new Element.</returns>
+        /// <returns>A new Element owned by this Datamodel.</returns>
+        /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Elements allowed in a Datamodel has been reached.</exception>
         public Element CreateElement(string name, Guid id, string class_name = "DmElement")
         {
             return CreateElement(name, id, false, class_name);
@@ -570,7 +591,7 @@ namespace Datamodel
             lock (AllElements.ChangeLock)
             {
                 if (AllElements.Count == Int32.MaxValue) // jinkies!
-                    throw new InvalidOperationException("Maximum Element count reached.");
+                    throw new IndexOutOfRangeException("Maximum Element count reached.");
 
                 if (AllElements[id] != null)
                     throw new ElementIdException(String.Format("Element ID {0} already in use in this Datamodel.", id.ToString()));
@@ -596,10 +617,10 @@ namespace Datamodel
 
     #region Exceptions
     /// <summary>
-    /// A <see cref="Type"/> unsupported by the Datamodel spec was used.
+    /// The exception that is thrown when the value of an <see cref="Attribute"/> is an unsupported <see cref="Type"/>.
     /// </summary>
     [Serializable]
-    public class AttributeTypeException : Exception
+    public class AttributeTypeException : ArgumentException
     {
         internal AttributeTypeException(string message)
             : base(message)
@@ -612,10 +633,10 @@ namespace Datamodel
     }
 
     /// <summary>
-    /// An <see cref="Element.ID"/> collision occurred.
+    /// The exception that is thrown when an <see cref="Element.ID"/> collision occurrs.
     /// </summary>
     [Serializable]
-    public class ElementIdException : Exception
+    public class ElementIdException : InvalidOperationException
     {
         internal ElementIdException(string message)
             : base(message)
@@ -628,7 +649,23 @@ namespace Datamodel
     }
 
     /// <summary>
-    /// An error occured in an <see cref="ICodec"/>.
+    /// The exception that is thrown when a Datamodel tries to manipulate an <see cref="Element"/> with an innapropriate owner.
+    /// </summary>
+    [Serializable]
+    public class ElementOwnershipException : InvalidOperationException
+    {
+        internal ElementOwnershipException(string message)
+            : base(message)
+        { }
+
+        [SecuritySafeCritical]
+        protected ElementOwnershipException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        { }
+    }
+
+    /// <summary>
+    /// The exception that is thrown when an error occurs in an <see cref="ICodec"/>.
     /// </summary>
     [Serializable]
     public class CodecException : Exception

@@ -456,7 +456,7 @@ namespace Datamodel.Codecs
                         var elem_list = attr.Value as IList<Element>;
                         if (elem_list != null)
                         {
-                            var elem_indices = ElementIndices; // workaround for .Net 4 lambad limitation in structs
+                            var elem_indices = ElementIndices; // workaround for .Net 4 lambda limitation in structs
                             foreach (var item in elem_list.Where(e => e != null && !elem_indices.ContainsKey(e)))
                                 WriteIndex(item);
                         }
