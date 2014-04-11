@@ -129,8 +129,10 @@ namespace Datamodel
         /// <summary>
         /// Gets or sets the assumed encoding of text in DMX files. Defaults to UTF8.
         /// </summary>
-        /// <remarks>Changing this value does not alter Datamodels whiche are already in memory.</remarks>
+        /// <remarks>Changing this value does not alter Datamodels which are already in memory.</remarks>
         public static System.Text.Encoding TextEncoding { get; set; }
+
+        const string FormatBlankError = "Cannot save while Datamodel.Format is blank";
 
         /// <summary>
         /// Writes this Datamodel to a <see cref="Stream"/> with the given encoding and encoding version.
@@ -138,8 +140,11 @@ namespace Datamodel
         /// <param name="stream">The output Stream.</param>
         /// <param name="encoding">The desired encoding.</param>
         /// <param name="encoding_version">The desired encoding version.</param>
+        /// <exception cref="InvalidOperationException">Thrown when the value of <see cref="Datamodel.Format"/> is null or whitespace.</exception>
         public void Save(Stream stream, string encoding, int encoding_version)
         {
+            if (String.IsNullOrWhiteSpace(Format))
+                throw new InvalidOperationException(FormatBlankError);
             GetCodec(encoding, encoding_version).Encode(this, encoding_version, stream);
         }
 
@@ -149,8 +154,11 @@ namespace Datamodel
         /// <param name="path">The destination file path.</param>
         /// <param name="encoding">The desired encoding.</param>
         /// <param name="encoding_version">The desired encoding version.</param>
+        /// <exception cref="InvalidOperationException">Thrown when the value of <see cref="Datamodel.Format"/> is null or whitespace.</exception>
         public void Save(string path, string encoding, int encoding_version)
         {
+            if (String.IsNullOrWhiteSpace(Format))
+                throw new InvalidOperationException(FormatBlankError);
             using (var stream = System.IO.File.Create(path))
             {
                 Save(stream, encoding, encoding_version);
@@ -379,13 +387,14 @@ namespace Datamodel
         /// <summary>
         /// Gets or sets the format of the Datamodel.
         /// </summary>
+        /// <exception cref="ArgumentException">Thrown when an attempt is made to set a value containing the space character.</exception>
         public string Format
         {
             get { return _Format; }
             set
             {
                 if (value != null && value.Contains(' '))
-                    throw new ArgumentException("Format name cannot contain spaces.");
+                    throw new ArgumentException("Format name cannot contain the space character.");
                 _Format = value;
                 NotifyPropertyChanged("Format");
             }
@@ -405,10 +414,17 @@ namespace Datamodel
         /// <summary>
         /// Gets or sets the encoding with which this Datamodel should be stored.
         /// </summary>
+        /// <exception cref="ArgumentException">Thrown when an attempt is made to set a value containing the space character.</exception>
         public string Encoding
         {
             get { return _Encoding; }
-            set { _Encoding = value; NotifyPropertyChanged("Encoding"); }
+            set
+            {
+                if (value != null && value.Contains(' '))
+                    throw new ArgumentException("Encoding name cannot contain the space character.");
+                _Encoding = value;
+                NotifyPropertyChanged("Encoding");
+            }
         }
         string _Encoding;
 
@@ -435,7 +451,7 @@ namespace Datamodel
             set
             {
                 if (value != null && value.Owner != this)
-                    throw new ElementOwnershipException("Cannot add an element from a different Datamodel. Use ImportElement() first.");
+                    throw new ElementOwnershipException("Cannot add an Element from a different Datamodel. Use ImportElement() first.");
                 _Root = value;
                 NotifyPropertyChanged("Root");
             }

@@ -39,12 +39,7 @@ namespace Datamodel
         internal void AddAttribute(Attribute attr)
         {
             if (attr.Name == "id" || attr.Name == "name")
-                throw new InvalidOperationException(String.Format("Attribute name \"{0}\" is reserved.", attr.Name));
-
-#if TRACE
-            if (StringComparer.CurrentCultureIgnoreCase.Compare(attr.Name, "ID") == 0 || StringComparer.CurrentCultureIgnoreCase.Compare(attr.Name, "Name") == 0)
-                System.Diagnostics.Trace.TraceWarning("Creating Datamodel attribute with name \"{0}\". This name is similar to a reserved name; consider changing it.");
-#endif       
+                throw new InvalidOperationException(String.Format("Attribute name \"{0}\" is reserved.", attr.Name));   
 
             lock (Attribute_ChangeLock)
             {
