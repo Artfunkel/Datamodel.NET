@@ -10,7 +10,7 @@ namespace Datamodel
     /// <summary>
     /// A name/value pair associated with an <see cref="Element"/>.
     /// </summary>
-    class Attribute : INotifyPropertyChanged, ISupportInitialize
+    class Attribute : INotifyPropertyChanged
     {
         /// <summary>
         /// Creates a new Attribute.
@@ -38,31 +38,11 @@ namespace Datamodel
         public Attribute(string name, Element owner, long defer_offset)
             : this(name, null)
         {
-            ((ISupportInitialize)this).BeginInit();
-
             if (owner == null)
                 throw new ArgumentNullException("owner");
             
             Owner = owner;
             Offset = defer_offset;
-
-            ((ISupportInitialize)this).EndInit();
-        }
-
-        protected bool Initialising { get; private set; }
-        void ISupportInitialize.BeginInit()
-        {
-            if (Initialising) throw new InvalidOperationException("Attribute is already initializing.");
-            Initialising = true;
-        }
-
-        void ISupportInitialize.EndInit()
-        {
-            if (!Initialising)
-                throw new InvalidOperationException("Attribute is not initializing.");
-            if (Name == null)
-                throw new InvalidOperationException("An Attribute name must be defined.");
-            Initialising = false;
         }
 
         #region Properties

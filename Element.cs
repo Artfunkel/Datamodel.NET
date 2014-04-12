@@ -17,7 +17,7 @@ namespace Datamodel
     /// <remarks>Recursion is allowed, i.e. an <see cref="Attribute"/> can refer to an <see cref="Element"/> which is higher up the tree.</remarks>
     /// <seealso cref="Attribute"/>
     [DefaultProperty("Name")]
-    public class Element : IDictionary<string,object>, IDictionary, INotifyPropertyChanged, INotifyCollectionChanged, ISupportInitialize
+    public class Element : IDictionary<string, object>, IDictionary, INotifyPropertyChanged, INotifyCollectionChanged, ISupportInitialize
     {
         #region Constructors and Init
 
@@ -35,11 +35,11 @@ namespace Datamodel
             if (class_name == null) throw new ArgumentNullException("class_name");
 
             ((ISupportInitialize)this).BeginInit();
-            
+
             Owner = owner;
             Name = name;
             ClassName = class_name;
-            
+
             if (id.HasValue)
                 ID = id.Value;
             else
@@ -77,9 +77,9 @@ namespace Datamodel
         public Element()
         {
             ((ISupportInitialize)this).BeginInit();
-            
+
             ID = Guid.NewGuid();
-            
+
             ((ISupportInitialize)this).EndInit();
         }
 
@@ -104,7 +104,7 @@ namespace Datamodel
 
         private List<Attribute> Attributes = new List<Attribute>();
         private object Attribute_ChangeLock = new object();
-        
+
         void AttributeChanged(object sender, PropertyChangedEventArgs e)
         {
             var attr = (Attribute)sender;
@@ -117,11 +117,11 @@ namespace Datamodel
         /// <summary>
         /// Gets the ID of this Element. This must be unique within the Element's <see cref="Datamodel"/>.
         /// </summary>
-        public Guid ID 
-        { 
+        public Guid ID
+        {
             get { return _ID; }
-            set 
-            { 
+            set
+            {
                 if (!Initialising) throw new InvalidOperationException("ID can only be changed during initialisation.");
                 _ID = value;
             }
@@ -193,7 +193,9 @@ namespace Datamodel
         /// <typeparam name="T">The expected Type of the Attribute.</typeparam>
         /// <param name="name">The Attribute name to search for.</param>
         /// <returns>The value of the Attribute with the given name.</returns>
-        /// <exception cref="AttributeTypeException">Thrown when the value of the requested Attribute is not compatible with <see cref="T"/>.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when the value of name is null.</exception>
+        /// <exception cref="AttributeTypeException">Thrown when the value of the requested Attribute is not compatible with T.</exception>
+        /// <exception cref="KeyNotFoundException">Thrown when an attempt is made to get a name that is not present on this Element.</exception>
         public T Get<T>(string name)
         {
             object value = this[name];
@@ -211,6 +213,9 @@ namespace Datamodel
         /// <typeparam name="T">The expected <see cref="Type"/> of the array's items.</typeparam>
         /// <param name="name">The name to search for.</param>
         /// <returns>The value of the Attribute with the given name.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when the value of name is null.</exception>
+        /// <exception cref="AttributeTypeException">Thrown when the value of the requested Attribute is not compatible with IList&lt;T&gt;.</exception>
+        /// <exception cref="KeyNotFoundException">Thrown when an attempt is made to get a name that is not present on this Element.</exception>
         public IList<T> GetArray<T>(string name)
         {
             try
@@ -230,7 +235,7 @@ namespace Datamodel
         /// <param name="name">The name to search for. Cannot be null.</param>
         /// <returns>The value associated with the given name.</returns>
         /// <exception cref="ArgumentNullException">Thrown when the value of name is null.</exception>
-        /// <exception cref="KeyNotFoundException">Thrown when an attempt is made to get an Attribute name that is not defined on this Element.</exception>
+        /// <exception cref="KeyNotFoundException">Thrown when an attempt is made to get a name that is not present on this Element.</exception>
         /// <exception cref="InvalidOperationException">Thrown when an attempt is made to set an attribute on a <see cref="Stub"/> Element.</exception>
         /// <exception cref="ElementOwnershipException">Thrown when an attempt is made to set the value of the attribute to an Element from a different <see cref="Datamodel"/>.</exception>
         /// <exception cref="AttributeTypeException">Thrown when an attempt is made to set a value that is not of a valid Datamodel attribute type.</exception>
@@ -241,7 +246,9 @@ namespace Datamodel
             {
                 if (name == null) throw new ArgumentNullException("name");
                 if (Stub) throw new InvalidOperationException("Cannot get attributes from a stub element.");
-                return Attributes.First(a => a.Name == name).Value;
+                var attr = Attributes.Find(a => a.Name == name);
+                if (attr == null) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
+                return attr.Value;
             }
             set
             {
@@ -251,7 +258,7 @@ namespace Datamodel
                 if (value != null && !Datamodel.IsDatamodelType(value.GetType()))
                     throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", value.GetType().FullName));
 
-                
+
                 Attribute old_attr, new_attr;
                 int old_index;
                 lock (Attribute_ChangeLock)
@@ -326,22 +333,13 @@ namespace Datamodel
             get
             {
                 var attr = Attributes[index];
-                return new AttrKVP(attr.Name,attr.Value);
+                return new AttrKVP(attr.Name, attr.Value);
             }
             set
             {
                 RemoveAt(index);
                 Insert(index, new Attribute(value.Key, value.Value));
             }
-        }
-
-        void Validate(string key, object value)
-        {
-            if (Stub) throw new InvalidOperationException("Cannot set attributes on a stub element.");
-            /*if (item.Owner != null && item.Owner != this)
-                throw new InvalidOperationException("Attribute is already owned by another Element.");*/
-            if (key == "id" || key == "name")
-                throw new InvalidOperationException(String.Format("Attribute name \"{0}\" is reserved.", key));
         }
 
         /// <summary>
@@ -424,7 +422,7 @@ namespace Datamodel
             if (CollectionChanged != null)
                 CollectionChanged(this, e);
         }
-        
+
         public bool IsReadOnly { get { return false; } }
         public bool IsSynchronized { get { return true; } }
 
@@ -436,7 +434,7 @@ namespace Datamodel
         /// </summary>
         public object SyncRoot { get { return Attribute_ChangeLock; } }
 
-        
+
         #endregion
 
         #endregion
@@ -566,8 +564,8 @@ namespace Datamodel
         }
 
 
-        #endregion       
-    
+        #endregion
+
         /// <summary>
         /// Adds a new attribute to this Element.
         /// </summary>
@@ -585,24 +583,28 @@ namespace Datamodel
         /// <param name="offset">The location of the attribute's value in the Datamodel's source stream.</param>
         internal void Add(string key, long offset)
         {
-            Attributes.Add(new Attribute(key, this, offset));
+            lock (Attribute_ChangeLock)
+                Attributes.Add(new Attribute(key, this, offset));
         }
 
         public bool ContainsKey(string key)
         {
             if (key == null) throw new ArgumentNullException("key");
             if (Stub) throw new InvalidOperationException("Cannot access attributes on a stub element.");
-            return Attributes.Any(a => a.Name == key);
+            lock (Attribute_ChangeLock)
+                return Attributes.Any(a => a.Name == key);
         }
 
         public ICollection<string> Keys
         {
-            get { return Attributes.Select(a => a.Name).ToArray(); }
+            get { lock (Attribute_ChangeLock) return Attributes.Select(a => a.Name).ToArray(); }
         }
 
         public bool TryGetValue(string key, out object value)
         {
-            var result = Attributes.FirstOrDefault(a => a.Name == key);
+            Attribute result;
+            lock (Attribute_ChangeLock)
+                result = Attributes.FirstOrDefault(a => a.Name == key);
 
             if (result != null)
             {
@@ -618,7 +620,7 @@ namespace Datamodel
 
         public ICollection<object> Values
         {
-            get { return Attributes.Select(a => a.Value).ToArray(); }
+            get { lock (Attribute_ChangeLock) return Attributes.Select(a => a.Value).ToArray(); }
         }
 
         void ICollection<AttrKVP>.Add(AttrKVP item)
@@ -628,16 +630,18 @@ namespace Datamodel
 
         bool ICollection<AttrKVP>.Contains(AttrKVP item)
         {
-            return Attributes.Any(a => a.Name == item.Key && a.Value == item.Value);
+            lock (Attribute_ChangeLock)
+                return Attributes.Any(a => a.Name == item.Key && a.Value == item.Value);
         }
 
         void ICollection<AttrKVP>.CopyTo(AttrKVP[] array, int arrayIndex)
         {
-            foreach (var attr in Attributes)
-            {
-                array[arrayIndex] = new AttrKVP(attr.Name, attr.Value);
-                arrayIndex++;
-            }
+            lock (Attribute_ChangeLock)
+                foreach (var attr in Attributes)
+                {
+                    array[arrayIndex] = new AttrKVP(attr.Name, attr.Value);
+                    arrayIndex++;
+                }
         }
 
         public IEnumerator<AttrKVP> GetEnumerator()
@@ -669,7 +673,7 @@ namespace Datamodel
 
         ICollection IDictionary.Keys
         {
-            get { return Attributes.Select(a => a.Name).ToArray(); }
+            get { lock (Attribute_ChangeLock) return Attributes.Select(a => a.Name).ToArray(); }
         }
 
         void IDictionary.Remove(object key)
@@ -679,7 +683,7 @@ namespace Datamodel
 
         ICollection IDictionary.Values
         {
-            get { return Attributes.Select(a => a.Value).ToArray(); }
+            get { lock (Attribute_ChangeLock) return Attributes.Select(a => a.Value).ToArray(); }
         }
 
         object IDictionary.this[object key]
@@ -696,15 +700,23 @@ namespace Datamodel
 
         bool ICollection<AttrKVP>.Remove(AttrKVP item)
         {
-            var attr = Attributes.FirstOrDefault(a => a.Name == item.Key);
-            if (attr == null || attr.Value != item.Value) return false;
-            Remove(attr.Name);
-            return true;
+            lock (Attribute_ChangeLock)
+            {
+                var attr = Attributes.Find(a => a.Name == item.Key);
+                if (attr == null || attr.Value != item.Value) return false;
+                Remove(attr.Name);
+                return true;
+            }
         }
 
         void ICollection.CopyTo(Array array, int index)
         {
-            throw new NotImplementedException();
+            lock (Attribute_ChangeLock)
+                foreach (var attr in Attributes)
+                {
+                    array.SetValue(new AttrKVP(attr.Name, attr.Value), index);
+                    index++;
+                }
         }
     }
 }

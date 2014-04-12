@@ -16,7 +16,6 @@ namespace Datamodel
     /// <summary>
     /// Represents a thread-safe tree of <see cref="Element"/>s.
     /// </summary>
-    [System.Windows.Markup.ContentProperty("Root")]
     public class Datamodel : INotifyPropertyChanged, IDisposable, ISupportInitialize
     {
         #region Attribute types

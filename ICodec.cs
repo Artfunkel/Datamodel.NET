@@ -122,9 +122,10 @@ namespace Datamodel.Codecs
         /// </summary>
         /// <param name="elem">The Element to add to.</param>
         /// <param name="key">The name of the attribute. Must be unique on the Element.</param>
-        /// <param name="offset">If using deferred loading, the location within the source stream at which this Attribute's value is located. Otherwise 0.</param>
+        /// <param name="defer_offset">The location in the encoded DMX stream at which this Attribute's value can be found.</param>
         public static void AddDeferredAttribute(Element elem, string key, long offset)
         {
+            if (offset <= 0) throw new ArgumentOutOfRangeException("offset","Address must be greater than 0.");
             elem.Add(key, offset);
         }
     }
