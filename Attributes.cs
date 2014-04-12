@@ -10,83 +10,164 @@ namespace Datamodel
     /// <summary>
     /// A name/value pair associated with an <see cref="Element"/>.
     /// </summary>
-    public class Attribute : INotifyPropertyChanged
+    class Attribute : INotifyPropertyChanged, ISupportInitialize
     {
-        internal Attribute(Element owner, string name, object value, long offset)
+        /// <summary>
+        /// Creates a new Attribute.
+        /// </summary>
+        public Attribute()
+        { }
+
+        /// <summary>
+        /// Creates a new Attribute with a specified name and value.
+        /// </summary>
+        /// <param name="name">The name of the Attribute, which must be unique to its owner.</param>
+        /// <param name="value">The value of the Attribute, which must be of a supported Datamodel type.</param>
+        public Attribute(string name, object value)
         {
             Name = name;
             Value = value;
-            Offset = offset;
-            this._Owner = owner;
-            Owner.AddAttribute(this);
+        }
+
+        /// <summary>
+        /// Creates a new Attribute with deferred loading.
+        /// </summary>
+        /// <param name="name">The name of the Attribute, which must be unique to its owner.</param>
+        /// <param name="owner">The Element which owns this Attribute.</param>
+        /// <param name="defer_offset">The location in the encoded DMX stream at which this Attribute's value can be found.</param>
+        public Attribute(string name, Element owner, long defer_offset)
+            : this(name, null)
+        {
+            ((ISupportInitialize)this).BeginInit();
+
+            if (owner == null)
+                throw new ArgumentNullException("owner");
+            
+            Owner = owner;
+            Offset = defer_offset;
+
+            ((ISupportInitialize)this).EndInit();
+        }
+
+        protected bool Initialising { get; private set; }
+        void ISupportInitialize.BeginInit()
+        {
+            if (Initialising) throw new InvalidOperationException("Attribute is already initializing.");
+            Initialising = true;
+        }
+
+        void ISupportInitialize.EndInit()
+        {
+            if (!Initialising)
+                throw new InvalidOperationException("Attribute is not initializing.");
+            if (Name == null)
+                throw new InvalidOperationException("An Attribute name must be defined.");
+            Initialising = false;
         }
 
         #region Properties
         /// <summary>
-        /// The name of this Attribute.
+        /// Gets or sets the name of this Attribute.
         /// </summary>
         public string Name
         {
             get { return _Name; }
-            set { _Name = value; NotifyPropertyChanged("Name"); }
+            set { _Name = value; OnPropertyChanged("Name"); }
         }
         string _Name;
 
         /// <summary>
-        /// The <see cref="Element"/> which this Attribute is part of.
+        /// Gets the <see cref="Element"/> which this Attribute is part of.
         /// </summary>
-        public Element Owner { get { return _Owner; } }
+        public Element Owner
+        {
+            get { return _Owner; }
+            internal set
+            {
+                if (_Owner == value) return;
+
+                if (Deferred && _Owner != null) DeferredLoad();
+                _Owner = value;
+                OnPropertyChanged("Owner");
+            }
+        }
         Element _Owner;
 
         /// <summary>
-        /// The value held by this Attribute.
+        /// Gets whether the value of this Attribute has yet to be decoded.
         /// </summary>
+        public bool Deferred { get { return Offset != 0; } }
+
+        /// <summary>
+        /// Loads the value of this Attribute from the encoded source Datamodel.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown when the Attribute has already been loaded.</exception>
+        /// <exception cref="CodecException">Thrown when the deferred load fails.</exception>
+        public void DeferredLoad()
+        {
+            if (Offset == 0) throw new InvalidOperationException("Attribute already loaded.");
+
+            if (Owner == null || Owner.Owner == null || Owner.Owner.Codec == null)
+                throw new CodecException("Trying to load a deferred Attribute, but could not find codec.");
+
+            var dm = Owner.Owner;
+            try
+            {
+                lock (dm.Codec)
+                {
+                    _Value = dm.Codec.DeferredDecodeAttribute(dm, Offset);
+                }
+            }
+            catch (Exception err)
+            {
+                throw new CodecException(String.Format("Deferred loading of attribute \"{0}\" on element {1} using codec {2} threw an exception.", Name, Owner.ID, dm.Codec), err);
+            }
+            Offset = 0;
+            OnPropertyChanged("Deferred");
+        }
+
+        /// <summary>
+        /// Gets or sets the value held by this Attribute.
+        /// </summary>
+        /// <exception cref="CodecException">Thrown when deferred value loading fails.</exception>
         public object Value
         {
             get
             {
-                var dm = Owner.Owner;
-                // read deferred
                 if (Offset > 0)
-                {
-                    try
-                    {
-                        lock (dm.Codec)
-                        {
-                            _Value = dm.Codec.DeferredDecodeAttribute(dm, Offset);
-                        }
-                    }
-                    catch (Exception err)
-                    {
-                        throw new CodecException(String.Format("Deferred loading of attribute \"{0}\" on element {1} using codec {2} threw an exception.", Name, Owner.ID, dm.Codec), err);
-                    }
-                    Offset = 0;
-                }
+                    DeferredLoad();
 
-                // expand stubs
-                if (dm.ElementsAdded > LastStubSearch)
+                if (Owner != null && Owner.Owner != null)
                 {
-                    lock (dm.AllElements.ChangeLock)
+                    // expand stubs
+                    var dm = Owner.Owner;
+                    if (dm.AllElements.ElementsAdded > LastStubSearch)
                     {
                         var elem = _Value as Element;
-                        if (elem != null)
+                        if (elem != null && elem.Stub)
                         {
-                            if (elem.Stub) _Value = dm.AllElements[elem.ID] ?? _Value;
+                            Element destub_elem;
+                            lock (dm.AllElements.ChangeLock)
+                                destub_elem = dm.AllElements[elem.ID];
+                            if (destub_elem != _Value)
+                                Value = dm.AllElements[elem.ID];
                         }
                         else
                         {
-                            var elem_list = _Value as List<Element>;
+                            var elem_list = _Value as IList<Element>;
                             if (elem_list != null)
                                 for (int i = 0; i < elem_list.Count; i++)
                                 {
                                     var e = elem_list[i];
                                     if (e != null && e.Stub)
-                                        elem_list[i] = dm.AllElements[e.ID];
+                                        lock (dm.AllElements.ChangeLock)
+                                            elem_list[i] = dm.AllElements[e.ID];
                                 }
                         }
+
                     }
+                    LastStubSearch = dm.AllElements.ElementsAdded;
                 }
-                LastStubSearch = dm.ElementsAdded;
 
                 return _Value;
             }
@@ -94,7 +175,7 @@ namespace Datamodel
             {
                 _Value = value;
                 Offset = 0;
-                NotifyPropertyChanged("Value");
+                OnPropertyChanged("Value");
             }
         }
         object _Value;
@@ -110,18 +191,19 @@ namespace Datamodel
             return String.Format("{0} <{1}>", Name, inner_type != null ? inner_type.FullName + "[]" : type.FullName);
         }
 
-        #region Interfaces
         /// <summary>
         /// Raised when the <see cref="Name"/> or <see cref="Value"/> of the Attribute changes.
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
-        void NotifyPropertyChanged(string info)
+        protected virtual void OnPropertyChanged(string info)
         {
             if (PropertyChanged != null)
                 PropertyChanged(this, new PropertyChangedEventArgs(info));
         }
-        #endregion
 
+        /// <summary>
+        /// Compares two Attributes by their values.
+        /// </summary>
         public class ValueComparer : IEqualityComparer, IEqualityComparer<Attribute>
         {
             /// <summary>

@@ -7,6 +7,8 @@ using System.ComponentModel;
 using System.Linq;
 using System.Text;
 
+using AttrKVP = System.Collections.Generic.KeyValuePair<string, object>;
+
 namespace Datamodel
 {
     /// <summary>
@@ -14,43 +16,95 @@ namespace Datamodel
     /// </summary>
     /// <remarks>Recursion is allowed, i.e. an <see cref="Attribute"/> can refer to an <see cref="Element"/> which is higher up the tree.</remarks>
     /// <seealso cref="Attribute"/>
-    public class Element : IEnumerable<Attribute>, INotifyPropertyChanged, INotifyCollectionChanged
+    [DefaultProperty("Name")]
+    public class Element : IDictionary<string,object>, IDictionary, INotifyPropertyChanged, INotifyCollectionChanged, ISupportInitialize
     {
-        internal Element(Datamodel datamodel, Guid id, string name, string class_name, bool stub)
+        #region Constructors and Init
+
+        /// <summary>
+        /// Creates a new Element with a specified name, optionally specifying an ID and class name.
+        /// </summary>
+        /// <param name="owner">The owner of this Element. Cannot be null.</param>
+        /// <param name="id">A GUID that must be unique within the owning Datamodel. Can be null, in which case a random GUID is generated.</param>
+        /// <param name="name">An arbitrary string. Does not have to be unique, and can be null.</param>
+        /// <param name="class_name">An arbitrary string which loosely defines the type of Element this is. Cannot be null.</param>
+        /// <exception cref="IndexOutOfRangeException">Thrown when the owner already contains the maximum number of Elements allowed in a Datamodel.</exception>
+        public Element(Datamodel owner, string name, Guid? id = null, string class_name = "DmElement")
         {
-            this._ID = id;
+            if (owner == null) throw new ArgumentNullException("owner");
+            if (class_name == null) throw new ArgumentNullException("class_name");
+
+            ((ISupportInitialize)this).BeginInit();
+            
+            Owner = owner;
             Name = name;
             ClassName = class_name;
-            this._Stub = stub;
-            if (!stub)
+            
+            if (id.HasValue)
+                ID = id.Value;
+            else
             {
-                _Owner = datamodel;
-                lock (Owner.AllElements)
-                {
-                    Owner.AllElements.Add(this);
-                    if (Owner.AllElements.Count == 1) Owner.Root = this;
-                }
+                if (!owner.AllowRandomIDs) throw new InvalidOperationException("Random IDs are not allowed in this Datamodel.");
+                ID = Guid.NewGuid();
             }
+
+            ((ISupportInitialize)this).EndInit();
         }
+
+        /// <summary>
+        /// Creates a new stub Element to represent an Element in another Datamodel.
+        /// </summary>
+        /// <seealso cref="Element.Stub"/>
+        /// <param name="owner">The owner of this Element.</param>
+        /// <param name="id">The ID of the remote Element that this stub represents.</param>
+        public Element(Datamodel owner, Guid id)
+        {
+            if (owner == null) throw new ArgumentNullException("owner");
+
+            ((ISupportInitialize)this).BeginInit();
+
+            Owner = owner;
+            ID = id;
+            Stub = true;
+            Name = "Stub element";
+
+            ((ISupportInitialize)this).EndInit();
+        }
+
+        /// <summary>
+        /// Creates a new Element with a random GUID.
+        /// </summary>
+        public Element()
+        {
+            ((ISupportInitialize)this).BeginInit();
+            
+            ID = Guid.NewGuid();
+            
+            ((ISupportInitialize)this).EndInit();
+        }
+
+        bool Initialising = false;
+        void ISupportInitialize.BeginInit()
+        {
+            if (Initialising) throw new InvalidOperationException("Element is already initializing.");
+            Initialising = true;
+        }
+
+        void ISupportInitialize.EndInit()
+        {
+            if (!Initialising) throw new InvalidOperationException("Element is not initializing.");
+
+            if (ID == null)
+                ID = Guid.NewGuid();
+
+            Initialising = false;
+        }
+
+        #endregion
 
         private List<Attribute> Attributes = new List<Attribute>();
         private object Attribute_ChangeLock = new object();
-
-        internal void AddAttribute(Attribute attr)
-        {
-            if (attr.Name == "id" || attr.Name == "name")
-                throw new InvalidOperationException(String.Format("Attribute name \"{0}\" is reserved.", attr.Name));   
-
-            lock (Attribute_ChangeLock)
-            {
-                if (Attributes.Count == Int32.MaxValue)
-                    throw new IndexOutOfRangeException(String.Format("Maximum Attribute count reached for Element {0}.", ID));
-
-                Attributes.Add(attr);
-                attr.PropertyChanged += AttributeChanged;
-            }
-        }
-
+        
         void AttributeChanged(object sender, PropertyChangedEventArgs e)
         {
             var attr = (Attribute)sender;
@@ -59,11 +113,20 @@ namespace Datamodel
         }
 
         #region Properties
+
         /// <summary>
         /// Gets the ID of this Element. This must be unique within the Element's <see cref="Datamodel"/>.
         /// </summary>
-        public Guid ID { get { return _ID; } }
-        readonly Guid _ID;
+        public Guid ID 
+        { 
+            get { return _ID; }
+            set 
+            { 
+                if (!Initialising) throw new InvalidOperationException("ID can only be changed during initialisation.");
+                _ID = value;
+            }
+        }
+        Guid _ID;
 
         /// <summary>
         /// Gets or sets the name of this Element.
@@ -71,32 +134,56 @@ namespace Datamodel
         public string Name
         {
             get { return _Name; }
-            set { _Name = value; NotifyPropertyChanged("Name"); }
+            set { _Name = value; OnPropertyChanged("Name"); }
         }
         string _Name;
 
         /// <summary>
         /// Gets or sets the class of this Element. This is a string which loosely defines what <see cref="Attribute"/>s the Element contains.
         /// </summary>
+        [DefaultValue("DmeElement")]
         public string ClassName
         {
             get { return _ClassName; }
-            set { _ClassName = value; NotifyPropertyChanged("ClassName"); }
+            set { _ClassName = value; OnPropertyChanged("ClassName"); }
         }
-        string _ClassName;
+        string _ClassName = "DmeElement";
 
         /// <summary>
         /// Gets or sets whether this Element is a stub.
         /// </summary>
         /// <remarks>A Stub element does (or did) exist, but is not defined in this Element's <see cref="Datamodel"/>. Only its <see cref="ID"/> is known.</remarks>
-        public bool Stub { get { return _Stub; } }
-        readonly bool _Stub;
+        public bool Stub
+        {
+            get { return _Stub; }
+            set
+            {
+                if (!Initialising) throw new InvalidOperationException("Stub state can only be changed during initialisation.");
+                if (Count > 0) throw new InvalidOperationException("An Element containing Attributes cannot be a Stub.");
+                _Stub = value;
+            }
+        }
+        bool _Stub;
 
         /// <summary>
-        /// The <see cref="Datamodel"/> that this Element is part of.
+        /// Gets the <see cref="Datamodel"/> that this Element is owned by.
         /// </summary>
-        public Datamodel Owner { get { return _Owner; } }
-        readonly Datamodel _Owner;
+        public Datamodel Owner
+        {
+            get { return _Owner; }
+            internal set
+            {
+                if (_Owner != null) throw new InvalidOperationException("Element already has an owner.");
+                _Owner = value;
+                if (value != null)
+                {
+                    value.AllElements.Add(this);
+                    if (value.AllElements.Count == 1) value.Root = this;
+                }
+            }
+        }
+        Datamodel _Owner;
+
         #endregion
 
         /// <summary>
@@ -106,7 +193,7 @@ namespace Datamodel
         /// <typeparam name="T">The expected Type of the Attribute.</typeparam>
         /// <param name="name">The Attribute name to search for.</param>
         /// <returns>The value of the Attribute with the given name.</returns>
-        /// <exception cref="AttributeTypeException">Thrown when the value requested is not compatible with <see cref="T"/>.</exception>
+        /// <exception cref="AttributeTypeException">Thrown when the value of the requested Attribute is not compatible with <see cref="T"/>.</exception>
         public T Get<T>(string name)
         {
             object value = this[name];
@@ -138,40 +225,6 @@ namespace Datamodel
         }
 
         /// <summary>
-        /// Returns the <see cref="Attribute"/> object with the specified name. Do not store references to Attributes as they are replaced whenever a new value is set.
-        /// </summary>
-        /// <param name="name">The name to search for.</param>
-        /// <returns>The <see cref="Attribute"/> object with the given name.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when name is null.</exception>
-        /// <exception cref="InvalidOperationException">Thown if the Element is a stub.</exception>
-        /// <exception cref="KeyNotFoundException">Thrown when there is no attribute with the given name.</exception>
-        public Attribute GetAttribute(string name)
-        {
-            if (name == null) throw new ArgumentNullException("name");
-            if (Stub) throw new InvalidOperationException("Cannot access attributes on a stub element.");
-
-            Attribute attr = Attributes.Find(a => a.Name == name);
-
-            if (attr == null) throw new KeyNotFoundException(String.Format("Attribute \"{0}\" not found on <{1}>.", name, this));
-
-            return attr;
-        }
-
-        /// <summary>
-        /// Determines whether this <see cref="Element"/> contains an <see cref="Attribute"/> with the given name.
-        /// </summary>
-        /// <param name="name">The <see cref="Attribute"/> name to search for.</param>
-        /// <exception cref="ArgumentNullException">Thrown when name is null.</exception>
-        /// <exception cref="InvalidOperationException">Thown if the Element is a stub.</exception>
-        public bool HasAttribute(string name)
-        {
-            if (name == null) throw new ArgumentNullException("name");
-            if (Stub) throw new InvalidOperationException("Cannot access attributes on a stub element.");
-
-            return Attributes.Any(a => a.Name == name);
-        }
-
-        /// <summary>
         /// Gets or sets the value of the <see cref="Attribute"/> with the given name.
         /// </summary>
         /// <param name="name">The name to search for. Cannot be null.</param>
@@ -186,7 +239,9 @@ namespace Datamodel
         {
             get
             {
-                return GetAttribute(name).Value;
+                if (name == null) throw new ArgumentNullException("name");
+                if (Stub) throw new InvalidOperationException("Cannot get attributes from a stub element.");
+                return Attributes.First(a => a.Name == name).Value;
             }
             set
             {
@@ -196,46 +251,31 @@ namespace Datamodel
                 if (value != null && !Datamodel.IsDatamodelType(value.GetType()))
                     throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", value.GetType().FullName));
 
-                var elem = value as Element;
-                if (elem != null && elem.Owner != null && elem.Owner != Owner)
-                        throw new ElementOwnershipException("Cannot add an Element from a different Datamodel. Use Datamodel.ImportElement() or Datamodel.CreateStub() instead.");
-
+                
                 Attribute old_attr, new_attr;
+                int old_index;
                 lock (Attribute_ChangeLock)
                 {
                     old_attr = Attributes.Find(a => a.Name == name);
-                    new_attr = new Attribute(this, name, value, 0); // the constructor adds to the store itself
-                }
-                if (old_attr != null)
-                    Attributes.Remove(old_attr);
+                    new_attr = new Attribute(name, value);
 
-                if (CollectionChanged != null)
-                {
-                    NotifyCollectionChangedEventArgs change_args;
+                    old_index = Attributes.IndexOf(old_attr);
+                    Insert(old_index == -1 ? Count : old_index, new Attribute(name, value));
+
                     if (old_attr != null)
-                        change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr, old_attr);
-                    else
-                        change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr);
-
-                    CollectionChanged(this, change_args);
+                        Attributes.Remove(old_attr);
                 }
+
+                NotifyCollectionChangedEventArgs change_args;
+                if (old_attr != null)
+                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr, old_attr, old_index);
+                else
+                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr, Count);
+
+                OnCollectionChanged(change_args);
             }
         }
 
-        public bool Remove(Attribute item)
-        {
-            lock (Attribute_ChangeLock)
-            {
-                var index = Attributes.IndexOf(item);
-                if (Attributes.Remove(item))
-                {
-                    if (CollectionChanged != null)
-                        CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
-                    return true;
-                }
-                else return false;
-            }
-        }
         /// <summary>
         /// Removes an <see cref="Attribute"/> by name.
         /// </summary>
@@ -244,62 +284,166 @@ namespace Datamodel
         public bool Remove(string name)
         {
             lock (Attribute_ChangeLock)
-                return Remove(Attributes.FirstOrDefault(a => a.Name == name));
+            {
+                var attr = Attributes.FirstOrDefault(a => a.Name == name);
+                if (attr == null) return false;
+                var index = Attributes.IndexOf(attr);
+                if (Attributes.Remove(attr))
+                {
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, new AttrKVP(attr.Name, attr.Value), index));
+                    return true;
+                }
+                else return false;
+            }
         }
 
-        public bool Contains(string name)
-        {
-            return Attributes.Any(a => a.Name == name);
-        }
         /// <summary>
         /// Removes all Attributes from the Element.
         /// </summary>
         public void Clear()
         {
-            Attributes.Clear();
+            lock (Attribute_ChangeLock)
+                Attributes.Clear();
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
         /// <summary>
         /// Gets the number of <see cref="Attribute"/>s in the Element.
         /// </summary>
-        public int Count { get { return Attributes.Count; } }
+        public int Count
+        {
+            get
+            {
+                lock (Attribute_ChangeLock)
+                    return Attributes.Count;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the attribute at the given index.
+        /// </summary>
+        public AttrKVP this[int index]
+        {
+            get
+            {
+                var attr = Attributes[index];
+                return new AttrKVP(attr.Name,attr.Value);
+            }
+            set
+            {
+                RemoveAt(index);
+                Insert(index, new Attribute(value.Key, value.Value));
+            }
+        }
+
+        void Validate(string key, object value)
+        {
+            if (Stub) throw new InvalidOperationException("Cannot set attributes on a stub element.");
+            /*if (item.Owner != null && item.Owner != this)
+                throw new InvalidOperationException("Attribute is already owned by another Element.");*/
+            if (key == "id" || key == "name")
+                throw new InvalidOperationException(String.Format("Attribute name \"{0}\" is reserved.", key));
+        }
+
+        /// <summary>
+        /// Inserts an Attribute at the given index.
+        /// </summary>
+        private void Insert(int index, Attribute item)
+        {
+            if (item.Owner != this)
+            {
+                var elem = item.Value as Element;
+                if (elem != null && elem.Owner != null && elem.Owner != Owner)
+                    throw new ElementOwnershipException("Cannot add an Element from a different Datamodel. Use Datamodel.ImportElement() or Datamodel.CreateStub() instead.");
+            }
+
+            if (item.Value != null && !Datamodel.IsDatamodelType(item.Value.GetType()))
+                throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", item.Value.GetType().FullName));
+
+            lock (Attribute_ChangeLock)
+            {
+                if (Attributes.Count == Int32.MaxValue)
+                    throw new IndexOutOfRangeException(String.Format("Maximum Attribute count reached for Element {0}.", ID));
+
+                Attributes.Insert(index, item);
+            }
+            item.Owner = this;
+            item.PropertyChanged += AttributeChanged;
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
+        }
+
+        /// <summary>
+        /// Removes the attribute at the given index.
+        /// </summary>
+        public void RemoveAt(int index)
+        {
+            Attribute attr;
+            lock (Attribute_ChangeLock)
+            {
+                attr = Attributes[index];
+                attr.Owner = null;
+                Attributes.RemoveAt(index);
+            }
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr, index));
+        }
+
+        [Obsolete("Use the ContainsKey method.")]
+        public bool Contains(string name)
+        {
+            return ContainsKey(name);
+        }
+
+        public int IndexOf(string key)
+        {
+            lock (Attribute_ChangeLock)
+            {
+                int i = 0;
+                foreach (var attr in Attributes)
+                    if (attr.Name == key) return i;
+            }
+            return -1;
+        }
 
         #region Interfaces
-        /// <summary>
-        /// Raised when an <see cref="Attribute"/> is added, removed, or replaced.
-        /// </summary>
-        public event NotifyCollectionChangedEventHandler CollectionChanged;
+
         /// <summary>
         /// Raised when <see cref="Element.Name"/>, <see cref="Element.ClassName"/>, or <see cref="Element.ID"/> has changed.
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
-        void NotifyPropertyChanged(string info)
+        protected virtual void OnPropertyChanged(string info)
         {
             if (PropertyChanged != null)
                 PropertyChanged(this, new PropertyChangedEventArgs(info));
         }
 
-        internal void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
+        /// <summary>
+        /// Raised when an <see cref="Attribute"/> is added, removed, or replaced.
+        /// </summary>
+        public event NotifyCollectionChangedEventHandler CollectionChanged;
+        protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
         {
             if (CollectionChanged != null)
                 CollectionChanged(this, e);
         }
+        
+        public bool IsReadOnly { get { return false; } }
+        public bool IsSynchronized { get { return true; } }
+
+        #region Explicit interfaces
+
 
         /// <summary>
-        /// Returns an enumerator which iterates through this Element's <see cref="AttributeCollection"/>.
+        /// Gets an object which can be used to synchronise access to this Element's Attributes.
         /// </summary>
-        public IEnumerator<Attribute> GetEnumerator()
-        {
-            return Attributes.GetEnumerator();
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return Attributes.GetEnumerator() as IEnumerator;
-        }
+        public object SyncRoot { get { return Attribute_ChangeLock; } }
+
+        
+        #endregion
+
         #endregion
 
         public override string ToString()
         {
-            return String.Format("{0} [{1}]", Name, ClassName);
+            return String.Format("{0}[{1}]", Name, ClassName);
         }
 
         #region IEqualityComparer
@@ -422,6 +566,145 @@ namespace Datamodel
         }
 
 
-        #endregion
+        #endregion       
+    
+        /// <summary>
+        /// Adds a new attribute to this Element.
+        /// </summary>
+        /// <param name="key">The name of the attribute. Must be unique to this Element.</param>
+        /// <param name="value">The value of the Attribute. Must be of a valid Datamodel type.</param>
+        public void Add(string key, object value)
+        {
+            this[key] = value;
+        }
+
+        /// <summary>
+        /// Adds a new deferred attribute to this Element.
+        /// </summary>
+        /// <param name="key">The name of the attribute. Must be unique to this Element.</param>
+        /// <param name="offset">The location of the attribute's value in the Datamodel's source stream.</param>
+        internal void Add(string key, long offset)
+        {
+            Attributes.Add(new Attribute(key, this, offset));
+        }
+
+        public bool ContainsKey(string key)
+        {
+            if (key == null) throw new ArgumentNullException("key");
+            if (Stub) throw new InvalidOperationException("Cannot access attributes on a stub element.");
+            return Attributes.Any(a => a.Name == key);
+        }
+
+        public ICollection<string> Keys
+        {
+            get { return Attributes.Select(a => a.Name).ToArray(); }
+        }
+
+        public bool TryGetValue(string key, out object value)
+        {
+            var result = Attributes.FirstOrDefault(a => a.Name == key);
+
+            if (result != null)
+            {
+                value = result.Value;
+                return true;
+            }
+            else
+            {
+                value = null;
+                return false;
+            }
+        }
+
+        public ICollection<object> Values
+        {
+            get { return Attributes.Select(a => a.Value).ToArray(); }
+        }
+
+        void ICollection<AttrKVP>.Add(AttrKVP item)
+        {
+            this[item.Key] = item.Value;
+        }
+
+        bool ICollection<AttrKVP>.Contains(AttrKVP item)
+        {
+            return Attributes.Any(a => a.Name == item.Key && a.Value == item.Value);
+        }
+
+        void ICollection<AttrKVP>.CopyTo(AttrKVP[] array, int arrayIndex)
+        {
+            foreach (var attr in Attributes)
+            {
+                array[arrayIndex] = new AttrKVP(attr.Name, attr.Value);
+                arrayIndex++;
+            }
+        }
+
+        public IEnumerator<AttrKVP> GetEnumerator()
+        {
+            foreach (var attr in Attributes)
+                yield return new AttrKVP(attr.Name, attr.Value);
+        }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        void IDictionary.Add(object key, object value)
+        {
+            Add((string)key, value);
+        }
+
+        public bool Contains(object key)
+        {
+            return ContainsKey((string)key);
+        }
+
+        IDictionaryEnumerator IDictionary.GetEnumerator()
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool IsFixedSize { get { return false; } }
+
+        ICollection IDictionary.Keys
+        {
+            get { return Attributes.Select(a => a.Name).ToArray(); }
+        }
+
+        void IDictionary.Remove(object key)
+        {
+            Remove((string)key);
+        }
+
+        ICollection IDictionary.Values
+        {
+            get { return Attributes.Select(a => a.Value).ToArray(); }
+        }
+
+        object IDictionary.this[object key]
+        {
+            get
+            {
+                return this[(string)key];
+            }
+            set
+            {
+                this[(string)key] = value;
+            }
+        }
+
+        bool ICollection<AttrKVP>.Remove(AttrKVP item)
+        {
+            var attr = Attributes.FirstOrDefault(a => a.Name == item.Key);
+            if (attr == null || attr.Value != item.Value) return false;
+            Remove(attr.Name);
+            return true;
+        }
+
+        void ICollection.CopyTo(Array array, int index)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

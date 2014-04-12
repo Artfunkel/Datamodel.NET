@@ -74,7 +74,7 @@ namespace Datamodel_Tests
         {
             System.Threading.Tasks.Parallel.ForEach<Datamodel.Element>(dm.AllElements, e =>
             {
-                System.Threading.Tasks.Parallel.ForEach<Datamodel.Attribute>(e, a => { ; });
+                System.Threading.Tasks.Parallel.ForEach(e, a => { ; });
             });
         }
 
@@ -83,7 +83,7 @@ namespace Datamodel_Tests
 
         protected static void Populate(Datamodel.Datamodel dm, int attr_version)
         {
-            dm.Root = dm.CreateElement("root", RootGuid);
+            dm.Root = new Element(dm, "root", RootGuid);
             foreach (var value in TestValues)
             {
                 if (attr_version < 2 && value is TimeSpan)
@@ -102,7 +102,8 @@ namespace Datamodel_Tests
             }
 
             dm.Root["Element"] = dm.Root;
-            dm.Root["ElementStub"] = dm.CreateStubElement(Guid.NewGuid());
+            dm.Root["NoName"] = new Element();
+            dm.Root["ElementStub"] = new Element(dm, Guid.NewGuid());
         }
 
         protected void ValidatePopulated(int attr_version)
@@ -282,8 +283,8 @@ namespace Datamodel_Tests
         public void Perf_CreateElements_Binary5()
         {
             var dm = new Datamodel.Datamodel("model", 1); // using "model" to keep dxmconvert happy
-            dm.Root = dm.CreateElement("root");
-            var inner_elem = dm.CreateElement("inner_elem");
+            dm.Root = new Element(dm, "root");
+            var inner_elem = new Element(dm, "inner_elem");
             var arr = new Element[20000];
             dm.Root["big_array"] = arr;
 

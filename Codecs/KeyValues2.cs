@@ -246,9 +246,9 @@ namespace Datamodel.Codecs
                 foreach (var attr in element)
                 {
                     if (attr.Value == null)
-                        write_attribute(attr.Name, typeof(Element), null, false);
+                        write_attribute(attr.Key, typeof(Element), null, false);
                     else
-                        write_attribute(attr.Name, attr.Value.GetType(), attr.Value, false);
+                        write_attribute(attr.Key, attr.Value.GetType(), attr.Value, false);
                 }
 
                 Writer.Indent--;
@@ -327,7 +327,7 @@ namespace Datamodel.Codecs
                 Guid id = new Guid(id_s);
                 elem = DM.AllElements[id];
                 if (elem == null)
-                    elem = DM.CreateStubElement(id);
+                    elem = new Element(DM, id);
             }
             return elem;
         }
@@ -357,13 +357,13 @@ namespace Datamodel.Codecs
                     if (attr_name == "id" && attr_type_s == "elementid")
                         elem_id = Decode_NextToken();
                     if (elem_name != null && elem_id != null)
-                        elem = DM.CreateElement(elem_name, new Guid(elem_id), elem_class);
+                        elem = new Element(DM, elem_name, new Guid(elem_id), elem_class);
                     continue;
                 }
 
                 if (attr_type_s == "element")
                 {
-                    new Attribute(elem, attr_name, Decode_ParseElementId(), 0);
+                    elem.Add(attr_name, Decode_ParseElementId());
                     continue;
                 }
 
@@ -394,7 +394,7 @@ namespace Datamodel.Codecs
                 else
                     attr_value = Decode_ParseValue(attr_type, Decode_NextToken());
 
-                new Attribute(elem, attr_name, attr_value, 0);
+                elem.Add(attr_name, attr_value);
             }
             return elem;
         }

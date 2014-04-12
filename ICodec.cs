@@ -71,18 +71,6 @@ namespace Datamodel.Codecs
     public static class CodecUtilities
     {
         /// <summary>
-        /// Creates a new <see cref="Attribute"/> on an existing <see cref="Element"/>. This method is intended for <see cref="ICodec"/> implementers and should not be directly called from any other code.
-        /// </summary>
-        /// <param name="elem">The Element to add to.</param>
-        /// <param name="name">The name of the Attribute. Must be unique on the Element.</param>
-        /// <param name="value">The value held by the Attribute. Must be a valid Datamodel type, or null. Null means either an empty Element reference, or if the offset argument is not 0 that the value has not been loaded yet.</param>
-        /// <param name="offset">If using deferred loading, the location within the source stream at which this Attribute's value is located. Otherwise 0.</param>
-        public static void AddAttribute(Element elem, string name, object value, long offset)
-        {
-            new Attribute(elem, name, value, offset);
-        }
-
-        /// <summary>
         /// Standard DMX header with CLR-style variable tokens.
         /// </summary>
         public const string HeaderPattern = "<!-- dmx encoding {0} {1} format {2} {3} -->";
@@ -127,6 +115,17 @@ namespace Datamodel.Codecs
                 return new List<Matrix>(count);
 
             throw new ArgumentException("Unrecognised Type.");
+        }
+
+        /// <summary>
+        /// Creates a new attribute on an <see cref="Element"/>. This method is intended for <see cref="ICodec"/> implementers and should not be directly called from any other code.
+        /// </summary>
+        /// <param name="elem">The Element to add to.</param>
+        /// <param name="key">The name of the attribute. Must be unique on the Element.</param>
+        /// <param name="offset">If using deferred loading, the location within the source stream at which this Attribute's value is located. Otherwise 0.</param>
+        public static void AddDeferredAttribute(Element elem, string key, long offset)
+        {
+            elem.Add(key, offset);
         }
     }
 }

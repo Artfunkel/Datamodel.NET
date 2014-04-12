@@ -16,7 +16,8 @@ namespace Datamodel
     /// <summary>
     /// Represents a thread-safe tree of <see cref="Element"/>s.
     /// </summary>
-    public class Datamodel : INotifyPropertyChanged, IDisposable
+    [System.Windows.Markup.ContentProperty("Root")]
+    public class Datamodel : INotifyPropertyChanged, IDisposable, ISupportInitialize
     {
         #region Attribute types
         public static Type[] AttributeTypes { get { return _AttributeTypes; } }
@@ -52,6 +53,7 @@ namespace Datamodel
         /// <param name="t">The Type to check.</param>
         public static Type GetArrayInnerType(Type t)
         {
+            if (t == typeof(Element)) return null;
             var i_type = t.IsGenericType && t.GetGenericTypeDefinition() == typeof(IList<>) ? t : t.GetInterface("IList`1");
             if (i_type == null) return null;
 
@@ -254,6 +256,7 @@ namespace Datamodel
         public class ElementList : IEnumerable<Element>, INotifyCollectionChanged
         {
             internal object ChangeLock = new object();
+            internal int ElementsAdded = 0; // used to optimise de-stubbing
 
             List<Element> store = new List<Element>();
             Datamodel Owner;
@@ -269,7 +272,7 @@ namespace Datamodel
                 {
                     if (item.Owner != null && item.Owner != Owner)
                         throw new InvalidOperationException("Cannot add an element from a different Datamodel. Use ImportElement() first.");
-                    // if it's in the datamodel, its ID has already been checked for collisions.
+                    // if it's in the owner, its ID has already been checked for collisions.
                     store.Add(item);
                     if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item));
                 }
@@ -321,8 +324,9 @@ namespace Datamodel
                 {
                     if (store.Remove(item))
                     {
-                        foreach (var attr in store.AsParallel().SelectMany(e => e.Where(a => a.Value == item)))
-                            attr.Value = (mode == RemoveMode.MakeStubs) ? Owner.CreateStubElement(((Element)attr.Value).ID) : (Element)null;
+                        foreach (var elem in store)
+                            foreach(var attr in elem.AsParallel().Where(a => a.Value == item))
+                            elem[attr.Key] = (mode == RemoveMode.MakeStubs) ? new Element(Owner,((Element)attr.Value).ID) : (Element)null;
 
                         if (Owner.Root == item) Owner.Root = null;
 
@@ -353,15 +357,40 @@ namespace Datamodel
         }
 
         /// <summary>
-        /// Creates a new Datamodel.
+        /// Creates a new Datamodel with a specified Format and FormatVersion.
         /// </summary>
         /// <param name="format">The format of the Datamodel. This is not the same as the encoding used to save or load the Datamodel.</param>
         /// <param name="format_version">The version of the format in use.</param>
         public Datamodel(string format, int format_version)
+            : this()
         {
             Format = format;
             FormatVersion = format_version;
+        }
+
+        /// <summary>
+        /// Creates a new Datamodel.
+        /// </summary>
+        public Datamodel()
+        { 
             AllElements = new ElementList(this);
+        }
+
+        protected bool Initialising { get; private set; }
+        void ISupportInitialize.BeginInit()
+        {
+            if (Initialising) throw new InvalidOperationException("Datamodel is already initializing.");
+            Initialising = true;
+        }
+
+        void ISupportInitialize.EndInit()
+        {
+            if (!Initialising) throw new InvalidOperationException("Datamodel is not initializing.");
+
+            if (Format == null)
+                throw new InvalidOperationException("A Format name must be defined.");
+            
+            Initialising = false;
         }
 
         /// <summary>
@@ -394,7 +423,7 @@ namespace Datamodel
             set
             {
                 if (value != null && value.Contains(' '))
-                    throw new ArgumentException("Format name cannot contain the space character.");
+                    throw new ArgumentException("Format name cannot contain spaces.");
                 _Format = value;
                 NotifyPropertyChanged("Format");
             }
@@ -421,7 +450,7 @@ namespace Datamodel
             set
             {
                 if (value != null && value.Contains(' '))
-                    throw new ArgumentException("Encoding name cannot contain the space character.");
+                    throw new ArgumentException("Encoding name cannot contain spaces.");
                 _Encoding = value;
                 NotifyPropertyChanged("Encoding");
             }
@@ -450,8 +479,13 @@ namespace Datamodel
             get { return _Root; }
             set
             {
-                if (value != null && value.Owner != this)
-                    throw new ElementOwnershipException("Cannot add an Element from a different Datamodel. Use ImportElement() first.");
+                if (value != null)
+                {
+                    if (value.Owner == null)
+                        value.Owner = this;
+                    else if (value.Owner != this)
+                        throw new ElementOwnershipException("Cannot add an Element from a different Datamodel. Use ImportElement() first.");
+                }
                 _Root = value;
                 NotifyPropertyChanged("Root");
             }
@@ -496,7 +530,7 @@ namespace Datamodel
 
             // ...copy a reference type
             else if (attr_type == typeof(Element))
-                return deep ? ImportElement_internal((Element)value, true, overwrite) : CreateStubElement(((Element)value).ID);
+                return deep ? ImportElement_internal((Element)value, true, overwrite) : new Element(this,((Element)value).ID);
             else if (attr_type == typeof(Vector2))
                 return new Vector2((Vector2)value);
             else if (attr_type == typeof(Vector3))
@@ -533,13 +567,13 @@ namespace Datamodel
                     AllElements.Remove(result, ElementList.RemoveMode.MakeStubs); // allow attributes to substitute this Element for the old one
                 return result;
             }
-            result = CreateElement(foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
+            result = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
             
             // Copy attributes
             foreach (var attr in foreign_element)
             {
                 if (attr.Value == null)
-                    result[attr.Name] = null;
+                    result[attr.Key] = null;
                 else if (IsDatamodelArrayType(attr.Value.GetType()))
                 {
                     var list = (System.Collections.ICollection)attr.Value;
@@ -549,10 +583,10 @@ namespace Datamodel
                     foreach (var item in list)
                         copied_array.Add(CopyValue(item, deep, overwrite));
 
-                    result[attr.Name] = copied_array;
+                    result[attr.Key] = copied_array;
                 }
                 else
-                    result[attr.Name] = CopyValue(attr.Value, deep, overwrite);
+                    result[attr.Key] = CopyValue(attr.Value, deep, overwrite);
             }
             return result;
         }
@@ -564,9 +598,10 @@ namespace Datamodel
         /// <param name="id">The ID of the stub. Must be unique within the Datamodel.</param>
         /// <returns>A new stub Element owned by this Datamodel.</returns>
         /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Elements allowed in a Datamodel has been reached.</exception>
+        [Obsolete("Elements should now be constructed directly.")]
         public Element CreateStubElement(Guid id)
         {
-            return CreateElement("Stub element", id, true);
+            return CreateElement(null, id, true);
         }
 
         /// <summary>
@@ -577,6 +612,7 @@ namespace Datamodel
         /// <returns>A new Element owned by this Datamodel.</returns>
         /// <exception cref="InvalidOperationException">Thrown when Datamodel.AllowRandomIDs is false.</exception>
         /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Elements allowed in a Datamodel has been reached.</exception>
+        [Obsolete("Elements should now be constructed directly.")]
         public Element CreateElement(string name, string class_name = "DmElement")
         {
             if (!AllowRandomIDs)
@@ -596,12 +632,13 @@ namespace Datamodel
         /// <param name="class_name">The Element's class.</param>
         /// <returns>A new Element owned by this Datamodel.</returns>
         /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Elements allowed in a Datamodel has been reached.</exception>
+        [Obsolete("Elements should now be constructed directly.")]
         public Element CreateElement(string name, Guid id, string class_name = "DmElement")
         {
             return CreateElement(name, id, false, class_name);
         }
 
-        internal int ElementsAdded = 0; // used to optimise de-stubbing
+        [Obsolete("Elements should now be constructed directly.")]
         internal Element CreateElement(string name, Guid id, bool stub, string classname = "DmElement")
         {
             lock (AllElements.ChangeLock)
@@ -612,9 +649,9 @@ namespace Datamodel
                 if (AllElements[id] != null)
                     throw new ElementIdException(String.Format("Element ID {0} already in use in this Datamodel.", id.ToString()));
 
-                if (!stub) ElementsAdded++;
+                if (!stub) AllElements.ElementsAdded++;
             }
-            return new Element(this, id, name, classname, stub);
+            return stub ? new Element(this, id) : new Element(this, name, id, classname);
         }
         #endregion
 

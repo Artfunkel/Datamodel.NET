@@ -133,7 +133,7 @@ namespace Datamodel.Codecs
                 Strings.Add(elem.ClassName);
                 foreach (var attr in elem)
                 {
-                    Strings.Add(attr.Name);
+                    Strings.Add(attr.Key);
                     if (attr.Value is string) Strings.Add((string)attr.Value);
                     if (attr.Value is Element) ScrapeElement((Element)attr.Value);
                     if (attr.Value is IList<Element>)
@@ -189,7 +189,7 @@ namespace Datamodel.Codecs
                 if (index == -1)
                     return null;
                 else if (index == -2)
-                    return dm.CreateStubElement(new Guid(ReadString_Raw())); // yes, it's in ASCII!
+                    return new Element(dm, new Guid(ReadString_Raw())); // yes, it's in ASCII!
                 else
                     return dm.AllElements[index];
             }
@@ -260,7 +260,7 @@ namespace Datamodel.Codecs
                 var name = EncodingVersion >= 4 ? StringDict.ReadString() : ReadString_Raw();
                 var id_bits = Reader.ReadBytes(16);
                 var id = new Guid(BitConverter.IsLittleEndian ? id_bits : id_bits.Reverse().ToArray());
-                dm.CreateElement(name, id, type);
+                new Element(dm, name, id, type);
             }
 
             // read attributes (or not, if we're deferred)
@@ -276,12 +276,12 @@ namespace Datamodel.Codecs
 
                     if (defer_mode == DeferredMode.Automatic)
                     {
-                        CodecUtilities.AddAttribute(elem, name, null, Reader.BaseStream.Position);
+                        CodecUtilities.AddDeferredAttribute(elem,name,Reader.BaseStream.Position);
                         SkipAttribte();
                     }
                     else
                     {
-                        CodecUtilities.AddAttribute(elem, name, DecodeAttribute(dm), 0);
+                        elem.Add(name, DecodeAttribute(dm));
                     }
                 }
             }
@@ -469,7 +469,7 @@ namespace Datamodel.Codecs
                 Writer.Write(elem.Count);
                 foreach (var attr in elem)
                 {
-                    StringDict.WriteString(attr.Name);
+                    StringDict.WriteString(attr.Key);
                     var attr_type = attr.Value == null ? typeof(Element) : attr.Value.GetType();
                     Writer.Write(TypeToId(attr_type, EncodingVersion));
 
@@ -584,7 +584,8 @@ namespace Datamodel.Codecs
             [System.Security.SecuritySafeCritical]
             public override void Write(string value)
             {
-                base.Write(Datamodel.TextEncoding.GetBytes(value));
+                if (value != null)
+                    base.Write(Datamodel.TextEncoding.GetBytes(value));
                 base.Write((byte)0);
             }
 
