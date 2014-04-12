@@ -42,6 +42,11 @@ namespace Datamodel_Tests
             System.IO.File.Delete(DmxConvertPath);
         }
 
+        protected static DM MakeDatamodel()
+        {
+            return new DM("model", 1); // using "model" to keep dxmconvert happy
+        }
+
         protected void SaveAndConvert(Datamodel.Datamodel dm, string encoding, int version)
         {
             dm.Save(DmxSavePath, encoding, version);
@@ -135,7 +140,7 @@ namespace Datamodel_Tests
 
         protected void Create(string encoding, int version, bool memory_save = false)
         {
-            var dm = new Datamodel.Datamodel("model", 1); // using "model" to keep dxmconvert happy
+            var dm = MakeDatamodel();
             var attr_version = encoding == "keyvalues2" || version >= 5 ? 2 : 1;
             Populate(dm,attr_version);
             
@@ -226,10 +231,10 @@ namespace Datamodel_Tests
         [TestMethod]
         public void Import()
         {
-            var dm = new DM("model",1);
+            var dm = MakeDatamodel();
             Populate(dm, 2);
 
-            var dm2 = new DM("model", 1);
+            var dm2 = MakeDatamodel();
             dm2.Root = dm2.ImportElement(dm.Root, true, true);
             
             SaveAndConvert(dm, "keyvalues2", 1);
@@ -282,7 +287,7 @@ namespace Datamodel_Tests
         [TestMethod]
         public void Perf_CreateElements_Binary5()
         {
-            var dm = new Datamodel.Datamodel("model", 1); // using "model" to keep dxmconvert happy
+            var dm = MakeDatamodel();
             dm.Root = new Element(dm, "root");
             var inner_elem = new Element(dm, "inner_elem");
             var arr = new Element[20000];
@@ -290,6 +295,28 @@ namespace Datamodel_Tests
 
             foreach (int i in Enumerable.Range(0,19999))
                 arr[i] = inner_elem;
+
+            SaveAndConvert(dm, "binary", 5);
+            Cleanup();
+        }
+
+        [TestMethod]
+        public void Perf_CreateAttributes_Binary5()
+        {
+            var dm = MakeDatamodel();
+            dm.Root = new Element(dm, "root");
+            
+            foreach(int x in Enumerable.Range(0,5000))
+            {
+                var elem_name = x.ToString();
+                foreach (int i in Enumerable.Range(0, 5))
+                {
+                    var elem = new Element(dm, elem_name);
+                    var key = i.ToString();
+                    elem[key] = i;
+                    elem.Get<int>(key);
+                }
+            }
 
             SaveAndConvert(dm, "binary", 5);
             Cleanup();
