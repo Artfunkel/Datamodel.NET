@@ -347,7 +347,7 @@ namespace Datamodel
                     throw new ElementOwnershipException("Cannot add an Element from a different Datamodel. Use Datamodel.ImportElement() or Datamodel.CreateStub() instead.");
             }
 
-            if (item.Value != null && !Datamodel.IsDatamodelType(item.Value.GetType()))
+            if (!Datamodel.IsDatamodelType(item.ValueType))
                 throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", item.Value.GetType().FullName));
 
             lock (Attribute_ChangeLock)

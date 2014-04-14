@@ -7,6 +7,7 @@ using System.Linq;
 using System.IO;
 using System.Security;
 using System.Runtime.Serialization;
+using System.Threading;
 
 using Codec_t = System.Tuple<string, int>;
 using Datamodel.Codecs;
@@ -271,7 +272,7 @@ namespace Datamodel
         /// </summary>
         public class ElementList : IEnumerable<Element>, INotifyCollectionChanged
         {
-            internal object ChangeLock = new object();
+            internal ReaderWriterLockSlim ChangeLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
             internal int ElementsAdded = 0; // used to optimise de-stubbing
 
             List<Element> store = new List<Element>();
@@ -284,13 +285,18 @@ namespace Datamodel
 
             internal void Add(Element item)
             {
-                lock (ChangeLock)
+                ChangeLock.EnterWriteLock();
+                try
                 {
                     if (item.Owner != null && item.Owner != Owner)
                         throw new InvalidOperationException("Cannot add an element from a different Datamodel. Use ImportElement() first.");
                     // if it's in the owner, its ID has already been checked for collisions.
                     store.Add(item);
                     if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item));
+                }
+                finally
+                {
+                    ChangeLock.ExitWriteLock();
                 }
             }
 
@@ -300,19 +306,52 @@ namespace Datamodel
             /// <remarks>The order of this list has no meaning to a Datamodel. This accessor is intended for <see cref="ICodec"/> implementers.</remarks>
             /// <param name="index">The index to look up.</param>
             /// <returns>The Element found at the index.</returns>
-            public Element this[int index] { get { return store[index]; } }
+            public Element this[int index]
+            {
+                get
+                {
+                    ChangeLock.EnterReadLock();
+                    try
+                    {
+                        return store[index];
+                    }
+                    finally { ChangeLock.ExitReadLock(); }
+                }
+            }
 
             /// <summary>
             /// Searches the collection for an <see cref="Element"/> with the specified <see cref="Element.ID"/>.
             /// </summary>
             /// <param name="id">The ID to search for.</param>
             /// <returns>The Element with the given ID, or null if none is found.</returns>
-            public Element this[Guid id] { get { lock (ChangeLock) { return store.FirstOrDefault(e => e.ID == id); } } }
+            public Element this[Guid id]
+            {
+                get
+                {
+                    ChangeLock.EnterReadLock();
+                    try
+                    {
+                        return store.FirstOrDefault(e => e.ID == id);
+                    }
+                    finally { ChangeLock.ExitReadLock(); }
+                }
+            } 
 
             /// <summary>
             /// Gets the number of <see cref="Element"/>s in this collection.
             /// </summary>
-            public int Count { get { return store.Count; } }
+            public int Count
+            { 
+                get
+                {
+                    ChangeLock.EnterReadLock();
+                    try
+                    {
+                        return store.Count;
+                    }
+                    finally { ChangeLock.ExitReadLock(); }
+                }
+            }
 
             /// <summary>
             /// Specifies a behaviour for removing references to an <see cref="Element"/> from other Elements in a <see cref="Datamodel"/>.
@@ -336,12 +375,13 @@ namespace Datamodel
             /// <returns>true if item is successfully removed; otherwise, false.</returns>
             public bool Remove(Element item, RemoveMode mode)
             {
-                lock (ChangeLock)
+                ChangeLock.EnterWriteLock();
+                try
                 {
                     if (store.Remove(item))
                     {
                         foreach (var elem in store.ToArray())
-                            foreach (var attr in elem.AsParallel().Where(a => a.Value == item))
+                            foreach (var attr in elem.Where(a => a.Value == item).ToArray())
                                 elem[attr.Key] = (mode == RemoveMode.MakeStubs) ? new Element(Owner, ((Element)attr.Value).ID) : (Element)null;
 
                         if (Owner.Root == item) Owner.Root = null;
@@ -351,6 +391,7 @@ namespace Datamodel
                     }
                     else return false;
                 }
+                finally { ChangeLock.ExitWriteLock(); }
             }
 
             #region Interfaces
@@ -537,7 +578,7 @@ namespace Datamodel
             if (deep) mode |= ImportMode.Deep;
             if (overwrite) mode |= ImportMode.Overwrite;
 
-            return ImportElement_internal(foreign_element, mode, new Dictionary<Element, Element>());
+            return ImportElement_internal(foreign_element, new ImportJob(mode));
         }
 
         [Flags]
@@ -554,7 +595,21 @@ namespace Datamodel
             Overwrite
         }
 
-        object CopyValue(object value, ImportMode mode, Dictionary<Element, Element> imported)
+        struct ImportJob
+        {
+            public ImportMode Mode;
+            public Dictionary<Element, Element> ImportMap;
+            public int Depth;
+
+            public ImportJob(ImportMode mode)
+            {
+                Mode = mode;
+                ImportMap = new Dictionary<Element, Element>();
+                Depth = 0;
+            }
+        }
+
+        object CopyValue(object value, ImportJob job)
         {
             if (value == null) return null;
             var attr_type = value.GetType();
@@ -572,8 +627,12 @@ namespace Datamodel
 
                 if (local_element != null && !local_element.Stub)
                     best_element = local_element;
-                else if (!foreign_element.Stub && mode.HasFlag(ImportMode.Deep))
-                    best_element = ImportElement_internal(foreign_element, mode, imported);
+                else if (!foreign_element.Stub && job.Mode.HasFlag(ImportMode.Deep))
+                {
+                    job.Depth++;
+                    best_element = ImportElement_internal(foreign_element, job);
+                    job.Depth--;
+                }
                 else
                     best_element = local_element ?? new Element(this, foreign_element.ID);
 
@@ -602,7 +661,7 @@ namespace Datamodel
             else throw new ArgumentException("CopyValue: unhandled type.");
         }
 
-        Element ImportElement_internal(Element foreign_element, ImportMode mode, Dictionary<Element, Element> imported)
+        Element ImportElement_internal(Element foreign_element, ImportJob job)
         {
             if (foreign_element == null) return null;
             if (foreign_element.Owner == this) return foreign_element;
@@ -610,25 +669,25 @@ namespace Datamodel
             Element local_element;
 
             // don't import the same Element twice
-            if (imported.TryGetValue(foreign_element, out local_element))
+            if (job.ImportMap.TryGetValue(foreign_element, out local_element))
                 return local_element;
 
             // find a local element with the same ID and either return or stub it
             local_element = AllElements[foreign_element.ID];
             if (local_element != null)
             {
-                if (!foreign_element.Stub && (local_element.Stub || mode.HasFlag(ImportMode.Overwrite)))
+                if (!foreign_element.Stub && (local_element.Stub || job.Mode.HasFlag(ImportMode.Overwrite)))
                     AllElements.Remove(local_element, ElementList.RemoveMode.MakeStubs); // allows attributes to substitute this Element for the old one
                 else
                     return local_element;
             }
 
             // Create a new local Element
-            if (foreign_element.Stub)
+            if (foreign_element.Stub || (!job.Mode.HasFlag(ImportMode.Deep) && job.Depth > 0))
                 local_element = new Element(this, foreign_element.ID);
             else
                 local_element = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
-            imported.Add(foreign_element, local_element);
+            job.ImportMap.Add(foreign_element, local_element);
 
             // Copy attributes
             if (!local_element.Stub)
@@ -643,12 +702,12 @@ namespace Datamodel
 
                         var copied_array = CodecUtilities.MakeList(inner_type, list.Count);
                         foreach (var item in list)
-                            copied_array.Add(CopyValue(item, mode, imported));
+                            copied_array.Add(CopyValue(item, job));
 
                         local_element[attr.Key] = copied_array;
                     }
                     else
-                        local_element[attr.Key] = CopyValue(attr.Value, mode, imported);
+                        local_element[attr.Key] = CopyValue(attr.Value, job);
                 }
             return local_element;
         }
@@ -703,7 +762,8 @@ namespace Datamodel
         [Obsolete("Elements should now be constructed directly.")]
         internal Element CreateElement(string name, Guid id, bool stub, string classname = "DmElement")
         {
-            lock (AllElements.ChangeLock)
+            AllElements.ChangeLock.EnterWriteLock();
+            try
             {
                 if (AllElements.Count == Int32.MaxValue) // jinkies!
                     throw new IndexOutOfRangeException("Maximum Element count reached.");
@@ -713,6 +773,7 @@ namespace Datamodel
 
                 if (!stub) AllElements.ElementsAdded++;
             }
+            finally { AllElements.ChangeLock.ExitWriteLock(); }
             return stub ? new Element(this, id) : new Element(this, name, id, classname);
         }
         #endregion

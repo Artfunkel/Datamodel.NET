@@ -22,8 +22,9 @@ namespace Datamodel
             if (name == null)
                 throw new ArgumentNullException("name");
 
-            _Name = name;
+            Name = name;
             _Value = value;
+            ValueType = value != null ? value.GetType() : typeof(Element);
             LastStubSearch = 0;
             Offset = 0;
             _Owner = owner;
@@ -48,12 +49,9 @@ namespace Datamodel
         /// <summary>
         /// Gets or sets the name of this Attribute.
         /// </summary>
-        public string Name
-        {
-            get { return _Name; }
-            set { _Name = value; }
-        }
-        string _Name;
+        public string Name;
+
+        public Type ValueType;
 
         /// <summary>
         /// Gets the <see cref="Element"/> which this Attribute is part of.
@@ -110,8 +108,7 @@ namespace Datamodel
             {
                 Element destub_elem = null;
                 if (OwnerDatamodel.AllElements.ElementsAdded > LastStubSearch)
-                    lock (OwnerDatamodel.AllElements.ChangeLock)
-                        destub_elem = OwnerDatamodel.AllElements[stub_elem.ID];
+                    destub_elem = OwnerDatamodel.AllElements[stub_elem.ID];
                 if (destub_elem == null)
                     destub_elem = OwnerDatamodel.OnStubRequest(stub_elem.ID);
                 if (destub_elem != null)
