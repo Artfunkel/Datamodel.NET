@@ -104,19 +104,24 @@ namespace Datamodel
             Offset = 0;
         }
 
-        void Destub(Element elem)
+        bool Destub(Element stub_elem, out Element full_elem)
         {
-            if (elem != null && elem.Stub)
+            if (stub_elem != null && stub_elem.Stub)
             {
                 Element destub_elem = null;
                 if (OwnerDatamodel.AllElements.ElementsAdded > LastStubSearch)
                     lock (OwnerDatamodel.AllElements.ChangeLock)
-                        destub_elem = OwnerDatamodel.AllElements[elem.ID];
+                        destub_elem = OwnerDatamodel.AllElements[stub_elem.ID];
                 if (destub_elem == null)
-                    destub_elem = OwnerDatamodel.OnStubRequest(elem.ID);
+                    destub_elem = OwnerDatamodel.OnStubRequest(stub_elem.ID);
                 if (destub_elem != null)
-                    Value = destub_elem;
+                {
+                    full_elem = destub_elem;
+                    return true;
+                }
             }
+            full_elem = stub_elem;
+            return false;
         }
 
         /// <summary>
@@ -134,14 +139,18 @@ namespace Datamodel
                 {
                     // expand stubs
                     var elem = _Value as Element;
-                    if (elem != null)
-                        Destub(elem);
+                    Element full_elem;
+                    if (elem != null && Destub(elem, out full_elem))
+                        Value = full_elem;
                     else
                     {
                         var elem_list = _Value as IList<Element>;
                         if (elem_list != null)
                             for (int i = 0; i < elem_list.Count; i++)
-                                Destub(elem_list[i]);
+                            {
+                                if (Destub(elem_list[i], out full_elem))
+                                    elem_list[i] = full_elem;
+                            }
                     }
 
                     LastStubSearch = OwnerDatamodel.AllElements.ElementsAdded;

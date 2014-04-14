@@ -262,7 +262,7 @@ namespace Datamodel
         /// <summary>
         /// Occurs when an attempt is made to access a stub elment.
         /// </summary>
-        public event StubRequestHandler StubRequest;        
+        public event StubRequestHandler StubRequest;
 
         #endregion
 
@@ -340,9 +340,9 @@ namespace Datamodel
                 {
                     if (store.Remove(item))
                     {
-                        foreach (var elem in store)
-                            foreach(var attr in elem.AsParallel().Where(a => a.Value == item))
-                            elem[attr.Key] = (mode == RemoveMode.MakeStubs) ? new Element(Owner,((Element)attr.Value).ID) : (Element)null;
+                        foreach (var elem in store.ToArray())
+                            foreach (var attr in elem.AsParallel().Where(a => a.Value == item))
+                                elem[attr.Key] = (mode == RemoveMode.MakeStubs) ? new Element(Owner, ((Element)attr.Value).ID) : (Element)null;
 
                         if (Owner.Root == item) Owner.Root = null;
 
@@ -388,7 +388,7 @@ namespace Datamodel
         /// Creates a new Datamodel.
         /// </summary>
         public Datamodel()
-        { 
+        {
             AllElements = new ElementList(this);
         }
 
@@ -405,7 +405,7 @@ namespace Datamodel
 
             if (Format == null)
                 throw new InvalidOperationException("A Format name must be defined.");
-            
+
             Initialising = false;
         }
 
@@ -532,10 +532,29 @@ namespace Datamodel
         {
             if (foreign_element == null) throw new ArgumentNullException("element");
             if (foreign_element.Owner == this) throw new ElementOwnershipException("Element is already a part of this Datamodel.");
-            return ImportElement_internal(foreign_element, deep, overwrite);
+            
+            ImportMode mode = ImportMode.Normal;
+            if (deep) mode |= ImportMode.Deep;
+            if (overwrite) mode |= ImportMode.Overwrite;
+
+            return ImportElement_internal(foreign_element, mode, new Dictionary<Element, Element>());
         }
 
-        object CopyValue(object value, bool deep, bool overwrite)
+        [Flags]
+        enum ImportMode
+        {
+            Normal,
+            /// <summary>
+            /// Recursively import all referenced Elements.
+            /// </summary>
+            Deep,
+            /// <summary>
+            /// Replace local Elements, even if they are not stubs.
+            /// </summary>
+            Overwrite
+        }
+
+        object CopyValue(object value, ImportMode mode, Dictionary<Element, Element> imported)
         {
             if (value == null) return null;
             var attr_type = value.GetType();
@@ -553,8 +572,8 @@ namespace Datamodel
 
                 if (local_element != null && !local_element.Stub)
                     best_element = local_element;
-                else if (!foreign_element.Stub && deep)
-                    best_element = ImportElement_internal(foreign_element, true, overwrite);
+                else if (!foreign_element.Stub && mode.HasFlag(ImportMode.Deep))
+                    best_element = ImportElement_internal(foreign_element, mode, imported);
                 else
                     best_element = local_element ?? new Element(this, foreign_element.ID);
 
@@ -583,45 +602,55 @@ namespace Datamodel
             else throw new ArgumentException("CopyValue: unhandled type.");
         }
 
-        Element ImportElement_internal(Element foreign_element, bool deep, bool overwrite)
+        Element ImportElement_internal(Element foreign_element, ImportMode mode, Dictionary<Element, Element> imported)
         {
             if (foreign_element == null) return null;
             if (foreign_element.Owner == this) return foreign_element;
-
-            // find an existing element with the same ID and either return or replace it
-            var result = AllElements[foreign_element.ID];
-            if (result != null)
-            {
-                if (overwrite && !foreign_element.Stub)
-                    AllElements.Remove(result, ElementList.RemoveMode.MakeStubs); // allow attributes to substitute this Element for the old one
-                return result;
-            }
-
-            if (foreign_element.Stub)
-                return new Element(this, foreign_element.ID);
-            else
-                result = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
             
-            // Copy attributes
-            foreach (var attr in foreign_element)
+            Element local_element;
+
+            // don't import the same Element twice
+            if (imported.TryGetValue(foreign_element, out local_element))
+                return local_element;
+
+            // find a local element with the same ID and either return or stub it
+            local_element = AllElements[foreign_element.ID];
+            if (local_element != null)
             {
-                if (attr.Value == null)
-                    result[attr.Key] = null;
-                else if (IsDatamodelArrayType(attr.Value.GetType()))
-                {
-                    var list = (System.Collections.ICollection)attr.Value;
-                    var inner_type = GetArrayInnerType(list.GetType());
-
-                    var copied_array = CodecUtilities.MakeList(inner_type, list.Count);
-                    foreach (var item in list)
-                        copied_array.Add(CopyValue(item, deep, overwrite));
-
-                    result[attr.Key] = copied_array;
-                }
+                if (!foreign_element.Stub && (local_element.Stub || mode.HasFlag(ImportMode.Overwrite)))
+                    AllElements.Remove(local_element, ElementList.RemoveMode.MakeStubs); // allows attributes to substitute this Element for the old one
                 else
-                    result[attr.Key] = CopyValue(attr.Value, deep, overwrite);
+                    return local_element;
             }
-            return result;
+
+            // Create a new local Element
+            if (foreign_element.Stub)
+                local_element = new Element(this, foreign_element.ID);
+            else
+                local_element = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
+            imported.Add(foreign_element, local_element);
+
+            // Copy attributes
+            if (!local_element.Stub)
+                foreach (var attr in foreign_element)
+                {
+                    if (attr.Value == null)
+                        local_element[attr.Key] = null;
+                    else if (IsDatamodelArrayType(attr.Value.GetType()))
+                    {
+                        var list = (System.Collections.ICollection)attr.Value;
+                        var inner_type = GetArrayInnerType(list.GetType());
+
+                        var copied_array = CodecUtilities.MakeList(inner_type, list.Count);
+                        foreach (var item in list)
+                            copied_array.Add(CopyValue(item, mode, imported));
+
+                        local_element[attr.Key] = copied_array;
+                    }
+                    else
+                        local_element[attr.Key] = CopyValue(attr.Value, mode, imported);
+                }
+            return local_element;
         }
 
         /// <summary>
