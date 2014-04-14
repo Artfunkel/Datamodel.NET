@@ -247,6 +247,23 @@ namespace Datamodel
             return dm;
         }
 
+        internal Element OnStubRequest(Guid id)
+        {
+            Element result = null;
+            if (StubRequest != null)
+            {
+                result = StubRequest(id);
+                if (result != null && result.ID != id)
+                    throw new InvalidOperationException("Datamodel.StubRequest returned an Element with a an ID different from the one requested.");
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Occurs when an attempt is made to access a stub elment.
+        /// </summary>
+        public event StubRequestHandler StubRequest;        
+
         #endregion
 
         /// <summary>
@@ -529,7 +546,20 @@ namespace Datamodel
 
             // ...copy a reference type
             else if (attr_type == typeof(Element))
-                return deep ? ImportElement_internal((Element)value, true, overwrite) : new Element(this,((Element)value).ID);
+            {
+                var foreign_element = (Element)value;
+                var local_element = AllElements[foreign_element.ID];
+                Element best_element = null;
+
+                if (local_element != null && !local_element.Stub)
+                    best_element = local_element;
+                else if (!foreign_element.Stub && deep)
+                    best_element = ImportElement_internal(foreign_element, true, overwrite);
+                else
+                    best_element = local_element ?? new Element(this, foreign_element.ID);
+
+                return best_element;
+            }
             else if (attr_type == typeof(Vector2))
                 return new Vector2((Vector2)value);
             else if (attr_type == typeof(Vector3))
@@ -566,7 +596,11 @@ namespace Datamodel
                     AllElements.Remove(result, ElementList.RemoveMode.MakeStubs); // allow attributes to substitute this Element for the old one
                 return result;
             }
-            result = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
+
+            if (foreign_element.Stub)
+                return new Element(this, foreign_element.ID);
+            else
+                result = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
             
             // Copy attributes
             foreach (var attr in foreign_element)
@@ -666,6 +700,13 @@ namespace Datamodel
         }
         #endregion
     }
+
+    /// <summary>
+    /// Represents the method that will handle the <see cref="Datamodel.StubRequest"/> event.
+    /// </summary>
+    /// <param name="id">The Element ID to search for.</param>
+    /// <returns>An Element with the requested ID.</returns>
+    public delegate Element StubRequestHandler(Guid id);
 
     #region Exceptions
     /// <summary>

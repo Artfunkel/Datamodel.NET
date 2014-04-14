@@ -10,23 +10,23 @@ namespace Datamodel
     /// <summary>
     /// A name/value pair associated with an <see cref="Element"/>.
     /// </summary>
-    class Attribute : INotifyPropertyChanged
+    struct Attribute
     {
-        /// <summary>
-        /// Creates a new Attribute.
-        /// </summary>
-        public Attribute()
-        { }
-
         /// <summary>
         /// Creates a new Attribute with a specified name and value.
         /// </summary>
         /// <param name="name">The name of the Attribute, which must be unique to its owner.</param>
         /// <param name="value">The value of the Attribute, which must be of a supported Datamodel type.</param>
-        public Attribute(string name, object value)
+        public Attribute(string name, Element owner, object value)
         {
-            Name = name;
-            Value = value;
+            if (name == null)
+                throw new ArgumentNullException("name");
+
+            _Name = name;
+            _Value = value;
+            LastStubSearch = 0;
+            Offset = 0;
+            _Owner = owner;
         }
 
         /// <summary>
@@ -36,12 +36,11 @@ namespace Datamodel
         /// <param name="owner">The Element which owns this Attribute.</param>
         /// <param name="defer_offset">The location in the encoded DMX stream at which this Attribute's value can be found.</param>
         public Attribute(string name, Element owner, long defer_offset)
-            : this(name, null)
+            : this(name, owner, null)
         {
             if (owner == null)
                 throw new ArgumentNullException("owner");
-            
-            Owner = owner;
+
             Offset = defer_offset;
         }
 
@@ -52,7 +51,7 @@ namespace Datamodel
         public string Name
         {
             get { return _Name; }
-            set { _Name = value; OnPropertyChanged("Name"); }
+            set { _Name = value; }
         }
         string _Name;
 
@@ -68,10 +67,11 @@ namespace Datamodel
 
                 if (Deferred && _Owner != null) DeferredLoad();
                 _Owner = value;
-                OnPropertyChanged("Owner");
             }
         }
         Element _Owner;
+
+        Datamodel OwnerDatamodel { get { return Owner != null ? Owner.Owner : null; } }
 
         /// <summary>
         /// Gets whether the value of this Attribute has yet to be decoded.
@@ -87,23 +87,36 @@ namespace Datamodel
         {
             if (Offset == 0) throw new InvalidOperationException("Attribute already loaded.");
 
-            if (Owner == null || Owner.Owner == null || Owner.Owner.Codec == null)
+            if (OwnerDatamodel == null || OwnerDatamodel.Codec == null)
                 throw new CodecException("Trying to load a deferred Attribute, but could not find codec.");
 
-            var dm = Owner.Owner;
             try
             {
-                lock (dm.Codec)
+                lock (OwnerDatamodel.Codec)
                 {
-                    _Value = dm.Codec.DeferredDecodeAttribute(dm, Offset);
+                    _Value = OwnerDatamodel.Codec.DeferredDecodeAttribute(OwnerDatamodel, Offset);
                 }
             }
             catch (Exception err)
             {
-                throw new CodecException(String.Format("Deferred loading of attribute \"{0}\" on element {1} using codec {2} threw an exception.", Name, Owner.ID, dm.Codec), err);
+                throw new CodecException(String.Format("Deferred loading of attribute \"{0}\" on element {1} using codec {2} threw an exception.", Name, Owner.ID, OwnerDatamodel.Codec), err);
             }
             Offset = 0;
-            OnPropertyChanged("Deferred");
+        }
+
+        void Destub(Element elem)
+        {
+            if (elem != null && elem.Stub)
+            {
+                Element destub_elem = null;
+                if (OwnerDatamodel.AllElements.ElementsAdded > LastStubSearch)
+                    lock (OwnerDatamodel.AllElements.ChangeLock)
+                        destub_elem = OwnerDatamodel.AllElements[elem.ID];
+                if (destub_elem == null)
+                    destub_elem = OwnerDatamodel.OnStubRequest(elem.ID);
+                if (destub_elem != null)
+                    Value = destub_elem;
+            }
         }
 
         /// <summary>
@@ -117,36 +130,21 @@ namespace Datamodel
                 if (Offset > 0)
                     DeferredLoad();
 
-                if (Owner != null && Owner.Owner != null)
+                if (OwnerDatamodel != null)
                 {
                     // expand stubs
-                    var dm = Owner.Owner;
-                    if (dm.AllElements.ElementsAdded > LastStubSearch)
+                    var elem = _Value as Element;
+                    if (elem != null)
+                        Destub(elem);
+                    else
                     {
-                        var elem = _Value as Element;
-                        if (elem != null && elem.Stub)
-                        {
-                            Element destub_elem;
-                            lock (dm.AllElements.ChangeLock)
-                                destub_elem = dm.AllElements[elem.ID];
-                            if (destub_elem != _Value)
-                                Value = dm.AllElements[elem.ID];
-                        }
-                        else
-                        {
-                            var elem_list = _Value as IList<Element>;
-                            if (elem_list != null)
-                                for (int i = 0; i < elem_list.Count; i++)
-                                {
-                                    var e = elem_list[i];
-                                    if (e != null && e.Stub)
-                                        lock (dm.AllElements.ChangeLock)
-                                            elem_list[i] = dm.AllElements[e.ID];
-                                }
-                        }
-
+                        var elem_list = _Value as IList<Element>;
+                        if (elem_list != null)
+                            for (int i = 0; i < elem_list.Count; i++)
+                                Destub(elem_list[i]);
                     }
-                    LastStubSearch = dm.AllElements.ElementsAdded;
+
+                    LastStubSearch = OwnerDatamodel.AllElements.ElementsAdded;
                 }
 
                 return _Value;
@@ -155,30 +153,19 @@ namespace Datamodel
             {
                 _Value = value;
                 Offset = 0;
-                OnPropertyChanged("Value");
             }
         }
         object _Value;
         #endregion
 
         long Offset;
-        int LastStubSearch = 0;
+        int LastStubSearch;
 
         public override string ToString()
         {
             var type = Value != null ? Value.GetType() : typeof(Element);
             var inner_type = Datamodel.GetArrayInnerType(type);
             return String.Format("{0} <{1}>", Name, inner_type != null ? inner_type.FullName + "[]" : type.FullName);
-        }
-
-        /// <summary>
-        /// Raised when the <see cref="Name"/> or <see cref="Value"/> of the Attribute changes.
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged(string info)
-        {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(info));
         }
 
         /// <summary>

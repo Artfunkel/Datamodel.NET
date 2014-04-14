@@ -104,14 +104,7 @@ namespace Datamodel
 
         private List<Attribute> Attributes = new List<Attribute>();
         private object Attribute_ChangeLock = new object();
-
-        void AttributeChanged(object sender, PropertyChangedEventArgs e)
-        {
-            var attr = (Attribute)sender;
-            if (CollectionChanged != null)
-                CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, (object)sender, (object)sender, Attributes.IndexOf(attr)));
-        }
-
+        
         #region Properties
 
         /// <summary>
@@ -236,7 +229,7 @@ namespace Datamodel
         /// <returns>The value associated with the given name.</returns>
         /// <exception cref="ArgumentNullException">Thrown when the value of name is null.</exception>
         /// <exception cref="KeyNotFoundException">Thrown when an attempt is made to get a name that is not present on this Element.</exception>
-        /// <exception cref="InvalidOperationException">Thrown when an attempt is made to set an attribute on a <see cref="Stub"/> Element.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when an attempt is made to get or set an attribute on a <see cref="Stub"/> Element.</exception>
         /// <exception cref="ElementOwnershipException">Thrown when an attempt is made to set the value of the attribute to an Element from a different <see cref="Datamodel"/>.</exception>
         /// <exception cref="AttributeTypeException">Thrown when an attempt is made to set a value that is not of a valid Datamodel attribute type.</exception>
         /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Attributes allowed in an Element has been reached.</exception>
@@ -247,7 +240,7 @@ namespace Datamodel
                 if (name == null) throw new ArgumentNullException("name");
                 if (Stub) throw new InvalidOperationException("Cannot get attributes from a stub element.");
                 var attr = Attributes.Find(a => a.Name == name);
-                if (attr == null) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
+                if (attr.Name == null) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
                 return attr.Value;
             }
             set
@@ -264,17 +257,17 @@ namespace Datamodel
                 lock (Attribute_ChangeLock)
                 {
                     old_attr = Attributes.Find(a => a.Name == name);
-                    new_attr = new Attribute(name, value);
+                    new_attr = new Attribute(name, this, value);
 
                     old_index = Attributes.IndexOf(old_attr);
-                    Insert(old_index == -1 ? Count : old_index, new Attribute(name, value));
+                    Insert(old_index == -1 ? Count : old_index, new Attribute(name, this, value));
 
-                    if (old_attr != null)
+                    if (old_attr.Name != null)
                         Attributes.Remove(old_attr);
                 }
 
                 NotifyCollectionChangedEventArgs change_args;
-                if (old_attr != null)
+                if (old_attr.Name != null)
                     change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr, old_attr, old_index);
                 else
                     change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr, Count);
@@ -293,7 +286,7 @@ namespace Datamodel
             lock (Attribute_ChangeLock)
             {
                 var attr = Attributes.FirstOrDefault(a => a.Name == name);
-                if (attr == null) return false;
+                if (attr.Name == null) return false;
                 var index = Attributes.IndexOf(attr);
                 if (Attributes.Remove(attr))
                 {
@@ -338,7 +331,7 @@ namespace Datamodel
             set
             {
                 RemoveAt(index);
-                Insert(index, new Attribute(value.Key, value.Value));
+                Insert(index, new Attribute(value.Key, this, value.Value));
             }
         }
 
@@ -365,7 +358,6 @@ namespace Datamodel
                 Attributes.Insert(index, item);
             }
             item.Owner = this;
-            item.PropertyChanged += AttributeChanged;
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
         }
 
@@ -606,7 +598,7 @@ namespace Datamodel
             lock (Attribute_ChangeLock)
                 result = Attributes.FirstOrDefault(a => a.Name == key);
 
-            if (result != null)
+            if (result.Name != null)
             {
                 value = result.Value;
                 return true;
@@ -703,7 +695,7 @@ namespace Datamodel
             lock (Attribute_ChangeLock)
             {
                 var attr = Attributes.Find(a => a.Name == item.Key);
-                if (attr == null || attr.Value != item.Value) return false;
+                if (attr.Name == null || attr.Value != item.Value) return false;
                 Remove(attr.Name);
                 return true;
             }
