@@ -276,6 +276,7 @@ namespace Datamodel
             internal int ElementsAdded = 0; // used to optimise de-stubbing
 
             List<Element> store = new List<Element>();
+            Dictionary<Guid, Element> Lookup = new Dictionary<Guid, Element>();
             Datamodel Owner;
 
             internal ElementList(Datamodel owner)
@@ -292,6 +293,7 @@ namespace Datamodel
                         throw new InvalidOperationException("Cannot add an element from a different Datamodel. Use ImportElement() first.");
                     // if it's in the owner, its ID has already been checked for collisions.
                     store.Add(item);
+                    Lookup[item.ID] = item;
                     if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item));
                 }
                 finally
@@ -331,7 +333,9 @@ namespace Datamodel
                     ChangeLock.EnterReadLock();
                     try
                     {
-                        return store.FirstOrDefault(e => e.ID == id);
+                        Element elem;
+                        Lookup.TryGetValue(id,out elem);
+                        return elem;
                     }
                     finally { ChangeLock.ExitReadLock(); }
                 }
@@ -380,6 +384,7 @@ namespace Datamodel
                 {
                     if (store.Remove(item))
                     {
+                        Lookup.Remove(item.ID);
                         foreach (var elem in store.ToArray())
                             foreach (var attr in elem.Where(a => a.Value == item).ToArray())
                                 elem[attr.Key] = (mode == RemoveMode.MakeStubs) ? new Element(Owner, ((Element)attr.Value).ID) : (Element)null;

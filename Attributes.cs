@@ -107,8 +107,7 @@ namespace Datamodel
             if (stub_elem != null && stub_elem.Stub)
             {
                 Element destub_elem = null;
-                if (OwnerDatamodel.AllElements.ElementsAdded > LastStubSearch)
-                    destub_elem = OwnerDatamodel.AllElements[stub_elem.ID];
+                destub_elem = OwnerDatamodel.AllElements[stub_elem.ID];
                 if (destub_elem == null)
                     destub_elem = OwnerDatamodel.OnStubRequest(stub_elem.ID);
                 if (destub_elem != null)
