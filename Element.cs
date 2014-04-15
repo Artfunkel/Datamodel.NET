@@ -638,7 +638,7 @@ namespace Datamodel
 
         public IEnumerator<AttrKVP> GetEnumerator()
         {
-            foreach (var attr in Attributes)
+            foreach (var attr in Attributes.ToArray())
                 yield return new AttrKVP(attr.Name, attr.Value);
         }
         IEnumerator IEnumerable.GetEnumerator()

@@ -113,6 +113,7 @@ namespace Datamodel
                 if (destub_elem != null)
                 {
                     full_elem = destub_elem;
+                    OwnerDatamodel.AllElements.Add(full_elem);
                     return true;
                 }
             }
