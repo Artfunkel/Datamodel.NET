@@ -36,7 +36,6 @@ namespace Datamodel
 
             ((ISupportInitialize)this).BeginInit();
 
-            Owner = owner;
             Name = name;
             ClassName = class_name;
 
@@ -47,6 +46,7 @@ namespace Datamodel
                 if (!owner.AllowRandomIDs) throw new InvalidOperationException("Random IDs are not allowed in this Datamodel.");
                 ID = Guid.NewGuid();
             }
+            Owner = owner;
 
             ((ISupportInitialize)this).EndInit();
         }
@@ -63,10 +63,10 @@ namespace Datamodel
 
             ((ISupportInitialize)this).BeginInit();
 
-            Owner = owner;
             ID = id;
             Stub = true;
             Name = "Stub element";
+            Owner = owner;
 
             ((ISupportInitialize)this).EndInit();
         }
@@ -151,8 +151,7 @@ namespace Datamodel
             get { return _Stub; }
             set
             {
-                if (!Initialising) throw new InvalidOperationException("Stub state can only be changed during initialisation.");
-                if (Count > 0) throw new InvalidOperationException("An Element containing Attributes cannot be a Stub.");
+                if (value && Count > 0) throw new InvalidOperationException("An Element containing Attributes cannot be a Stub.");
                 _Stub = value;
             }
         }
@@ -170,8 +169,13 @@ namespace Datamodel
                 _Owner = value;
                 if (value != null)
                 {
-                    value.AllElements.Add(this);
-                    if (value.AllElements.Count == 1) value.Root = this;
+                    value.AllElements.ChangeLock.EnterWriteLock();
+                    try
+                    {
+                        value.AllElements.Add(this);
+                        if (value.AllElements.Count == 1) value.Root = this;
+                    }
+                    finally { value.AllElements.ChangeLock.ExitWriteLock(); }
                 }
             }
         }

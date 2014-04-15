@@ -189,7 +189,10 @@ namespace Datamodel.Codecs
                 if (index == -1)
                     return null;
                 else if (index == -2)
-                    return new Element(dm, new Guid(ReadString_Raw())); // yes, it's in ASCII!
+                {
+                    var id = new Guid(ReadString_Raw()); // yes, it's in ASCII!
+                    return dm.AllElements[id] ?? new Element(dm, id);
+                }
                 else
                     return dm.AllElements[index];
             }

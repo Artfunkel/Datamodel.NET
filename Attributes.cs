@@ -25,7 +25,6 @@ namespace Datamodel
             Name = name;
             _Value = value;
             ValueType = value != null ? value.GetType() : typeof(Element);
-            LastStubSearch = 0;
             Offset = 0;
             _Owner = owner;
         }
@@ -102,25 +101,6 @@ namespace Datamodel
             Offset = 0;
         }
 
-        bool Destub(Element stub_elem, out Element full_elem)
-        {
-            if (stub_elem != null && stub_elem.Stub)
-            {
-                Element destub_elem = null;
-                destub_elem = OwnerDatamodel.AllElements[stub_elem.ID];
-                if (destub_elem == null)
-                    destub_elem = OwnerDatamodel.OnStubRequest(stub_elem.ID);
-                if (destub_elem != null)
-                {
-                    full_elem = destub_elem;
-                    OwnerDatamodel.AllElements.Add(full_elem);
-                    return true;
-                }
-            }
-            full_elem = stub_elem;
-            return false;
-        }
-
         /// <summary>
         /// Gets or sets the value held by this Attribute.
         /// </summary>
@@ -136,21 +116,15 @@ namespace Datamodel
                 {
                     // expand stubs
                     var elem = _Value as Element;
-                    Element full_elem;
-                    if (elem != null && Destub(elem, out full_elem))
-                        Value = full_elem;
-                    else
-                    {
-                        var elem_list = _Value as IList<Element>;
-                        if (elem_list != null)
-                            for (int i = 0; i < elem_list.Count; i++)
-                            {
-                                if (Destub(elem_list[i], out full_elem))
-                                    elem_list[i] = full_elem;
-                            }
-                    }
-
-                    LastStubSearch = OwnerDatamodel.AllElements.ElementsAdded;
+                    if (elem != null && elem.Stub)
+                        _Value = OwnerDatamodel.OnStubRequest(elem.ID) ?? _Value;
+                    var elem_list = _Value as IList<Element>;
+                    if (elem_list != null)
+                        for (int i = 0; i < elem_list.Count; i++)
+                        {
+                            if (elem_list[i] == null || !elem_list[i].Stub) continue;
+                            elem_list[i] = OwnerDatamodel.OnStubRequest(elem_list[i].ID) ?? elem_list[i];
+                        }
                 }
 
                 return _Value;
@@ -165,7 +139,6 @@ namespace Datamodel
         #endregion
 
         long Offset;
-        int LastStubSearch;
 
         public override string ToString()
         {

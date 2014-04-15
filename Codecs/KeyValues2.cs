@@ -67,6 +67,14 @@ namespace Datamodel.Codecs
                 Output.Dispose();
             }
 
+            string Sanitise(string value)
+            {
+                return value == null ? null : value.Replace("\"", "\\\"");
+            }
+
+            /// <summary>
+            /// Writes the string straight to the output steam, with no sanitisation.
+            /// </summary>
             public void Write(string value)
             {
                 Output.Write(value);
@@ -74,7 +82,7 @@ namespace Datamodel.Codecs
 
             public void WriteTokens(params string[] values)
             {
-                Output.Write("\"{0}\"", String.Join("\" \"", values));
+                Output.Write("\"{0}\"", String.Join("\" \"", values.Select(s => Sanitise(s))));
             }
 
             public void WriteLine()
@@ -123,13 +131,19 @@ namespace Datamodel.Codecs
             else
             {
                 Users[elem] = 1;
-                foreach (var child in elem.Select(a => a.Value))
+                foreach (var attr in elem)
                 {
-                    if (child == null) continue;
-                    if (child.GetType() == typeof(Element)) CountUsers((Element)child);
-                    if (child.GetType() == typeof(List<Element>))
-                        foreach (var child_elem in ((List<Element>)child).Where(c => c != null))
-                            CountUsers(child_elem);
+                    if (attr.Value == null) continue;
+                    var child_elem = attr.Value as Element;
+                    if (child_elem != null)
+                        CountUsers(child_elem);
+                    else
+                    {
+                        var enumerable = attr.Value as IEnumerable<Element>;
+                        if (enumerable != null)
+                            foreach (var array_elem in enumerable.Where(c => c != null))
+                                CountUsers(array_elem);
+                    }
                 }
             }
         }
@@ -200,7 +214,7 @@ namespace Datamodel.Codecs
                         }
                         else
                         {
-                            if (elem != null && Users[elem] == 1)
+                            if (elem != null && Users.ContainsKey(elem) && Users[elem] == 1)
                             {
                                 Writer.WriteLine(String.Format("\"{0}\" ", name));
                                 write_element(elem);
@@ -213,13 +227,13 @@ namespace Datamodel.Codecs
                     {
                         if (type == typeof(bool))
                             value = (bool)value ? 1 : 0;
-                        if (type == typeof(float))
-                            value = (double)(float)value;
-                        if (type == typeof(byte[]))
+                        else if (type == typeof(float))
+                            value = (float)value;
+                        else if (type == typeof(byte[]))
                             value = BitConverter.ToString((byte[])value).Replace("-", String.Empty);
-                        if (type == typeof(TimeSpan))
+                        else if (type == typeof(TimeSpan))
                             value = ((TimeSpan)value).TotalSeconds;
-                        if (type == typeof(System.Drawing.Color))
+                        else if (type == typeof(System.Drawing.Color))
                         {
                             var c = (System.Drawing.Color)value;
                             value = String.Join(" ", new int[] { c.R, c.G, c.B, c.A });
@@ -261,6 +275,8 @@ namespace Datamodel.Codecs
 
             foreach (var pair in Users.Where(pair => pair.Value > 1))
             {
+                if (pair.Key == dm.Root)
+                    continue;
                 Writer.WriteLine();
                 write_element(pair.Key);
                 Writer.WriteLine();
@@ -357,7 +373,19 @@ namespace Datamodel.Codecs
                     if (attr_name == "id" && attr_type_s == "elementid")
                         elem_id = Decode_NextToken();
                     if (elem_name != null && elem_id != null)
-                        elem = new Element(DM, elem_name, new Guid(elem_id), elem_class);
+                    {
+                        var id = new Guid(elem_id);
+                        var local_element = DM.AllElements[id];
+                        if (local_element != null)
+                        {
+                            elem = local_element;
+                            elem.Name = elem_name;
+                            elem.ClassName = elem_class;
+                            elem.Stub = false;
+                        }
+                        else
+                            elem = new Element(DM, elem_name, new Guid(elem_id), elem_class);
+                    }
                     continue;
                 }
 
@@ -465,7 +493,7 @@ namespace Datamodel.Codecs
                 try
                 { Decode_ParseElement(next); }
                 catch (Exception err)
-                { throw new CodecException(String.Format("KeyValues2 decode failed on line {0}: {1}", Line, err.Message), err); }
+                { throw new CodecException(String.Format("KeyValues2 decode failed on line {0}.", Line), err); }
             }
 
             return DM;

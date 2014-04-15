@@ -1,16 +1,14 @@
-﻿using System;
+﻿using Datamodel.Codecs;
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Linq;
 using System.IO;
-using System.Security;
+using System.Linq;
 using System.Runtime.Serialization;
+using System.Security;
 using System.Threading;
-
 using Codec_t = System.Tuple<string, int>;
-using Datamodel.Codecs;
 
 namespace Datamodel
 {
@@ -256,6 +254,8 @@ namespace Datamodel
                 result = StubRequest(id);
                 if (result != null && result.ID != id)
                     throw new InvalidOperationException("Datamodel.StubRequest returned an Element with a an ID different from the one requested.");
+                if (result.Owner != this)
+                    result = ImportElement(result, false, true);
             }
             return result;
         }
@@ -273,8 +273,7 @@ namespace Datamodel
         public class ElementList : IEnumerable<Element>, INotifyCollectionChanged
         {
             internal ReaderWriterLockSlim ChangeLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
-            internal int ElementsAdded = 0; // used to optimise de-stubbing
-
+            
             List<Element> store = new List<Element>();
             Dictionary<Guid, Element> Lookup = new Dictionary<Guid, Element>();
             Datamodel Owner;
@@ -286,20 +285,35 @@ namespace Datamodel
 
             internal void Add(Element item)
             {
-                ChangeLock.EnterWriteLock();
+                ChangeLock.EnterUpgradeableReadLock();
                 try
                 {
-                    if (item.Owner != null && item.Owner != Owner)
-                        throw new InvalidOperationException("Cannot add an element from a different Datamodel. Use ImportElement() first.");
-                    // if it's in the owner, its ID has already been checked for collisions.
-                    store.Add(item);
-                    Lookup[item.ID] = item;
-                    if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item));
+                    if (Count == Int32.MaxValue) // jinkies!
+                        throw new IndexOutOfRangeException("Maximum Element count reached.");
+
+                    if (Lookup.ContainsKey(item.ID))
+                        throw new ElementIdException(String.Format("Element ID {0} already in use in this Datamodel.", item.ID));
+
+                    if (item.Owner != null && item.Owner != this.Owner)
+                        throw new ElementOwnershipException("Cannot add an element from a different Datamodel. Use ImportElement() to create a local copy instead.");
+
+                    ChangeLock.EnterWriteLock();
+                    try
+                    {
+                        store.Add(item);
+                        Lookup[item.ID] = item;
+                    }
+                    finally
+                    {
+                        ChangeLock.ExitWriteLock();
+                    }
                 }
                 finally
                 {
-                    ChangeLock.ExitWriteLock();
+                    ChangeLock.ExitUpgradeableReadLock();
                 }
+
+                if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item));
             }
 
             /// <summary>
@@ -682,16 +696,22 @@ namespace Datamodel
             if (local_element != null)
             {
                 if (!foreign_element.Stub && (local_element.Stub || job.Mode.HasFlag(ImportMode.Overwrite)))
-                    AllElements.Remove(local_element, ElementList.RemoveMode.MakeStubs); // allows attributes to substitute this Element for the old one
+                {
+                    local_element.Name = foreign_element.Name;
+                    local_element.ClassName = foreign_element.ClassName;
+                    local_element.Stub = false;
+                }
                 else
                     return local_element;
             }
-
-            // Create a new local Element
-            if (foreign_element.Stub || (!job.Mode.HasFlag(ImportMode.Deep) && job.Depth > 0))
-                local_element = new Element(this, foreign_element.ID);
             else
-                local_element = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
+            {
+                // Create a new local Element
+                if (foreign_element.Stub || (!job.Mode.HasFlag(ImportMode.Deep) && job.Depth > 0))
+                    local_element = new Element(this, foreign_element.ID);
+                else
+                    local_element = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
+            }
             job.ImportMap.Add(foreign_element, local_element);
 
             // Copy attributes
@@ -716,6 +736,8 @@ namespace Datamodel
                 }
             return local_element;
         }
+
+        #region Deprecated methods
 
         /// <summary>
         /// Creates a new stub Element.
@@ -767,20 +789,11 @@ namespace Datamodel
         [Obsolete("Elements should now be constructed directly.")]
         internal Element CreateElement(string name, Guid id, bool stub, string classname = "DmElement")
         {
-            AllElements.ChangeLock.EnterWriteLock();
-            try
-            {
-                if (AllElements.Count == Int32.MaxValue) // jinkies!
-                    throw new IndexOutOfRangeException("Maximum Element count reached.");
-
-                if (AllElements[id] != null)
-                    throw new ElementIdException(String.Format("Element ID {0} already in use in this Datamodel.", id.ToString()));
-
-                if (!stub) AllElements.ElementsAdded++;
-            }
-            finally { AllElements.ChangeLock.ExitWriteLock(); }
             return stub ? new Element(this, id) : new Element(this, name, id, classname);
         }
+
+        #endregion
+        
         #endregion
 
         #region Events
