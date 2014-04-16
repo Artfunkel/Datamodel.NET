@@ -550,7 +550,7 @@ namespace Datamodel.Codecs
                     return;
                 }
 
-                var vector_value = value as VectorBase;
+                var vector_value = value as IEnumerable<float>;
                 if (vector_value != null)
                 {
                     Writer.Write(vector_value.SelectMany(f => BitConverter.GetBytes(f)).ToArray());

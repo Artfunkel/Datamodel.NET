@@ -24,7 +24,7 @@ namespace Datamodel
 
             Name = name;
             _Value = value;
-            ValueType = value != null ? value.GetType() : typeof(Element);
+            _ValueType = value != null ? value.GetType() : typeof(Element);
             Offset = 0;
             _Owner = owner;
         }
@@ -50,7 +50,8 @@ namespace Datamodel
         /// </summary>
         public string Name;
 
-        public Type ValueType;
+        public Type ValueType { get { return _ValueType; } }
+        Type _ValueType;
 
         /// <summary>
         /// Gets the <see cref="Element"/> which this Attribute is part of.
@@ -133,6 +134,7 @@ namespace Datamodel
             {
                 _Value = value;
                 Offset = 0;
+                _ValueType = value == null ? typeof(Element) : value.GetType();
             }
         }
         object _Value;
@@ -213,83 +215,25 @@ namespace Datamodel
 
     }
 
-    public abstract class VectorBase : IEnumerable<float>, INotifyPropertyChanged
+    [Serializable]
+    public struct Vector2 : IEnumerable<float>, IEquatable<Vector2>
     {
-        /// <summary>
-        /// Gets the number of ordinates in this vector.
-        /// </summary>
-        public abstract int Size { get; }
+        public float X;
+        public float Y;
 
-        /// <summary>
-        /// Raised when an ordinate changes.
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void NotifyPropertyChanged(string info)
-        {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(info));
-        }
+        public static readonly Vector2 Zero = new Vector2();
 
-        public abstract IEnumerator<float> GetEnumerator();
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public override string ToString()
-        {
-            return String.Join(" ", this.ToArray());
-        }
-
-        public override bool Equals(object obj)
-        {
-            var vec = obj as VectorBase;
-            if (vec == null) return false;
-
-            if (vec.Size != this.Size) return false;
-
-            var this_e = this.GetEnumerator();
-            var vec_e = vec.GetEnumerator();
-
-            for (int i = 0; i < this.Size; i++)
-            {
-                this_e.MoveNext();
-                vec_e.MoveNext();
-                if (this_e.Current != vec_e.Current) return false;
-            }
-            return true;
-        }
-
-        public override int GetHashCode()
-        {
-            int hash = 0;
-            foreach (var ord in this)
-                hash ^= ord.GetHashCode();
-            return hash;
-        }
-    }
-
-    public class Vector2 : VectorBase
-    {
-        public override int Size { get { return 2; } }
-
-        public float X { get { return x; } set { x = value; NotifyPropertyChanged("X"); } }
-        public float Y { get { return y; } set { y = value; NotifyPropertyChanged("Y"); } }
-
-        float x;
-        float y;
-
-        public Vector2()
-        { }
+        public float Length { get { return (float)Math.Sqrt(X * X + Y * Y); } }
 
         public Vector2(float x, float y)
         {
-            this.x = x;
-            this.y = y;
+            X = x;
+            Y = y;
         }
         public Vector2(IEnumerable<float> values)
+            : this()
         {
+            X = Y = 0;
             int i = 0;
             foreach (var ordinate in values.Take(2))
             {
@@ -302,10 +246,55 @@ namespace Datamodel
             }
         }
 
-        public override IEnumerator<float> GetEnumerator()
+        public void Normalise()
+        {
+            var scale = 1 / Length;
+            X *= scale;
+            Y *= scale;
+        }
+
+        public double Dot(Vector2 other)
+        {
+            return X * other.X + Y * other.Y;
+        }
+
+        public IEnumerator<float> GetEnumerator()
         {
             yield return X;
             yield return Y;
+        }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public override string ToString()
+        {
+            return String.Join(" ", X, Y);
+        }
+
+        public bool Equals(Vector2 other)
+        {
+            return X == other.X && Y == other.Y;
+        }
+        public override bool Equals(object obj)
+        {
+            if (!(obj is Vector2)) return false;
+            return Equals((Vector2)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return X.GetHashCode() ^ Y.GetHashCode();
+        }
+
+        public static bool operator ==(Vector2 a, Vector2 b)
+        {
+            return a.Equals(b);
+        }
+        public static bool operator !=(Vector2 a, Vector2 b)
+        {
+            return !a.Equals(b);
         }
 
         public static Vector2 operator -(Vector2 a, Vector2 b)
@@ -329,23 +318,26 @@ namespace Datamodel
         }
     }
 
-    public class Vector3 : Vector2
+    [Serializable]
+    public struct Vector3 : IEnumerable<float>, IEquatable<Vector3>
     {
-        public override int Size { get { return 3; } }
+        public float X;
+        public float Y;
+        public float Z;
 
-        public float Z { get { return z; } set { z = value; NotifyPropertyChanged("Z"); } }
-        float z;
+        public static readonly Vector3 Zero = new Vector3();
 
-        public Vector3()
-        { }
+        public float Length { get { return (float)Math.Sqrt(X * X + Y * Y + Z * Z); } }
 
         public Vector3(float x, float y, float z)
-            : base(x, y)
         {
-            this.z = z;
+            X = x;
+            Y = y;
+            Z = z;
         }
         public Vector3(IEnumerable<float> values)
         {
+            X = Y = Z = 0;
             int i = 0;
             foreach (var ordinate in values.Take(3))
             {
@@ -359,11 +351,57 @@ namespace Datamodel
             }
         }
 
-        public override IEnumerator<float> GetEnumerator()
+        public void Normalise()
+        {
+            var scale = 1 / Length;
+            X *= scale;
+            Y *= scale;
+            Z *= scale;
+        }
+
+        public double Dot(Vector3 other)
+        {
+            return X * other.X + Y * other.Y + Z * other.Z;
+        }
+
+        public IEnumerator<float> GetEnumerator()
         {
             yield return X;
             yield return Y;
             yield return Z;
+        }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public override string ToString()
+        {
+            return String.Join(" ", X, Y, Z);
+        }
+
+        public bool Equals(Vector3 other)
+        {
+            return X == other.X && Y == other.Y && Z == other.Z;
+        }
+        public override bool Equals(object obj)
+        {
+            if (!(obj is Vector3)) return false;
+            return Equals((Vector3)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return X.GetHashCode() ^ Y.GetHashCode() ^ Z.GetHashCode();
+        }
+
+        public static bool operator ==(Vector3 a, Vector3 b)
+        {
+            return a.Equals(b);
+        }
+        public static bool operator !=(Vector3 a, Vector3 b)
+        {
+            return !a.Equals(b);
         }
 
         public static Vector3 operator -(Vector3 a, Vector3 b)
@@ -387,18 +425,73 @@ namespace Datamodel
         }
     }
 
-    public class Angle : Vector3
+    [Serializable]
+    public struct Angle : IEnumerable<float>, IEquatable<Angle>
     {
-        public Angle()
-            : base()
-        { }
+        public float X;
+        public float Y;
+        public float Z;
+
+        public static readonly Angle Zero = new Angle();
 
         public Angle(float x, float y, float z)
-            : base(x, y, z)
-        { }
+        { X = x; Y = y; Z = z; }
+
         public Angle(IEnumerable<float> values)
-            : base(values)
-        { }
+        {
+            X = Y = Z = 0;
+            int i = 0;
+            foreach (var ordinate in values.Take(3))
+            {
+                switch (i)
+                {
+                    case 0: X = ordinate; break;
+                    case 1: Y = ordinate; break;
+                    case 2: Z = ordinate; break;
+                }
+                i++;
+            }
+        }
+
+        public IEnumerator<float> GetEnumerator()
+        {
+            yield return X;
+            yield return Y;
+            yield return Z;
+        }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public override string ToString()
+        {
+            return String.Join(" ", X, Y, Z);
+        }
+
+        public bool Equals(Angle other)
+        {
+            return X == other.X && Y == other.Y && Z == other.Z;
+        }
+        public override bool Equals(object obj)
+        {
+            if (!(obj is Angle)) return false;
+            return Equals((Angle)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return X.GetHashCode() ^ Y.GetHashCode() ^ Z.GetHashCode();
+        }
+
+        public static bool operator ==(Angle a, Angle b)
+        {
+            return a.Equals(b);
+        }
+        public static bool operator !=(Angle a, Angle b)
+        {
+            return !a.Equals(b);
+        }
 
         public static Angle operator -(Angle a, Angle b)
         {
@@ -421,24 +514,24 @@ namespace Datamodel
         }
     }
 
-    public class Vector4 : Vector3
+    [Serializable]
+    public struct Vector4 : IEnumerable<float>, IEquatable<Vector4>
     {
-        public override int Size { get { return 4; } }
+        public float X;
+        public float Y;
+        public float Z;
+        public float W;
 
-        public float W { get { return w; } set { w = value; NotifyPropertyChanged("W"); } }
-        float w;
-
-        public Vector4()
-        {
-        }
+        public static readonly Vector4 Zero = new Vector4();
 
         public Vector4(float x, float y, float z, float w)
-            : base(x, y, z)
         {
-            this.w = w;
+            X = x; Y = y; Z = z; W = w;
         }
+
         public Vector4(IEnumerable<float> values)
         {
+            X = Y = Z = W = 0;
             int i = 0;
             foreach (var ordinate in values.Take(4))
             {
@@ -453,12 +546,45 @@ namespace Datamodel
             }
         }
 
-        public override IEnumerator<float> GetEnumerator()
+        public IEnumerator<float> GetEnumerator()
         {
             yield return X;
             yield return Y;
             yield return Z;
             yield return W;
+        }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public override string ToString()
+        {
+            return String.Join(" ", X, Y, Z, W);
+        }
+
+        public bool Equals(Vector4 other)
+        {
+            return X == other.X && Y == other.Y && Z == other.Z && W == other.W;
+        }
+        public override bool Equals(object obj)
+        {
+            if (!(obj is Vector4)) return false;
+            return Equals((Vector4)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return X.GetHashCode() ^ Y.GetHashCode() ^ Z.GetHashCode() ^ W.GetHashCode();
+        }
+
+        public static bool operator ==(Vector4 a, Vector4 b)
+        {
+            return a.Equals(b);
+        }
+        public static bool operator !=(Vector4 a, Vector4 b)
+        {
+            return !a.Equals(b);
         }
 
         public static Vector4 operator -(Vector4 a, Vector4 b)
@@ -482,46 +608,109 @@ namespace Datamodel
         }
     }
 
-    public class Quaternion : Vector4
+    [Serializable]
+    public struct Quaternion : IEnumerable<float>
     {
-        public Quaternion()
-            : base()
-        { }
+        public float X;
+        public float Y;
+        public float Z;
+        public float W;
+
+        public static readonly Quaternion Zero = new Quaternion();
 
         public Quaternion(float x, float y, float z, float w)
-            : base(x, y, z, w)
-        { }
+        {
+            X = x; Y = y; Z = z; W = w;
+        }
+
         public Quaternion(IEnumerable<float> values)
-            : base(values)
-        { }
+        {
+            X = Y = Z = W = 0;
+
+            int i = 0;
+            foreach (var ordinate in values.Take(4))
+            {
+                switch (i)
+                {
+                    case 0: X = ordinate; break;
+                    case 1: Y = ordinate; break;
+                    case 2: Z = ordinate; break;
+                    case 3: W = ordinate; break;
+                }
+                i++;
+            }
+        }
+
+        public void Normalise()
+        {
+            float scale = 1.0f / (float)(System.Math.Sqrt(W * W + (X * X + Y * Y + Z * Z)));
+            X *= scale;
+            Y *= scale;
+            Z *= scale;
+            W *= scale;
+        }
+
+        public IEnumerator<float> GetEnumerator()
+        {
+            yield return X;
+            yield return Y;
+            yield return Z;
+            yield return W;
+        }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public override string ToString()
+        {
+            return String.Join(" ", X, Y, Z, W);
+        }
+
+        public bool Equals(Quaternion other)
+        {
+            return X == other.X && Y == other.Y && Z == other.Z && W == other.W;
+        }
+        public override bool Equals(object obj)
+        {
+            if (!(obj is Quaternion)) return false;
+            return Equals((Quaternion)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return X.GetHashCode() ^ Y.GetHashCode() ^ Z.GetHashCode() ^ W.GetHashCode();
+        }
+
+        public static bool operator ==(Quaternion a, Quaternion b)
+        {
+            return a.Equals(b);
+        }
+        public static bool operator !=(Quaternion a, Quaternion b)
+        {
+            return !a.Equals(b);
+        }
     }
 
-    public class Matrix : VectorBase
+    [Serializable]
+    public struct Matrix : IEnumerable<float>, IEquatable<Matrix>
     {
-        public override int Size { get { return 4 * 4; } }
+        public Vector4 Row0;
+        public Vector4 Row1;
+        public Vector4 Row2;
+        public Vector4 Row3;
 
-        public Vector4 Row0 { get { return row0; } set { row0 = value; NotifyPropertyChanged("Row0"); } }
-        public Vector4 Row1 { get { return row1; } set { row1 = value; NotifyPropertyChanged("Row1"); } }
-        public Vector4 Row2 { get { return row2; } set { row2 = value; NotifyPropertyChanged("Row2"); } }
-        public Vector4 Row3 { get { return row3; } set { row3 = value; NotifyPropertyChanged("Row3"); } }
-
-        Vector4 row0 = new Vector4();
-        Vector4 row1 = new Vector4();
-        Vector4 row2 = new Vector4();
-        Vector4 row3 = new Vector4();
-
-        public Matrix()
-        { }
+        public static readonly Matrix Zero = new Matrix();
 
         public Matrix(float[,] value)
         {
             if (value.GetUpperBound(0) < 4)
                 throw new InvalidOperationException("Not enough columns for a Matrix4.");
 
-            row0 = new Vector4(value.GetValue(0) as float[]);
-            row1 = new Vector4(value.GetValue(1) as float[]);
-            row2 = new Vector4(value.GetValue(2) as float[]);
-            row3 = new Vector4(value.GetValue(3) as float[]);
+            Row0 = new Vector4(value.GetValue(0) as float[]);
+            Row1 = new Vector4(value.GetValue(1) as float[]);
+            Row2 = new Vector4(value.GetValue(2) as float[]);
+            Row3 = new Vector4(value.GetValue(3) as float[]);
         }
 
         public Matrix(IEnumerable<float> values)
@@ -529,10 +718,10 @@ namespace Datamodel
             if (values.Count() < 4 * 4)
                 throw new ArgumentException("Not enough values for a Matrix4.");
 
-            row0 = new Vector4(values.Take(4));
-            row1 = new Vector4(values.Skip(4).Take(4));
-            row2 = new Vector4(values.Skip(8).Take(4));
-            row3 = new Vector4(values.Skip(12).Take(4));
+            Row0 = new Vector4(values.Take(4));
+            Row1 = new Vector4(values.Skip(4).Take(4));
+            Row2 = new Vector4(values.Skip(8).Take(4));
+            Row3 = new Vector4(values.Skip(12).Take(4));
         }
 
         public override string ToString()
@@ -540,9 +729,44 @@ namespace Datamodel
             return String.Join("  ", Row0, Row1, Row2, Row3);
         }
 
-        public override IEnumerator<float> GetEnumerator()
+        public IEnumerator<float> GetEnumerator()
         {
-            return Row0.Concat(Row1.Concat(Row2.Concat(Row3))).GetEnumerator();
+            foreach (var value in Row0)
+                yield return value;
+            foreach (var value in Row1)
+                yield return value;
+            foreach (var value in Row2)
+                yield return value;
+            foreach (var value in Row3)
+                yield return value;
+        }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public bool Equals(Matrix other)
+        {
+            return Row0.Equals(other.Row0) && Row1.Equals(other.Row1) && Row2.Equals(other.Row2) && Row3.Equals(other.Row3);
+        }
+        public override bool Equals(object obj)
+        {
+            if (!(obj is Matrix)) return false;
+            return Equals((Matrix)obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return Row0.GetHashCode() ^ Row1.GetHashCode() ^ Row2.GetHashCode() ^ Row3.GetHashCode();
+        }
+
+        public static bool operator ==(Matrix a, Matrix b)
+        {
+            return a.Equals(b);
+        }
+        public static bool operator !=(Matrix a, Matrix b)
+        {
+            return !a.Equals(b);
         }
     }
 }

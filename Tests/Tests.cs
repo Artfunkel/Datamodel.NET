@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -19,7 +20,7 @@ namespace Datamodel_Tests
             var binary = new byte[16];
             new Random().NextBytes(binary);
             var quat = new Quaternion(1, 2, 3, 4);
-            quat.Normalise();
+            quat.Normalise(); // dmxconvert will normalise this if I don't!
 
             TestValues = new object[] { "hello_world", 1, 1.5f, true, binary, TimeSpan.FromMinutes(5), System.Drawing.Color.Blue, 
                 new Vector2(1,2), new Vector3(1,2,3), new Angle(1,2,3), new Vector4(1,2,3,4), quat, new Matrix(Enumerable.Range(0,4*4).Select(i => (float)i)) };
@@ -124,12 +125,15 @@ namespace Datamodel_Tests
                     CollectionAssert.AreEqual((ICollection)value, (ICollection)dm.Root[name]);
                 else if (value is System.Drawing.Color)
                     Assert.AreEqual(((System.Drawing.Color)value).ToArgb(), dm.Root.Get<System.Drawing.Color>(name).ToArgb());
-                else if (value.GetType().IsSubclassOf(typeof(VectorBase)))
+                else if (value is IEnumerable<float>)
                 {
-                    var vec_value = ((VectorBase)value);
-                    var dm_value = ((VectorBase)dm.Root[name]).ToArray();
-                    for (int i = 0; i < vec_value.Count(); i++)
-                        Assert.AreEqual(vec_value.ElementAt(i), dm_value.ElementAt(i), 0.00001, name);
+                    var actual = (IEnumerable<float>)value;
+                    var expected = (IEnumerable<float>)dm.Root[name];
+
+                    Assert.AreEqual(actual.Count(), expected.Count());
+
+                    foreach (var t in actual.Zip(expected, (a, e) => new Tuple<float, float>(a, e)))
+                        Assert.AreEqual(t.Item1, t.Item2, 1e-6, name);
                 }
                 else
                     Assert.AreEqual(value, dm.Root[name], name);
@@ -328,15 +332,6 @@ namespace Datamodel_Tests
         public static Type MakeListType(this Type t)
         {
             return typeof(System.Collections.Generic.List<>).MakeGenericType(t);
-        }
-
-        public static void Normalise(this Quaternion q)
-        {
-            float scale = 1.0f / (float)(System.Math.Sqrt(q.W * q.W + (q.X * q.X + q.Y * q.Y + q.Z * q.Z)));
-            q.X *= scale;
-            q.Y *= scale;
-            q.Z *= scale;
-            q.W *= scale;
         }
     }
 }

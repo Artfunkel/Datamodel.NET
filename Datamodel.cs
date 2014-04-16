@@ -270,7 +270,7 @@ namespace Datamodel
         /// <summary>
         /// A collection of <see cref="Element"/>s owned by a single <see cref="Datamodel"/>.
         /// </summary>
-        public class ElementList : IEnumerable<Element>, INotifyCollectionChanged
+        public class ElementList : IEnumerable<Element>, INotifyCollectionChanged, IDisposable
         {
             internal ReaderWriterLockSlim ChangeLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
             
@@ -430,6 +430,11 @@ namespace Datamodel
             /// </summary>
             public event NotifyCollectionChangedEventHandler CollectionChanged;
             #endregion
+
+            public void Dispose()
+            {
+                ChangeLock.Dispose();
+            }
         }
 
         /// <summary>
@@ -475,6 +480,7 @@ namespace Datamodel
         public void Dispose()
         {
             if (Stream != null) Stream.Dispose();
+            AllElements.Dispose();
         }
 
         #region Properties
