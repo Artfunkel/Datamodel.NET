@@ -566,7 +566,7 @@ namespace Datamodel
                     if (value.Owner == null)
                         value.Owner = this;
                     else if (value.Owner != this)
-                        throw new ElementOwnershipException("Cannot add an Element from a different Datamodel. Use ImportElement() first.");
+                        throw new ElementOwnershipException();
                 }
                 _Root = value;
                 NotifyPropertyChanged("Root");
@@ -863,6 +863,10 @@ namespace Datamodel
     {
         internal ElementOwnershipException(string message)
             : base(message)
+        { }
+
+        internal ElementOwnershipException()
+            :base("Cannot add an Element from a different Datamodel. Use ImportElement() first.")
         { }
 
         [SecuritySafeCritical]

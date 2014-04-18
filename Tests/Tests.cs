@@ -107,8 +107,9 @@ namespace Datamodel_Tests
                 Assert.AreSame(list, dm.Root[name]);
             }
 
-            dm.Root["Element"] = dm.Root;
+            dm.Root["Recursive"] = dm.Root;
             dm.Root["NoName"] = new Element();
+            dm.Root["SpecialElemArray"] = new Element[] { new Element(dm, Guid.NewGuid()), new Element(), dm.Root };
             dm.Root["ElementStub"] = new Element(dm, Guid.NewGuid());
         }
 

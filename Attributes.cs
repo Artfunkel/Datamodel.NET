@@ -21,12 +21,13 @@ namespace Datamodel
         {
             if (name == null)
                 throw new ArgumentNullException("name");
-
+            
             Name = name;
-            _Value = value;
-            _ValueType = value != null ? value.GetType() : typeof(Element);
+            _Value = _ValueType = null; // dummy set to keep the compiler happy; the real, validated one comes at the end of the constructor
             Offset = 0;
             _Owner = owner;
+
+            Value = value;
         }
 
         /// <summary>
@@ -132,6 +133,26 @@ namespace Datamodel
             }
             set
             {
+                var owner_dm = OwnerDatamodel;
+                var elem = value as Element;
+                if (elem != null)
+                {
+                    if (elem.Owner == null)
+                        elem.Owner = owner_dm;
+                    else if (elem.Owner != owner_dm)
+                        throw new ElementOwnershipException();
+                }
+                var elem_list = value as IEnumerable<Element>;
+                if (elem_list != null)
+                foreach(var arr_elem in elem_list)
+                {
+                    if (arr_elem == null) continue;
+                    else if (arr_elem.Owner == null)
+                        arr_elem.Owner = owner_dm;
+                    else if (arr_elem.Owner != owner_dm)
+                        throw new ElementOwnershipException("One or more Elements in the assigned collection are from a different Datamodel. Use ImportElement() to copy them to this one before assigning.");
+                }
+
                 _Value = value;
                 Offset = 0;
                 _ValueType = value == null ? typeof(Element) : value.GetType();
