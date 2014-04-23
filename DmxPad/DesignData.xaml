@@ -1,0 +1,17 @@
+﻿<x:Array xmlns="clr-namespace:DmxPad" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=mscorlib"
+         Type="{x:Type ViewModel}">
+    <ViewModel Path="//VectorAttr" UseListView="False">
+        <ViewModel.Datamodel>
+            <Datamodel xmlns="clr-namespace:Datamodel;assembly=Datamodel.NET" Format="DesignData" FormatVersion="1" Encoding="binary" EncodingVersion="5">
+                <Datamodel.Root>
+                    <Element Name="RootElem">
+                        <x:NullExtension x:Key="NullElem"/>
+                        <Element x:Key="StubElem" Stub="True"/>
+                        <sys:String x:Key="StringAttr">Hello World</sys:String>
+                        <Vector3 x:Key="VectorAttr">0,0,5</Vector3>
+                    </Element>
+                </Datamodel.Root>
+            </Datamodel>
+        </ViewModel.Datamodel>
+    </ViewModel>
+</x:Array>

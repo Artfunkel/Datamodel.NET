@@ -1,7 +1,7 @@
 ﻿<Window x:Class="DmxPad.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:dm="clr-namespace:Datamodel;assembly=datamodel.net" xmlns:l="clr-namespace:DmxPad" xmlns:c="clr-namespace:DmxPad.Controls" xmlns:p="clr-namespace:DmxPad.Properties"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d"
-        Width="1024" Height="800" WindowStartupLocation="CenterScreen" d:DataContext="{Binding Source={d:DesignInstance Type=l:DesignTimeData,IsDesignTimeCreatable=True}}" Icon="/DmxPad;component/Resources/dmx.ico"
+        Width="1024" Height="800" WindowStartupLocation="CenterScreen" d:DataContext="{d:DesignData Source=DesignData.xaml,IsDesignTimeCreatable=True}" Icon="/DmxPad;component/Resources/dmx.ico"
         Title="{Binding ElementName=Tabs,Path=SelectedItem.File.FullName,StringFormat=DmxPad - {0},TargetNullValue=DmxPad}"
         UseLayoutRounding="True">
     <Window.CommandBindings>
@@ -37,8 +37,8 @@
                     </MenuItem.ItemTemplate>
                 </MenuItem>
                 <Separator />
-                <MenuItem Command="Save" CommandParameter="{Binding}" />
-                <MenuItem Command="SaveAs" CommandParameter="{Binding}" />
+                <MenuItem Command="Save" CommandParameter="{Binding ElementName=Tabs,Path=SelectedItem}" />
+                <MenuItem Command="SaveAs" CommandParameter="{Binding ElementName=Tabs,Path=SelectedItem}" />
                 <Separator />
                 <MenuItem Header="E_xit" InputGestureText="Alt+F4" Click="Exit_Click" />
             </MenuItem>

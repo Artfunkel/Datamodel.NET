@@ -19,7 +19,7 @@ namespace DmxPad.Controls
     {
         public TreeGridView()
         {
-            ColumnDefinitions = new List<TreeGridColumnDefinition>();
+            ColumnDefinitions = new TreeGridViewColumnCollection();
             DataContextChanged += TreeGridView_DataContextChanged;
         }
 
@@ -83,7 +83,8 @@ namespace DmxPad.Controls
             get { return (bool)GetValue(ShowHeadersProperty); }
             set { SetValue(ShowHeadersProperty, value); }
         }
-        public static readonly DependencyProperty ShowHeadersProperty = DependencyProperty.Register("ShowHeaders", typeof(bool), typeof(TreeGridView), new PropertyMetadata(true));
+        public static readonly DependencyProperty ShowHeadersProperty = DependencyProperty.Register("ShowHeaders", typeof(bool), typeof(TreeGridView),
+            new FrameworkPropertyMetadata(true, FrameworkPropertyMetadataOptions.AffectsArrange));
 
         [Description("Sets the Binding path used to locate the children of each bound item."), Category("Common Properties")]
         public string ChildItemsPath
@@ -92,15 +93,7 @@ namespace DmxPad.Controls
             set { SetValue(ChildItemsPathProperty, value); }
         }
         public static readonly DependencyProperty ChildItemsPathProperty = DependencyProperty.Register("ChildItemsPath", typeof(string), typeof(TreeGridView), new PropertyMetadata(null));
-
-        [Description("A deferred binding which locates the children of each bound item."), Category("Common Properties")]
-        public Binding ChildItemsSelector
-        {
-            get { return ChildItemsSelectorProperty; }
-            set { ChildItemsSelectorProperty = value; }
-        }
-        Binding ChildItemsSelectorProperty;
-
+        
         [Description("Sets the template used to generate the Title cell of each item."), Category("Common Properties")]
         public DataTemplate TitleTemplate
         {
@@ -108,7 +101,8 @@ namespace DmxPad.Controls
             set { SetValue(TitleTemplateProperty, value); }
         }
         public static readonly DependencyProperty TitleTemplateProperty =
-            DependencyProperty.Register("TitleTemplate", typeof(DataTemplate), typeof(TreeGridView), new PropertyMetadata(null));
+            DependencyProperty.Register("TitleTemplate", typeof(DataTemplate), typeof(TreeGridView),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsArrange));
 
         [Description("Sets the content that appears as the header of the Title column."), Category("Common Properties")]
         public object TitleColumnHeader
@@ -117,16 +111,18 @@ namespace DmxPad.Controls
             set { SetValue(TitleColumnHeaderProperty, value); }
         }
         public static readonly DependencyProperty TitleColumnHeaderProperty =
-            DependencyProperty.Register("TitleColumnHeader", typeof(object), typeof(TreeGridView), new PropertyMetadata(null));
+            DependencyProperty.Register("TitleColumnHeader", typeof(object), typeof(TreeGridView),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsArrange));
 
         [Description("Defines the columns that appear in the TreeGridView after the Title column."), Category("Common Properties")]
-        public List<TreeGridColumnDefinition> ColumnDefinitions
+        public TreeGridViewColumnCollection ColumnDefinitions
         {
-            get { return (List<TreeGridColumnDefinition>)GetValue(ColumnDefinitionsProperty); }
+            get { return (TreeGridViewColumnCollection)GetValue(ColumnDefinitionsProperty); }
             set { SetValue(ColumnDefinitionsProperty, value); }
         }
         public static readonly DependencyProperty ColumnDefinitionsProperty =
-            DependencyProperty.Register("ColumnDefinitions", typeof(List<TreeGridColumnDefinition>), typeof(TreeGridView), new PropertyMetadata(null));
+            DependencyProperty.Register("ColumnDefinitions", typeof(TreeGridViewColumnCollection), typeof(TreeGridView),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsArrange));
 
         [Description("Sets the gap between each column."), Category("Common Properties")]
         public double ColumnSpacing
@@ -135,29 +131,15 @@ namespace DmxPad.Controls
             set { SetValue(ColumnSpacingProperty, value); }
         }
         public static readonly DependencyProperty ColumnSpacingProperty =
-            DependencyProperty.Register("ColumnSpacing", typeof(double), typeof(TreeGridView), new PropertyMetadata(10.0));
+            DependencyProperty.Register("ColumnSpacing", typeof(double), typeof(TreeGridView),
+            new FrameworkPropertyMetadata(10.0, FrameworkPropertyMetadataOptions.AffectsArrange));
         #endregion
     }
 
-    internal class CellMarginConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-        {
-            if (value == null) return default(Thickness);
+    public class TreeGridViewColumnCollection : System.Collections.ObjectModel.ObservableCollection<TreeGridColumnDefinition>
+    { }
 
-            double horizontal = ((double)value) / 2;
-            double vertical = parameter != null ? double.Parse((string)parameter) / 2 : 0;
-
-            return new Thickness(horizontal, vertical, horizontal, vertical);
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-        {
-            var thickness = (Thickness)value;
-            return (thickness.Top + thickness.Bottom) / 2;
-        }
-    }
-
+    [DefaultProperty("Header")]
     public class TreeGridColumnDefinition : FrameworkContentElement
     {
         static TreeGridColumnDefinition()
@@ -221,6 +203,7 @@ namespace DmxPad.Controls
         public static readonly DependencyProperty CellStyleProperty = DependencyProperty.Register("CellStyle", typeof(Style), typeof(TreeGridColumnDefinition), new PropertyMetadata(null));
     }
 
+    [DefaultProperty("Header")]
     public class TreeGridTextColumnDefinition : TreeGridContentColumnDefinition
     {
         static TreeGridTextColumnDefinition()
@@ -238,6 +221,7 @@ namespace DmxPad.Controls
         }
     }
 
+    [DefaultProperty("Header")]
     public class TreeGridContentColumnDefinition : TreeGridColumnDefinition
     {
         static TreeGridContentColumnDefinition()
@@ -265,6 +249,7 @@ namespace DmxPad.Controls
         public TreeGridViewItem()
         {
             if (TitleTemplate == null) SetBinding(TitleTemplateProperty, new Binding("TitleTemplate") { Source = Owner });
+            IsExpanded = false;
         }
 
         static TreeGridViewItem()
@@ -282,7 +267,7 @@ namespace DmxPad.Controls
             return new TreeGridViewItem();
         }
 
-        T TryGetTemplateChild<T>(string name) where T: DependencyObject
+        T TryGetTemplateChild<T>(string name) where T : DependencyObject
         {
             var child = GetTemplateChild(name) as T;
             if (child == null)
@@ -337,8 +322,6 @@ namespace DmxPad.Controls
 
             var parent = ItemsControlFromItemContainer(this) as TreeGridViewItem;
             if (parent != null) Indent = parent.Indent + 1;
-
-            BindingOperations.SetBinding(this, ItemsSourceProperty, Owner.ChildItemsSelector ?? new Binding(Owner.ChildItemsPath));
         }
         #endregion
 
@@ -417,29 +400,64 @@ namespace DmxPad.Controls
         }
     }
 
-    internal class ExpanderVisibilityConverter : IValueConverter
+    namespace TreeGridViewConverters
     {
-        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        internal class CellMargin : IValueConverter
         {
-            return ((bool)value) ? Visibility.Hidden : Visibility.Visible;
+            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                if (value == null) return default(Thickness);
+
+                double horizontal = ((double)value) / 2;
+                double vertical = parameter != null ? double.Parse((string)parameter) / 2 : 0;
+
+                return new Thickness(horizontal, vertical, horizontal, vertical);
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                var thickness = (Thickness)value;
+                return (thickness.Top + thickness.Bottom) / 2;
+            }
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        internal class ExpanderVisibility : IValueConverter
         {
-            throw new NotImplementedException();
-        }
-    }
+            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                return ((bool)value) ? Visibility.Hidden : Visibility.Visible;
+            }
 
-    internal class ExpanderMarginConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
-        {
-            return new Thickness((int)value * 16, 0, 5, 0);
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        internal class ExpanderMargin : IValueConverter
         {
-            throw new NotImplementedException();
+            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                return new Thickness((int)value * 16, 0, 5, 0);
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                return ((Thickness)value).Left / 16.0;
+            }
+        }
+
+        internal class NegateDouble : IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                return -(double)value;
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                return -(double)value;
+            }
         }
     }
 }

@@ -19,83 +19,6 @@ using Datamodel;
 
 namespace DmxPad
 {
-    public class ViewModel : INotifyPropertyChanged, IDisposable
-    {
-        public ViewModel(Datamodel.Datamodel datamodel)
-        {
-            Datamodel = datamodel;
-        }
-
-        public Datamodel.Datamodel Datamodel
-        {
-            get { return _Datamodel; }
-            set { _Datamodel = value; NotifyPropertyChanged("Datamodel"); }
-        }
-        Datamodel.Datamodel _Datamodel;
-
-        public Element DisplayRoot
-        {
-            get { return _DisplayRoot ?? Datamodel.Root; }
-            set { _DisplayRoot = value; }
-        }
-        Element _DisplayRoot;
-
-        public string Path
-        {
-            get { return _Path; }
-            set { _Path = value; NotifyPropertyChanged("Path"); }
-        }
-        string _Path;
-
-        public FileInfo File
-        {
-            get { return _File; }
-            set { _File = value; NotifyPropertyChanged("File"); }
-        }
-        FileInfo _File;
-
-        public FileInfo ComparisonFile
-        {
-            get { return _ComparisonFile; }
-            set { _ComparisonFile = value; NotifyPropertyChanged("ComparisonFile"); }
-        }
-        FileInfo _ComparisonFile;
-
-        public ComparisonDatamodel ComparisonDatamodel
-        {
-            get { return _ComparisonDatamodel; }
-            set { _ComparisonDatamodel = value; NotifyPropertyChanged("ComparisonDatamodel"); }
-        }
-        ComparisonDatamodel _ComparisonDatamodel;
-
-        public bool FilterComparison
-        {
-            get { return _FilterComparison; }
-            set { _FilterComparison = value; NotifyPropertyChanged("FilterComparison"); }
-        }
-        bool _FilterComparison = false;
-
-        public bool UseListView
-        {
-            get { return _UseListView; }
-            set { _UseListView = value; NotifyPropertyChanged("UseListView"); }
-        }
-        bool _UseListView = false;
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void NotifyPropertyChanged(string info)
-        {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(info));
-        }
-
-        public void Dispose()
-        {
-            if (Datamodel != null) Datamodel.Dispose();
-            if (ComparisonDatamodel != null) ComparisonDatamodel.Datamodel_Right.Dispose();
-        }
-    }
-
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
@@ -154,7 +77,7 @@ namespace DmxPad
         private void New_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var dm = new Datamodel.Datamodel("my_format", 1);
-            dm.Root = dm.CreateElement("root");
+            dm.Root = new Element(dm, "root");
 
             var vm = new ViewModel(dm);
             Datamodels.Add(vm);
@@ -343,25 +266,6 @@ namespace DmxPad
                         vm.ComparisonDatamodel = new ComparisonDatamodel(new_dm_left, new_dm_right);
                 }
             }
-        }
-    }
-
-    class DesignTimeData : ObservableCollection<ViewModel>
-    {
-        public DesignTimeData()
-        {
-            var dm = new Datamodel.Datamodel("design_data", 1);
-            var vm = new ViewModel(dm);
-            vm.UseListView = true;
-            Add(vm);
-
-            dm.Root = dm.CreateElement("root");
-            dm.Root["BlankElem"] = null;
-            dm.Root["StubElem"] = dm.CreateStubElement(Guid.NewGuid());
-            dm.Root["Str"] = "Hello World";
-            dm.Root["Vector"] = new Datamodel.Vector3(0, 0, 1.5f);
-
-            vm.Path = "//root/str";
         }
     }
 }

@@ -8,8 +8,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Globalization;
 
-using DmEncoding = System.Tuple<string, int>;
 using Datamodel;
+using DmEncoding = System.Tuple<string, int>;
 using ComparisonState = DmxPad.ComparisonDatamodel.ComparisonState;
 
 namespace DmxPad.Converters
@@ -18,11 +18,13 @@ namespace DmxPad.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
+            System.Diagnostics.Debugger.Break();
             return value;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
+            System.Diagnostics.Debugger.Break();
             return value;
         }
     }
@@ -36,10 +38,10 @@ namespace DmxPad.Converters
             var elem = value as Element;
             if (elem != null) return elem;
 
-            var attr = value as Datamodel.Attribute;
-            if (attr != null && attr.Value != null)
+            var attr = value as AttributeView;
+            if (attr != null)
             {
-                var t = attr.Value.GetType();
+                var t = attr.ValueType;
                 if (Datamodel.Datamodel.IsDatamodelArrayType(t))
                     t = Datamodel.Datamodel.GetArrayInnerType(t);
                 if (t == typeof(Datamodel.Element))
@@ -72,7 +74,7 @@ namespace DmxPad.Converters
     {
         public override DataTemplate SelectTemplate(object item, DependencyObject container)
         {
-            var attr = item as Datamodel.Attribute;
+            var attr = item as AttributeView;
             if (attr == null || attr.Value == null || attr.Value is Element || Datamodel.Datamodel.IsDatamodelArrayType(attr.Value.GetType()))
                 return null;
 
@@ -84,12 +86,12 @@ namespace DmxPad.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var attr = value as Datamodel.Attribute;
+            var attr = value as AttributeView;
             var elem = value as Datamodel.Element;
             Type type;
 
-            if (attr != null && attr.Value != null)
-                type = attr.Value.GetType();
+            if (attr != null)
+                type = attr.ValueType;
             else if (elem != null)
                 type = typeof(Element);
             else return 0;
@@ -142,8 +144,11 @@ namespace DmxPad.Converters
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var attr = value as Datamodel.Attribute;
-            if (attr != null) value = attr.Value;
+            if (value is AttributeView)
+            {
+                var attr = (AttributeView)value;
+                if (attr.Key != null) value = attr.Value;
+            }
             else
             {
                 var cattr = value as ComparisonDatamodel.Attribute;
@@ -216,8 +221,14 @@ namespace DmxPad.Converters
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var attr = value as Datamodel.Attribute;
-            if (attr != null) value = attr.Value;
+            if (value is Type)
+                return TypeNames[(Type)value];
+
+            var attr = value as AttributeView;
+            if (attr != null)
+            {
+                value = attr.Value;
+            }
             else
             {
                 var cattr = value as ComparisonDatamodel.Attribute;
@@ -289,7 +300,7 @@ namespace DmxPad.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var attr = value as Datamodel.Attribute;
+            var attr = value as AttributeView;
             if (attr != null && attr.Value != null)
             {
                 var inner_type = Datamodel.Datamodel.GetArrayInnerType(attr.Value.GetType());
@@ -329,7 +340,7 @@ namespace DmxPad.Converters
             if (dm != null)
                 return new object[] { dm.Root };
 
-            var attr = value as Datamodel.Attribute;
+            var attr = value as AttributeView;
             if (attr != null)
                 return attr.Owner;
 
@@ -350,6 +361,20 @@ namespace DmxPad.Converters
         }
     }
 
+    public class EnsureAttributeView : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is AttributeView ? value : null;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value;
+        }
+    }
+
+
     public class Encoding : IMultiValueConverter
     {
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
@@ -368,7 +393,8 @@ namespace DmxPad.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var t = value as DmEncoding;
+            if (value == null) return null;
+            var t = (DmEncoding)value;
             return String.Join(" ", t.Item1, t.Item2);
         }
 
@@ -382,7 +408,7 @@ namespace DmxPad.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return value is Datamodel.Attribute ? Visibility.Visible : Visibility.Hidden;
+            return value is AttributeView ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -395,7 +421,7 @@ namespace DmxPad.Converters
     {
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
         {
-            var dm = (Datamodel.Datamodel)values[0];
+            var dm = values[0] as Datamodel.Datamodel;
             if (dm == null) return null;
 
             var path = (string)values[1];
@@ -412,7 +438,7 @@ namespace DmxPad.Converters
 
             foreach (var part in path.Split('/').Where(p => p.Length > 0))
             {
-                var attr = current as Datamodel.Attribute;
+                var attr = current as AttributeView;
                 if (attr != null && attr.Value is Element)
                 {
                     current = attr.Value;
@@ -433,12 +459,11 @@ namespace DmxPad.Converters
                     index = Int32.Parse(part.Substring(indexer_pos + 1, part.Length - indexer_pos - 2));
                 }
 
-                if (!elem.Contains(name)) return null;
+                if (!elem.ContainsKey(name)) return null;
 
-                current = attr = elem.GetAttribute(name);
+                current = attr = new AttributeView(elem, name);
                 if (index != -1)
                     current = ((System.Collections.IList)attr.Value)[index];
-
             }
 
             return current;
@@ -572,14 +597,14 @@ namespace DmxPad.Converters
     {
         public override DataTemplate SelectTemplate(object item, DependencyObject container)
         {
-            if (item == null) return null;
-            var attr = item as Datamodel.Attribute;
+            var attr = item as AttributeView;
             if (attr == null) return null;
-            if (!Datamodel.Datamodel.IsDatamodelArrayType(attr.Value.GetType())) return null;
+
+            if (!Datamodel.Datamodel.IsDatamodelArrayType(attr.ValueType)) return null;
 
             var host = (FrameworkElement)container;
 
-            var inner = Datamodel.Datamodel.GetArrayInnerType(attr.Value.GetType());
+            var inner = Datamodel.Datamodel.GetArrayInnerType(attr.ValueType);
             string resource_name;
 
             if (inner == typeof(Vector2))

@@ -1,17 +1,14 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 using Datamodel;
 using DmxPad.Controls;
@@ -30,41 +27,40 @@ namespace DmxPad
                 var elem = (Element)o;
                 return elem.Name.ContainsCI(ElementListSearch.Terms) || elem.ClassName.ContainsCI(ElementListSearch.Terms);
             };
-        }
-
-        static DmxView()
-        {
-            DataContextProperty.OverrideMetadata(typeof(DmxView), new FrameworkPropertyMetadata(typeof(DmxView)));
+            DataContextChanged += DmxView_DataContextChanged;
         }
 
         private void DmxTree_Loaded(object sender, RoutedEventArgs e)
         {
             var tgv = ((Controls.TreeGridView)sender);
-
-            var root_item = ((DmxPad.Controls.TreeGridViewItem)tgv.ItemContainerGenerator.ContainerFromIndex(0));
-            if (root_item != null)
-            {
-                root_item.IsSelected = true;
-                root_item.IsExpanded = true;
-            }
-
+            
             tgv.Items.Filter = ShowChangesOnly_Filter;
         }
 
-        private static void DatamodelChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
+        private bool ContextChanging = false;
+
+        void DmxView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (e.NewValue != null)
             {
-                (sender as DmxView).SetRoot((e.NewValue as Datamodel.Datamodel).Root);
+                ContextChanging = true;
+                
+                var vm = (ViewModel)e.NewValue;
+                Root = vm.DisplayRoot;
+
+                ContextChanging = false;
             }
         }
+        
 
-        private static void ExpandNode(object sender, EventArgs e)
+        private void ExpandNode(object sender, EventArgs e)
         {
-            var generator = sender as ItemContainerGenerator;
+            var generator = (ItemContainerGenerator)sender;
             if (generator.Status == System.Windows.Controls.Primitives.GeneratorStatus.ContainersGenerated)
             {
-                (generator.ContainerFromIndex(0) as TreeViewItem).IsExpanded = true;
+                var item = (TreeGridViewItem)generator.ContainerFromIndex(0);
+                item.IsSelected = true;
+                //item.IsExpanded = true;
                 generator.StatusChanged -= ExpandNode;
             }
         }
@@ -83,20 +79,20 @@ namespace DmxPad
 
         private void TreeViewItem_Selected(object sender, RoutedEventArgs e)
         {
-            ((ViewModel)DataContext).Path = MakeSelectionPath(e.OriginalSource as TreeViewItem);
+            if (!ContextChanging)
+                ((ViewModel)DataContext).Path = MakeSelectionPath(e.OriginalSource as TreeViewItem);
         }
 
         private string MakeSelectionPath(TreeViewItem control)
         {
             List<string> path_components = new List<string>();
             object array_item = null;
-
+            
             for (FrameworkElement current_control = control; !(current_control is TreeView); current_control = (FrameworkElement)VisualTreeHelper.GetParent(current_control))
             {
-                if (!(current_control is TreeViewItem))
-                    continue;
+                if (!(current_control is TreeViewItem)) continue;
 
-                var attr = current_control.DataContext as Datamodel.Attribute;
+                var attr = current_control.DataContext as AttributeView;
                 var cattr = current_control.DataContext as ComparisonDatamodel.Attribute;
 
                 if (attr == null && cattr == null)
@@ -104,8 +100,12 @@ namespace DmxPad
                     array_item = current_control.DataContext;
                     continue;
                 }
-                var name = attr != null ? attr.Name : cattr.Name;
-                var array = (attr != null ? attr.Value : cattr.Value_Combined) as System.Collections.IEnumerable;
+                var name = attr != null ? attr.Key : cattr.Name;
+                var value = attr != null ? attr.Value : cattr.Value_Combined;
+
+                IEnumerable array = null;
+                if (value != null && Datamodel.Datamodel.IsDatamodelArrayType(value.GetType()))
+                    array = value as System.Collections.IEnumerable;
 
                 if (array != null)
                 {
@@ -164,23 +164,37 @@ namespace DmxPad
             if ((e.Source as FrameworkElement).DataContext == DmxTree.Items[0])
             {
                 DisplayRootPath = MakeSelectionPath(tree_item);
-                SetRoot(tree_item.DataContext as Datamodel.Element);
+                Root = tree_item.DataContext as Datamodel.Element;
             }
         }
 
         private void ResetRoot_Click(object sender, MouseButtonEventArgs e)
         {
             DisplayRootPath = "";
-            SetRoot(((ViewModel)DataContext).Datamodel.Root);
+            Root = ((ViewModel)DataContext).Datamodel.Root;
         }
 
-        private void SetRoot(Datamodel.Element elem)
+        public Element Root
         {
-            DmxTree.ItemContainerGenerator.StatusChanged += ExpandNode;
-            DmxTree.ItemsSource = new Element[] { elem };
+            get { 
+                var source_list = DmxTree.ItemsSource as IList<Element>;
+                if (source_list == null || source_list.Count == 0) return null;
+                return source_list[0]; 
+            }
+            set
+            {
+                if (Root == value) return;
+                if (value == null) DmxTree.ItemsSource = null;
+                else
+                {
+                    DmxTree.ItemContainerGenerator.StatusChanged += ExpandNode;
+                    DmxTree.ItemsSource = new Element[] { value };
+                }
+                NotifyPropertyChanged("Root");
 
-            PathBox.Text = "//"; // TODO: element ID for non-root elements
-            PathBox_SourceUpdated(PathBox, null);
+                //PathBox.Text = "//"; // TODO: element ID for non-root elements
+                //PathBox_SourceUpdated(PathBox, null);
+            }
         }
 
         private void ElementHeader_KeyDown(object sender, KeyEventArgs e)
@@ -200,14 +214,15 @@ namespace DmxPad
 
         private void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
-            var attr = ((Button)sender).DataContext as Datamodel.Attribute;
+            var attr = ((Button)sender).DataContext as AttributeView;
             if (attr != null)
-                attr.Owner.Remove(attr);
+                attr.Owner.Remove(attr.Key);
         }
 
         private void ChooseElement_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            var attr = (Datamodel.Attribute)DmxTree.SelectedItem;
+            var attr = DmxTree.SelectedItem as AttributeView;
+            var a2 = DmxTree.SelectedValue as AttributeView;
 
             var select = new Controls.SelectElement();
             select.Owner = App.Current.MainWindow;
@@ -282,20 +297,17 @@ namespace DmxPad
 
         public override DataTemplate SelectTemplate(object item, DependencyObject container)
         {
-            if (item == null) return null;
-
-            var attr = item as Datamodel.Attribute;
+            var attr = item as AttributeView;
             if (attr != null)
             {
-                var inner_type = attr.Value == null ? typeof(Element) : attr.Value.GetType();
-
-                if (Datamodel.Datamodel.IsDatamodelArrayType(inner_type))
+                if (Datamodel.Datamodel.IsDatamodelArrayType(attr.ValueType))
                     return ObjectList;
-                if (inner_type == typeof(Element))
+                if (attr.ValueType == typeof(Element))
                     return ElementSingle;
-                if (inner_type == typeof(bool))
+                if (attr.ValueType == typeof(bool))
                     return BoolSingle;
             }
+
             return GenericSingle;
         }
     }

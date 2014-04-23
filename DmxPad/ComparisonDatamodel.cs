@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 
 using Datamodel;
+using AttrKVP = System.Collections.Generic.KeyValuePair<string, object>;
 
 namespace DmxPad
 {
@@ -105,6 +106,8 @@ namespace DmxPad
             }
             #endregion
 
+            public static readonly object NoAttributeValue = new object();
+
             public Element(ComparisonDatamodel owner, Datamodel.Element elem_left, Datamodel.Element elem_right)
             {
                 Owner = owner;
@@ -119,14 +122,14 @@ namespace DmxPad
                     Element_Left.ID != Element_Right.ID ||
                     Element_Left.ClassName != Element_Right.ClassName ||
                     Element_Left.Stub != Element_Right.Stub
-                    || !Enumerable.SequenceEqual(Element_Left.Select(a => a.Name), Element_Right.Select(a => a.Name)))
+                    || !Enumerable.SequenceEqual(Element_Left.Select(a => a.Key), Element_Right.Select(a => a.Key)))
                     State = ComparisonState.Changed;
 
                 if (Element_Right != null)
                 {
                     Owner.ComparedElements[Element_Right.ID] = this;
-                    foreach (var attr_right in Element_Right.Where(a => Element_Left != null && !Element_Left.Contains(a.Name)))
-                        Attributes.Add(attr_right.Name, new Attribute(this, null, attr_right));
+                    foreach (var attr_right in Element_Right.Where(a => Element_Left != null && !Element_Left.ContainsKey(a.Key)))
+                        Attributes.Add(attr_right.Key, new Attribute(this,attr_right.Key, NoAttributeValue, attr_right.Value));
                 }
 
                 if (Element_Left != null)
@@ -134,10 +137,10 @@ namespace DmxPad
                     Owner.ComparedElements[Element_Left.ID] = this;
                     foreach (var attr_left in Element_Left)
                     {
-                        Datamodel.Attribute attr_right = null;
-                        if (Element_Right != null && Element_Right.Contains(attr_left.Name))
-                            attr_right = Element_Right.GetAttribute(attr_left.Name);
-                        Attributes.Add(attr_left.Name, new Attribute(this, attr_left, attr_right));
+                        object value_right = NoAttributeValue;
+                        if (Element_Right != null && Element_Right.ContainsKey(attr_left.Key))
+                            value_right = Element_Right[attr_left.Key];
+                        Attributes.Add(attr_left.Key, new Attribute(this, attr_left.Key, attr_left.Value, value_right));
                     }
                 }
             }
@@ -200,19 +203,8 @@ namespace DmxPad
             }
             ComparisonState _State = ComparisonState.Unchanged;
 
-            public Datamodel.Attribute Attribute_Left
-            {
-                get { return _Attribute_Left; }
-                set { _Attribute_Left = value; }
-            }
-            Datamodel.Attribute _Attribute_Left;
-
-            public Datamodel.Attribute Attribute_Right
-            {
-                get { return _Attribute_Right; }
-                set { _Attribute_Right = value; }
-            }
-            Datamodel.Attribute _Attribute_Right;
+            public object Value_Left { get; set; }
+            public object Value_Right { get; set; }
 
             public object Value_Combined
             {
@@ -223,49 +215,50 @@ namespace DmxPad
 
             #endregion
 
-            public Attribute(Element owner, Datamodel.Attribute attr_left, Datamodel.Attribute attr_right)
+            public Attribute(Element owner, string name, object value_left, object value_right)
             {
                 Owner = owner;
-                Attribute_Left = attr_left;
-                Attribute_Right = attr_right;
+                Value_Left = value_left;
+                Value_Right = value_right;
 
                 var cdm = Owner.Owner;
 
-                Name = Attribute_Left != null ? Attribute_Left.Name : Attribute_Right.Name;
+                Name = name;
 
-                if (Attribute_Left == null)
+                if (value_left == Element.NoAttributeValue)
                 {
                     State = ComparisonState.Added;
-                    Value_Combined = Attribute_Right.Value;
+                    Value_Combined = value_right;
                 }
-                else if (Attribute_Right == null)
+                else if (value_right == Element.NoAttributeValue)
                 {
                     State = ComparisonState.Removed;
-                    Value_Combined = Attribute_Left.Value;
+                    Value_Combined = value_left;
                 }
                 else
                 {
-                    if (!Datamodel.Attribute.ValueComparer.Default.Equals(Attribute_Left, Attribute_Right))
+                    //if (!Datamodel.Attribute.ValueComparer.Default.Equals(attr_left, attr_right))
+                    if (!object.Equals(value_left,value_right))
                         State = ComparisonState.Changed;
 
-                    if (Attribute_Left.Value == null)
-                        Value_Combined = Attribute_Right.Value;
-                    else if (Attribute_Right.Value == null)
-                        Value_Combined = Attribute_Left.Value;
+                    if (Value_Left == null)
+                        Value_Combined = Value_Right;
+                    else if (Value_Right == null)
+                        Value_Combined = Value_Left;
                     else
                     {
-                        if (Attribute_Left.Value.GetType() == typeof(Datamodel.Element))
-                            Value_Combined = new Element(cdm, (Datamodel.Element)Attribute_Left.Value, (Datamodel.Element)Attribute_Right.Value);
+                        if (Value_Left.GetType() == typeof(Datamodel.Element))
+                            Value_Combined = new Element(cdm, (Datamodel.Element)Value_Left, (Datamodel.Element)Value_Right);
                         else
                         {
-                            var inner = Datamodel.Datamodel.GetArrayInnerType(Attribute_Left.Value.GetType());
+                            var inner = Datamodel.Datamodel.GetArrayInnerType(Value_Left.GetType());
                             if (inner == typeof(Datamodel.Element))
-                                Value_Combined = ((IList<Datamodel.Element>)Attribute_Left.Value)
-                                    .Concat((IList<Datamodel.Element>)Attribute_Right.Value)
+                                Value_Combined = ((IList<Datamodel.Element>)Value_Left)
+                                    .Concat((IList<Datamodel.Element>)Value_Right)
                                     .Distinct(Datamodel.Element.IDComparer.Default)
                                     .Select(e => new Element(cdm, cdm.Datamodel_Left.AllElements[e.ID], cdm.Datamodel_Right.AllElements[e.ID])).ToArray();
                             else
-                                Value_Combined = Attribute_Right.Value;
+                                Value_Combined = Value_Right;
                         }
                     }
                 }

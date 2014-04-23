@@ -93,6 +93,11 @@
       <DependentUpon>SelectElement.xaml</DependentUpon>
     </Compile>
     <Compile Include="Controls\TreeGrid.cs" />
+    <Compile Include="Viewmodel.cs" />
+    <Page Include="Controls\TreeGrid.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Controls\LabelledControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -105,6 +110,9 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <DesignDataWithDesignTimeCreatableTypes Include="DesignData.xaml">
+      <SubType>Designer</SubType>
+    </DesignDataWithDesignTimeCreatableTypes>
     <Page Include="DmxView.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
