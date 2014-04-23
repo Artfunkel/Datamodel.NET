@@ -43,10 +43,20 @@ Quick example
 ```c#
 var HelloWorld = new Datamodel.Datamodel("helloworld", 1); // must provide a format name (can be anything) and version
 
-HelloWorld.Root = HelloWorld.CreateElement("my_root");
+HelloWorld.Root = new Datamodel.Element(HelloWorld, "my_root");
 HelloWorld.Root["Hello"] = "World"; // any supported attribute type can be assigned
 
 var MyString = HelloWorld.Root.Get<string>("Hello");
 
 HelloWorld.Save("hello world.dmx", "keyvalues2", 1); // must provide an encoding name and version
+```
+
+```xml
+<Datamodel Format="helloworld" FormatVersion="1">
+    <Datamodel.Root>
+        <Element Name="my_root">
+            <sys:String x:Key="Hello">World</sys:String>
+        </Element>
+    </Datamodel.Root>
+</Datamodel>
 ```
