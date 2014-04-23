@@ -17,6 +17,7 @@ namespace Datamodel
     /// <remarks>Recursion is allowed, i.e. an <see cref="Attribute"/> can refer to an <see cref="Element"/> which is higher up the tree.</remarks>
     /// <seealso cref="Attribute"/>
     [DefaultProperty("Name")]
+    [TypeConverter(typeof(TypeConverters.ElementConverter))]
     public class Element : IDictionary<string, object>, IDictionary, INotifyPropertyChanged, INotifyCollectionChanged, ISupportInitialize
     {
         #region Constructors and Init
@@ -34,41 +35,33 @@ namespace Datamodel
             if (owner == null) throw new ArgumentNullException("owner");
             if (class_name == null) throw new ArgumentNullException("class_name");
 
-            ((ISupportInitialize)this).BeginInit();
-
             Name = name;
             ClassName = class_name;
 
             if (id.HasValue)
-                ID = id.Value;
+                _ID = id.Value;
             else
             {
                 if (!owner.AllowRandomIDs) throw new InvalidOperationException("Random IDs are not allowed in this Datamodel.");
-                ID = Guid.NewGuid();
+                _ID = Guid.NewGuid();
             }
             Owner = owner;
-
-            ((ISupportInitialize)this).EndInit();
         }
 
         /// <summary>
         /// Creates a new stub Element to represent an Element in another Datamodel.
         /// </summary>
         /// <seealso cref="Element.Stub"/>
-        /// <param name="owner">The owner of this Element.</param>
+        /// <param name="owner">The owner of this Element. Cannot be null.</param>
         /// <param name="id">The ID of the remote Element that this stub represents.</param>
         public Element(Datamodel owner, Guid id)
         {
             if (owner == null) throw new ArgumentNullException("owner");
 
-            ((ISupportInitialize)this).BeginInit();
-
-            ID = id;
+            _ID = id;
             Stub = true;
             Name = "Stub element";
             Owner = owner;
-
-            ((ISupportInitialize)this).EndInit();
         }
 
         /// <summary>
@@ -76,24 +69,17 @@ namespace Datamodel
         /// </summary>
         public Element()
         {
-            ((ISupportInitialize)this).BeginInit();
-
-            ID = Guid.NewGuid();
-
-            ((ISupportInitialize)this).EndInit();
+            _ID = Guid.NewGuid();
         }
 
         bool Initialising = false;
         void ISupportInitialize.BeginInit()
         {
-            if (Initialising) throw new InvalidOperationException("Element is already initializing.");
             Initialising = true;
         }
 
         void ISupportInitialize.EndInit()
         {
-            if (!Initialising) throw new InvalidOperationException("Element is not initializing.");
-
             if (ID == null)
                 ID = Guid.NewGuid();
 
@@ -104,7 +90,7 @@ namespace Datamodel
 
         private List<Attribute> Attributes = new List<Attribute>();
         private object Attribute_ChangeLock = new object();
-        
+
         #region Properties
 
         /// <summary>
@@ -197,7 +183,7 @@ namespace Datamodel
         {
             object value = this[name];
 
-            if (!(value is T))
+            if (!(value is T) && !(typeof(T) == typeof(Element) && value == null))
                 throw new AttributeTypeException(String.Format("Attribute \"{0}\" ({1}) does not implement {2}.", name, value.GetType().Name, typeof(T).Name));
 
             return (T)value;
@@ -344,16 +330,6 @@ namespace Datamodel
         /// </summary>
         private void Insert(int index, Attribute item)
         {
-            if (item.Owner != this)
-            {
-                var elem = item.Value as Element;
-                if (elem != null && elem.Owner != null && elem.Owner != Owner)
-                    throw new ElementOwnershipException("Cannot add an Element from a different Datamodel. Use Datamodel.ImportElement() or Datamodel.CreateStub() instead.");
-            }
-
-            if (!Datamodel.IsDatamodelType(item.ValueType))
-                throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", item.Value.GetType().FullName));
-
             lock (Attribute_ChangeLock)
             {
                 if (Attributes.Count == Int32.MaxValue)
@@ -713,6 +689,41 @@ namespace Datamodel
                     array.SetValue(new AttrKVP(attr.Name, attr.Value), index);
                     index++;
                 }
+        }
+    }
+
+    namespace TypeConverters
+    {
+        public class ElementConverter : TypeConverter
+        {
+            public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+            {
+                if (sourceType == typeof(string) || sourceType == typeof(Guid)) return true;
+                return base.CanConvertFrom(context, sourceType);
+            }
+
+            public override object ConvertFrom(ITypeDescriptorContext context, System.Globalization.CultureInfo culture, object value)
+            {
+                Guid guid_value;
+
+                var str_value = value as string;
+                if (str_value != null)
+                    guid_value = Guid.Parse(str_value);
+                else if (value is Guid)
+                    guid_value = (Guid)value;
+                else
+                    return base.ConvertFrom(context, culture, value);
+
+                var result = new Element();
+
+                var ir = (ISupportInitialize)result;
+                ir.BeginInit();
+                result.Stub = true;
+                result.ID = guid_value;
+                ir.EndInit();
+
+                return result;
+            }
         }
     }
 }

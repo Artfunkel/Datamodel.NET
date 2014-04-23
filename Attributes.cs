@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
+using System.Globalization;
 
 namespace Datamodel
 {
@@ -18,15 +19,13 @@ namespace Datamodel
         /// <param name="name">The name of the Attribute, which must be unique to its owner.</param>
         /// <param name="value">The value of the Attribute, which must be of a supported Datamodel type.</param>
         public Attribute(string name, Element owner, object value)
+            : this()
         {
             if (name == null)
                 throw new ArgumentNullException("name");
-            
-            Name = name;
-            _Value = _ValueType = null; // dummy set to keep the compiler happy; the real, validated one comes at the end of the constructor
-            Offset = 0;
-            _Owner = owner;
 
+            Name = name;
+            _Owner = owner;
             Value = value;
         }
 
@@ -49,10 +48,12 @@ namespace Datamodel
         /// <summary>
         /// Gets or sets the name of this Attribute.
         /// </summary>
-        public string Name;
+        public string Name { get; set; }
 
-        public Type ValueType { get { return _ValueType; } }
-        Type _ValueType;
+        /// <summary>
+        /// Gets the Type of this Attribute's Value.
+        /// </summary>
+        public Type ValueType { get; private set; }
 
         /// <summary>
         /// Gets the <see cref="Element"/> which this Attribute is part of.
@@ -133,29 +134,33 @@ namespace Datamodel
             }
             set
             {
-                var owner_dm = OwnerDatamodel;
+                ValueType = value == null ? typeof(Element) : value.GetType();
+
+                if (!Datamodel.IsDatamodelType(ValueType))
+                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", ValueType.FullName));
+
                 var elem = value as Element;
                 if (elem != null)
                 {
                     if (elem.Owner == null)
-                        elem.Owner = owner_dm;
-                    else if (elem.Owner != owner_dm)
+                        elem.Owner = OwnerDatamodel;
+                    else if (elem.Owner != OwnerDatamodel)
                         throw new ElementOwnershipException();
                 }
+
                 var elem_list = value as IEnumerable<Element>;
                 if (elem_list != null)
-                foreach(var arr_elem in elem_list)
-                {
-                    if (arr_elem == null) continue;
-                    else if (arr_elem.Owner == null)
-                        arr_elem.Owner = owner_dm;
-                    else if (arr_elem.Owner != owner_dm)
-                        throw new ElementOwnershipException("One or more Elements in the assigned collection are from a different Datamodel. Use ImportElement() to copy them to this one before assigning.");
-                }
+                    foreach (var arr_elem in elem_list)
+                    {
+                        if (arr_elem == null) continue;
+                        else if (arr_elem.Owner == null)
+                            arr_elem.Owner = OwnerDatamodel;
+                        else if (arr_elem.Owner != OwnerDatamodel)
+                            throw new ElementOwnershipException("One or more Elements in the assigned collection are from a different Datamodel. Use ImportElement() to copy them to this one before assigning.");
+                    }
 
                 _Value = value;
                 Offset = 0;
-                _ValueType = value == null ? typeof(Element) : value.GetType();
             }
         }
         object _Value;
@@ -237,16 +242,18 @@ namespace Datamodel
     }
 
     [Serializable]
+    [TypeConverter(typeof(TypeConverters.Vector2Converter))]
     public struct Vector2 : IEnumerable<float>, IEquatable<Vector2>
     {
-        public float X;
-        public float Y;
+        public float X { get; set; }
+        public float Y { get; set; }
 
         public static readonly Vector2 Zero = new Vector2();
 
         public float Length { get { return (float)Math.Sqrt(X * X + Y * Y); } }
 
         public Vector2(float x, float y)
+            : this()
         {
             X = x;
             Y = y;
@@ -254,7 +261,6 @@ namespace Datamodel
         public Vector2(IEnumerable<float> values)
             : this()
         {
-            X = Y = 0;
             int i = 0;
             foreach (var ordinate in values.Take(2))
             {
@@ -340,25 +346,27 @@ namespace Datamodel
     }
 
     [Serializable]
+    [TypeConverter(typeof(TypeConverters.Vector3Converter))]
     public struct Vector3 : IEnumerable<float>, IEquatable<Vector3>
     {
-        public float X;
-        public float Y;
-        public float Z;
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Z { get; set; }
 
         public static readonly Vector3 Zero = new Vector3();
 
         public float Length { get { return (float)Math.Sqrt(X * X + Y * Y + Z * Z); } }
 
         public Vector3(float x, float y, float z)
+            : this()
         {
             X = x;
             Y = y;
             Z = z;
         }
         public Vector3(IEnumerable<float> values)
+            : this()
         {
-            X = Y = Z = 0;
             int i = 0;
             foreach (var ordinate in values.Take(3))
             {
@@ -447,20 +455,22 @@ namespace Datamodel
     }
 
     [Serializable]
+    [TypeConverter(typeof(TypeConverters.Vector3Converter))]
     public struct Angle : IEnumerable<float>, IEquatable<Angle>
     {
-        public float X;
-        public float Y;
-        public float Z;
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Z { get; set; }
 
         public static readonly Angle Zero = new Angle();
 
         public Angle(float x, float y, float z)
+            : this()
         { X = x; Y = y; Z = z; }
 
         public Angle(IEnumerable<float> values)
+            : this()
         {
-            X = Y = Z = 0;
             int i = 0;
             foreach (var ordinate in values.Take(3))
             {
@@ -536,23 +546,25 @@ namespace Datamodel
     }
 
     [Serializable]
+    [TypeConverter(typeof(TypeConverters.Vector4Converter))]
     public struct Vector4 : IEnumerable<float>, IEquatable<Vector4>
     {
-        public float X;
-        public float Y;
-        public float Z;
-        public float W;
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Z { get; set; }
+        public float W { get; set; }
 
         public static readonly Vector4 Zero = new Vector4();
 
         public Vector4(float x, float y, float z, float w)
+            : this()
         {
             X = x; Y = y; Z = z; W = w;
         }
 
         public Vector4(IEnumerable<float> values)
+            : this()
         {
-            X = Y = Z = W = 0;
             int i = 0;
             foreach (var ordinate in values.Take(4))
             {
@@ -630,24 +642,25 @@ namespace Datamodel
     }
 
     [Serializable]
+    [TypeConverter(typeof(TypeConverters.Vector4Converter))]
     public struct Quaternion : IEnumerable<float>
     {
-        public float X;
-        public float Y;
-        public float Z;
-        public float W;
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Z { get; set; }
+        public float W { get; set; }
 
         public static readonly Quaternion Zero = new Quaternion();
 
         public Quaternion(float x, float y, float z, float w)
+            : this()
         {
             X = x; Y = y; Z = z; W = w;
         }
 
         public Quaternion(IEnumerable<float> values)
+            : this()
         {
-            X = Y = Z = W = 0;
-
             int i = 0;
             foreach (var ordinate in values.Take(4))
             {
@@ -714,16 +727,18 @@ namespace Datamodel
     }
 
     [Serializable]
+    [TypeConverter(typeof(TypeConverters.MatrixConverter))]
     public struct Matrix : IEnumerable<float>, IEquatable<Matrix>
     {
-        public Vector4 Row0;
-        public Vector4 Row1;
-        public Vector4 Row2;
-        public Vector4 Row3;
+        public Vector4 Row0 { get; set; }
+        public Vector4 Row1 { get; set; }
+        public Vector4 Row2 { get; set; }
+        public Vector4 Row3 { get; set; }
 
         public static readonly Matrix Zero = new Matrix();
 
         public Matrix(float[,] value)
+            : this()
         {
             if (value.GetUpperBound(0) < 4)
                 throw new InvalidOperationException("Not enough columns for a Matrix4.");
@@ -735,6 +750,7 @@ namespace Datamodel
         }
 
         public Matrix(IEnumerable<float> values)
+            : this()
         {
             if (values.Count() < 4 * 4)
                 throw new ArgumentException("Not enough values for a Matrix4.");
@@ -788,6 +804,92 @@ namespace Datamodel
         public static bool operator !=(Matrix a, Matrix b)
         {
             return !a.Equals(b);
+        }
+    }
+
+    namespace TypeConverters
+    {
+        public abstract class VectorConverter : TypeConverter
+        {
+            public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+            {
+                if (sourceType == typeof(string)) return true;
+                return base.CanConvertFrom(context, sourceType);
+            }
+
+            protected float[] GetOrdinates(string value, CultureInfo culture)
+            {
+                return value.Split(new string[] { culture.NumberFormat.CurrencyGroupSeparator, " " }, StringSplitOptions.RemoveEmptyEntries).Select(s => Single.Parse(s)).ToArray();
+            }
+
+            protected Exception NotEnoughValues(int expected, int actual)
+            {
+                return new ArgumentException(String.Format("Expected {0} values, got {1}", expected, actual));
+            }
+        }
+
+        public class Vector2Converter : VectorConverter
+        {
+            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+            {
+                var str_val = value as string;
+                if (str_val != null)
+                {
+                    var ordinates = GetOrdinates(str_val, culture);
+                    if (ordinates.Length != 2) throw NotEnoughValues(2, ordinates.Length);
+
+                    return new Vector2(ordinates[0], ordinates[1]);
+                }
+                return base.ConvertFrom(context, culture, value);
+            }
+        }
+
+        public class Vector3Converter : VectorConverter
+        {
+            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+            {
+                var str_val = value as string;
+                if (str_val != null)
+                {
+                    var ordinates = GetOrdinates(str_val, culture);
+                    if (ordinates.Length < 3) throw NotEnoughValues(3, ordinates.Length);
+
+                    return new Vector3(ordinates[0], ordinates[1], ordinates[2]);
+                }
+                return base.ConvertFrom(context, culture, value);
+            }
+        }
+
+        public class Vector4Converter : VectorConverter
+        {
+            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+            {
+                var str_val = value as string;
+                if (str_val != null)
+                {
+                    var ordinates = GetOrdinates(str_val, culture);
+                    if (ordinates.Length < 4) throw NotEnoughValues(4, ordinates.Length);
+
+                    return new Vector4(ordinates[0], ordinates[1], ordinates[2], ordinates[3]);
+                }
+                return base.ConvertFrom(context, culture, value);
+            }
+        }
+
+        public class MatrixConverter : VectorConverter
+        {
+            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+            {
+                var str_val = value as string;
+                if (str_val != null)
+                {
+                    var ordinates = GetOrdinates(str_val, culture);
+                    if (ordinates.Length < 4 * 4) throw NotEnoughValues(4 * 4, ordinates.Length);
+
+                    return new Matrix(ordinates);
+                }
+                return base.ConvertFrom(context, culture, value);
+            }
         }
     }
 }

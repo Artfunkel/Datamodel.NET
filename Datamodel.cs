@@ -257,7 +257,8 @@ namespace Datamodel
                 if (result.Owner != this)
                     result = ImportElement(result, false, true);
             }
-            return result;
+
+            return result ?? AllElements[id];
         }
 
         /// <summary>
@@ -294,7 +295,8 @@ namespace Datamodel
                     if (Lookup.ContainsKey(item.ID))
                         throw new ElementIdException(String.Format("Element ID {0} already in use in this Datamodel.", item.ID));
 
-                    if (item.Owner != null && item.Owner != this.Owner)
+                    System.Diagnostics.Debug.Assert(item.Owner != null);
+                    if (item.Owner != this.Owner)
                         throw new ElementOwnershipException("Cannot add an element from a different Datamodel. Use ImportElement() to create a local copy instead.");
 
                     ChangeLock.EnterWriteLock();
@@ -564,7 +566,7 @@ namespace Datamodel
                 if (value != null)
                 {
                     if (value.Owner == null)
-                        value.Owner = this;
+                        value = ImportElement(value,true,true);
                     else if (value.Owner != this)
                         throw new ElementOwnershipException();
                 }
@@ -697,50 +699,75 @@ namespace Datamodel
             if (job.ImportMap.TryGetValue(foreign_element, out local_element))
                 return local_element;
 
-            // find a local element with the same ID and either return or stub it
-            local_element = AllElements[foreign_element.ID];
-            if (local_element != null)
+            lock (foreign_element.SyncRoot)
             {
-                if (!foreign_element.Stub && (local_element.Stub || job.Mode.HasFlag(ImportMode.Overwrite)))
+                // Claim an unowned Element
+                if (foreign_element.Owner == null)
                 {
-                    local_element.Name = foreign_element.Name;
-                    local_element.ClassName = foreign_element.ClassName;
-                    local_element.Stub = false;
-                }
-                else
-                    return local_element;
-            }
-            else
-            {
-                // Create a new local Element
-                if (foreign_element.Stub || (!job.Mode.HasFlag(ImportMode.Deep) && job.Depth > 0))
-                    local_element = new Element(this, foreign_element.ID);
-                else
-                    local_element = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
-            }
-            job.ImportMap.Add(foreign_element, local_element);
-
-            // Copy attributes
-            if (!local_element.Stub)
-                foreach (var attr in foreign_element)
-                {
-                    if (attr.Value == null)
-                        local_element[attr.Key] = null;
-                    else if (IsDatamodelArrayType(attr.Value.GetType()))
+                    foreign_element.Owner = this;
+                    foreach (var attr in foreign_element)
                     {
-                        var list = (System.Collections.ICollection)attr.Value;
-                        var inner_type = GetArrayInnerType(list.GetType());
+                        var elem = attr.Value as Element;
+                        if (elem != null)
+                            foreign_element[attr.Key] = ImportElement_internal(elem, job);
 
-                        var copied_array = CodecUtilities.MakeList(inner_type, list.Count);
-                        foreach (var item in list)
-                            copied_array.Add(CopyValue(item, job));
+                        var elem_array = attr.Value as IList<Element>;
+                        if (elem_array != null)
+                            for (int i = 0; i < elem_array.Count; i++)
+                            {
+                                var item = elem_array[i];
+                                if (item != null && item.Owner != null)
+                                    elem_array[i] = ImportElement_internal(item, job);
+                            }
+                    }
+                    return foreign_element;
+                }
 
-                        local_element[attr.Key] = copied_array;
+                // find a local element with the same ID and either return or stub it
+                local_element = AllElements[foreign_element.ID];
+                if (local_element != null)
+                {
+                    if (!foreign_element.Stub && (local_element.Stub || job.Mode.HasFlag(ImportMode.Overwrite)))
+                    {
+                        local_element.Name = foreign_element.Name;
+                        local_element.ClassName = foreign_element.ClassName;
+                        local_element.Stub = false;
                     }
                     else
-                        local_element[attr.Key] = CopyValue(attr.Value, job);
+                        return local_element;
                 }
-            return local_element;
+                else
+                {
+                    // Create a new local Element
+                    if (foreign_element.Stub || (!job.Mode.HasFlag(ImportMode.Deep) && job.Depth > 0))
+                        local_element = new Element(this, foreign_element.ID);
+                    else
+                        local_element = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
+                }
+                job.ImportMap.Add(foreign_element, local_element);
+
+                // Copy attributes
+                if (!local_element.Stub)
+                    foreach (var attr in foreign_element)
+                    {
+                        if (attr.Value == null)
+                            local_element[attr.Key] = null;
+                        else if (IsDatamodelArrayType(attr.Value.GetType()))
+                        {
+                            var list = (System.Collections.ICollection)attr.Value;
+                            var inner_type = GetArrayInnerType(list.GetType());
+
+                            var copied_array = CodecUtilities.MakeList(inner_type, list.Count);
+                            foreach (var item in list)
+                                copied_array.Add(CopyValue(item, job));
+
+                            local_element[attr.Key] = copied_array;
+                        }
+                        else
+                            local_element[attr.Key] = CopyValue(attr.Value, job);
+                    }
+                return local_element;
+            }
         }
 
         #region Deprecated methods
@@ -829,7 +856,7 @@ namespace Datamodel
     [Serializable]
     public class AttributeTypeException : ArgumentException
     {
-        internal AttributeTypeException(string message)
+        public AttributeTypeException(string message)
             : base(message)
         { }
 
