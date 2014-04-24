@@ -258,9 +258,9 @@ namespace Datamodel
 
                 NotifyCollectionChangedEventArgs change_args;
                 if (old_attr.Name != null)
-                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr, old_attr, old_index);
+                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr.ToKeyValuePair(), old_attr.ToKeyValuePair(), old_index);
                 else
-                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr, Count);
+                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr.ToKeyValuePair(), Count);
 
                 OnCollectionChanged(change_args);
             }
@@ -280,7 +280,7 @@ namespace Datamodel
                 var index = Attributes.IndexOf(attr);
                 if (Attributes.Remove(attr))
                 {
-                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, new AttrKVP(attr.Name, attr.Value), index));
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr.ToKeyValuePair(), index));
                     return true;
                 }
                 else return false;
@@ -316,7 +316,7 @@ namespace Datamodel
             get
             {
                 var attr = Attributes[index];
-                return new AttrKVP(attr.Name, attr.Value);
+                return attr.ToKeyValuePair();
             }
             set
             {
@@ -338,7 +338,7 @@ namespace Datamodel
                 Attributes.Insert(index, item);
             }
             item.Owner = this;
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item, index));
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item.ToKeyValuePair(), index));
         }
 
         /// <summary>
@@ -391,6 +391,8 @@ namespace Datamodel
         public event NotifyCollectionChangedEventHandler CollectionChanged;
         protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
         {
+            System.Diagnostics.Debug.Assert(!(e.NewItems != null && e.NewItems.OfType<Attribute>().Any()) && !(e.OldItems != null && e.OldItems.OfType<Attribute>().Any()));
+
             if (CollectionChanged != null)
                 CollectionChanged(this, e);
         }
@@ -611,7 +613,7 @@ namespace Datamodel
             lock (Attribute_ChangeLock)
                 foreach (var attr in Attributes)
                 {
-                    array[arrayIndex] = new AttrKVP(attr.Name, attr.Value);
+                    array[arrayIndex] = attr.ToKeyValuePair();
                     arrayIndex++;
                 }
         }
@@ -619,7 +621,7 @@ namespace Datamodel
         public IEnumerator<AttrKVP> GetEnumerator()
         {
             foreach (var attr in Attributes.ToArray())
-                yield return new AttrKVP(attr.Name, attr.Value);
+                yield return attr.ToKeyValuePair();
         }
         IEnumerator IEnumerable.GetEnumerator()
         {
@@ -686,7 +688,7 @@ namespace Datamodel
             lock (Attribute_ChangeLock)
                 foreach (var attr in Attributes)
                 {
-                    array.SetValue(new AttrKVP(attr.Name, attr.Value), index);
+                    array.SetValue(attr.ToKeyValuePair(), index);
                     index++;
                 }
         }

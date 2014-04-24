@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text;
 using System.Globalization;
 
+using AttrKVP = System.Collections.Generic.KeyValuePair<string, object>;
+
 namespace Datamodel
 {
     /// <summary>
@@ -173,6 +175,11 @@ namespace Datamodel
             var type = Value != null ? Value.GetType() : typeof(Element);
             var inner_type = Datamodel.GetArrayInnerType(type);
             return String.Format("{0} <{1}>", Name, inner_type != null ? inner_type.FullName + "[]" : type.FullName);
+        }
+
+        public AttrKVP ToKeyValuePair()
+        {
+            return new AttrKVP(Name, Value);
         }
 
         /// <summary>
