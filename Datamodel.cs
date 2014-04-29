@@ -292,8 +292,11 @@ namespace Datamodel
                     if (Count == Int32.MaxValue) // jinkies!
                         throw new IndexOutOfRangeException("Maximum Element count reached.");
 
-                    if (Lookup.ContainsKey(item.ID))
+                    Element existing;
+                    if (Lookup.TryGetValue(item.ID, out existing) && !existing.Stub)
+                    {
                         throw new ElementIdException(String.Format("Element ID {0} already in use in this Datamodel.", item.ID));
+                    }
 
                     System.Diagnostics.Debug.Assert(item.Owner != null);
                     if (item.Owner != this.Owner)
@@ -304,6 +307,9 @@ namespace Datamodel
                     {
                         store.Add(item);
                         Lookup[item.ID] = item;
+
+                        if (existing != null)
+                            store.Remove(existing);
                     }
                     finally
                     {
