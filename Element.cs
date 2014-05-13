@@ -241,7 +241,6 @@ namespace Datamodel
                 if (value != null && !Datamodel.IsDatamodelType(value.GetType()))
                     throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", value.GetType().FullName));
 
-
                 Attribute old_attr, new_attr;
                 int old_index;
                 lock (Attribute_ChangeLock)
@@ -250,10 +249,9 @@ namespace Datamodel
                     new_attr = new Attribute(name, this, value);
 
                     old_index = Attributes.IndexOf(old_attr);
-                    Insert(old_index == -1 ? Count : old_index, new Attribute(name, this, value));
-
-                    if (old_attr.Name != null)
+                    if (old_index != -1)
                         Attributes.Remove(old_attr);
+                    Insert(old_index == -1 ? Count : old_index, new Attribute(name, this, value), notify: false);
                 }
 
                 NotifyCollectionChangedEventArgs change_args;
@@ -328,7 +326,7 @@ namespace Datamodel
         /// <summary>
         /// Inserts an Attribute at the given index.
         /// </summary>
-        private void Insert(int index, Attribute item)
+        private void Insert(int index, Attribute item, bool notify = true)
         {
             lock (Attribute_ChangeLock)
             {
@@ -338,7 +336,9 @@ namespace Datamodel
                 Attributes.Insert(index, item);
             }
             item.Owner = this;
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item.ToKeyValuePair(), index));
+
+            if (notify)
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item.ToKeyValuePair(), index));
         }
 
         /// <summary>
@@ -394,7 +394,7 @@ namespace Datamodel
             System.Diagnostics.Debug.Assert(!(e.NewItems != null && e.NewItems.OfType<Attribute>().Any()) && !(e.OldItems != null && e.OldItems.OfType<Attribute>().Any()));
 
             OnPropertyChanged("Item[]"); // this is the magic value of System.Windows.Data.Binding.IndexerName that tells the binding engine an indexer has changed
-            
+
             if (CollectionChanged != null)
                 CollectionChanged(this, e);
         }
@@ -402,16 +402,10 @@ namespace Datamodel
         public bool IsReadOnly { get { return false; } }
         public bool IsSynchronized { get { return true; } }
 
-        #region Explicit interfaces
-
-
         /// <summary>
         /// Gets an object which can be used to synchronise access to this Element's Attributes.
         /// </summary>
         public object SyncRoot { get { return Attribute_ChangeLock; } }
-
-
-        #endregion
 
         #endregion
 
