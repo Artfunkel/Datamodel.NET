@@ -267,7 +267,7 @@ namespace Datamodel.Codecs
             }
 
             // read attributes (or not, if we're deferred)
-            foreach (var elem in dm.AllElements)
+            foreach (var elem in dm.AllElements.ToArray())
             {
                 System.Diagnostics.Debug.Assert(!elem.Stub);
 
