@@ -14,6 +14,7 @@ namespace Datamodel_Tests
         protected FileStream Binary_5_File = System.IO.File.OpenRead(@"Resources\taunt05_b5.dmx");
         protected FileStream Binary_4_File = System.IO.File.OpenRead(@"Resources\binary4.dmx");
         protected FileStream KeyValues2_1_File = System.IO.File.OpenRead(@"Resources\taunt05.dmx");
+        protected FileStream Xaml_File = System.IO.File.OpenRead(@"Resources\xaml_dm.xaml");
 
         static DatamodelTests()
         {
@@ -62,7 +63,7 @@ namespace Datamodel_Tests
                 RedirectStandardError = true,
             };
 
-            Assert.IsTrue(File.Exists(dmxconvert.StartInfo.FileName),String.Format("Could not find dmxconvert at {0}",dmxconvert.StartInfo.FileName));
+            Assert.IsTrue(File.Exists(dmxconvert.StartInfo.FileName), String.Format("Could not find dmxconvert at {0}", dmxconvert.StartInfo.FileName));
 
             dmxconvert.Start();
             var err = dmxconvert.StandardError.ReadToEnd(); // dmxconvert writes to CON instead of STD...this does nothing!
@@ -109,7 +110,7 @@ namespace Datamodel_Tests
 
             dm.Root["Recursive"] = dm.Root;
             dm.Root["NoName"] = new Element();
-            dm.Root["SpecialElemArray"] = new Element[] { new Element(dm, Guid.NewGuid()), new Element(), dm.Root };
+            dm.Root["SpecialElemArray"] = new ElementArray(new Element[] { new Element(dm, Guid.NewGuid()), new Element(), dm.Root });
             dm.Root["ElementStub"] = new Element(dm, Guid.NewGuid());
         }
 
@@ -147,8 +148,8 @@ namespace Datamodel_Tests
         {
             var dm = MakeDatamodel();
             var attr_version = encoding == "keyvalues2" || version >= 5 ? 2 : 1;
-            Populate(dm,attr_version);
-            
+            Populate(dm, attr_version);
+
             dm.Root["Arr"] = new System.Collections.ObjectModel.ObservableCollection<int>();
             dm.Root.GetArray<int>("Arr");
 
@@ -241,9 +242,18 @@ namespace Datamodel_Tests
 
             var dm2 = MakeDatamodel();
             dm2.Root = dm2.ImportElement(dm.Root, true, true);
-            
+
             SaveAndConvert(dm, "keyvalues2", 1);
             SaveAndConvert(dm, "binary", 5);
+        }
+
+        [TestMethod]
+        public void LoadXaml()
+        {
+            var dm = System.Windows.Markup.XamlReader.Load(Xaml_File) as Datamodel.Datamodel;
+            var fact = dm.Root.GetArray<Element>("NonStubArray")[0];
+            var args = fact.GetArray<Element>("StubArray");
+            Assert.IsFalse(args.Any(e => e.Stub));
         }
     }
 
@@ -295,11 +305,11 @@ namespace Datamodel_Tests
             var dm = MakeDatamodel();
             dm.Root = new Element(dm, "root");
             var inner_elem = new Element(dm, "inner_elem");
-            var arr = new Element[20000];
+            var arr = new ElementArray(20000);
             dm.Root["big_array"] = arr;
 
-            foreach (int i in Enumerable.Range(0,19999))
-                arr[i] = inner_elem;
+            foreach (int i in Enumerable.Range(0, 19999))
+                arr.Add(inner_elem);
 
             SaveAndConvert(dm, "binary", 5);
             Cleanup();
@@ -310,8 +320,8 @@ namespace Datamodel_Tests
         {
             var dm = MakeDatamodel();
             dm.Root = new Element(dm, "root");
-            
-            foreach(int x in Enumerable.Range(0,5000))
+
+            foreach (int x in Enumerable.Range(0, 5000))
             {
                 var elem_name = x.ToString();
                 foreach (int i in Enumerable.Range(0, 5))

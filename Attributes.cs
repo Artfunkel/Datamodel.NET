@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
@@ -150,9 +151,19 @@ namespace Datamodel
                         throw new ElementOwnershipException();
                 }
 
-                var elem_list = value as IEnumerable<Element>;
-                if (elem_list != null)
-                    foreach (var arr_elem in elem_list)
+                var elem_enumerable = value as IEnumerable<Element>;
+                if (elem_enumerable != null)
+                {
+                    if (!(elem_enumerable is ElementArray))
+                        throw new InvalidOperationException("Element array objects must derive from Datamodel.ElementArray");
+
+                    var elem_array = (ElementArray)value;
+                    if (elem_array.Owner == null)
+                        elem_array.Owner = Owner;
+                    else if (elem_array.Owner != Owner)
+                        throw new InvalidOperationException("ElementArray is already owned by a different Datamodel.");
+
+                    foreach (var arr_elem in elem_array)
                     {
                         if (arr_elem == null) continue;
                         else if (arr_elem.Owner == null)
@@ -160,6 +171,7 @@ namespace Datamodel
                         else if (arr_elem.Owner != OwnerDatamodel)
                             throw new ElementOwnershipException("One or more Elements in the assigned collection are from a different Datamodel. Use ImportElement() to copy them to this one before assigning.");
                     }
+                }
 
                 _Value = value;
                 Offset = 0;
@@ -181,71 +193,6 @@ namespace Datamodel
         {
             return new AttrKVP(Name, Value);
         }
-
-        /// <summary>
-        /// Compares two Attributes by their values.
-        /// </summary>
-        public class ValueComparer : IEqualityComparer, IEqualityComparer<Attribute>
-        {
-            /// <summary>
-            /// Gets a default Attribute Value equality comparer.
-            /// </summary>
-            public static ValueComparer Default
-            {
-                get
-                {
-                    if (_Default == null)
-                        _Default = new ValueComparer();
-                    return _Default;
-                }
-            }
-            static ValueComparer _Default;
-
-            public bool Equals(Attribute x, Attribute y)
-            {
-                var type_x = x.Value == null ? null : x.Value.GetType();
-                var type_y = y.Value == null ? null : y.Value.GetType();
-
-                if (type_x == null && type_y == null)
-                    return true;
-
-                if (type_x != type_y)
-                    return false;
-
-                var inner = Datamodel.GetArrayInnerType(type_x);
-                if (inner != null)
-                {
-                    var array_left = (IList)x.Value;
-                    var array_right = (IList)y.Value;
-
-                    if (array_left.Count != array_right.Count) return false;
-
-                    var comparer = inner == typeof(Element) ? (IEqualityComparer)Element.IDComparer.Default : EqualityComparer<object>.Default;
-
-                    return !Enumerable.Range(0, array_left.Count).Any(i => !comparer.Equals(array_left[i], array_right[i]));
-                }
-                else if (type_x == typeof(Element))
-                    return Element.IDComparer.Default.Equals((Element)x.Value, (Element)y.Value);
-                else
-                    return EqualityComparer<object>.Default.Equals(x.Value, y.Value);
-            }
-
-            public int GetHashCode(Attribute obj)
-            {
-                return obj.Value.GetHashCode();
-            }
-
-            bool IEqualityComparer.Equals(object x, object y)
-            {
-                return Equals((Attribute)x, (Attribute)y);
-            }
-
-            int IEqualityComparer.GetHashCode(object obj)
-            {
-                return GetHashCode((Attribute)obj);
-            }
-        }
-
     }
 
     [Serializable]

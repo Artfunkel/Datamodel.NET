@@ -86,33 +86,33 @@ namespace Datamodel.Codecs
         public static System.Collections.IList MakeList(Type t, int count)
         {
             if (t == typeof(Element))
-                return new List<Element>(count);
+                return new ElementArray(count);
             if (t == typeof(int))
-                return new List<int>(count); 
+                return new IntArray(count);
             if (t == typeof(float))
-                return new List<float>(count); 
+                return new FloatArray(count);
             if (t == typeof(bool))
-                return new List<bool>(count); 
+                return new BoolArray(count);
             if (t == typeof(string))
-                return new List<string>(count); 
+                return new StringArray(count);
             if (t == typeof(byte[]))
-                return new List<byte[]>(count);
+                return new BinaryArray(count);
             if (t == typeof(TimeSpan))
-                return new List<TimeSpan>(count);
+                return new TimeSpanArray(count);
             if (t == typeof(System.Drawing.Color))
-                return new List<System.Drawing.Color>(count); 
+                return new ColorArray(count);
             if (t == typeof(Vector2))
-                return new List<Vector2>(count); 
+                return new Vector2Array(count);
             if (t == typeof(Vector3))
-                return new List<Vector3>(count); 
+                return new Vector3Array(count);
             if (t == typeof(Vector4))
-                return new List<Vector4>(count); 
+                return new Vector4Array(count);
             if (t == typeof(Angle))
-                return new List<Angle>(count);
+                return new AngleArray(count);
             if (t == typeof(Quaternion))
-                return new List<Quaternion>(count); 
+                return new QuaternionArray(count);
             if (t == typeof(Matrix))
-                return new List<Matrix>(count);
+                return new MatrixArray(count);
 
             throw new ArgumentException("Unrecognised Type.");
         }
@@ -125,7 +125,7 @@ namespace Datamodel.Codecs
         /// <param name="defer_offset">The location in the encoded DMX stream at which this Attribute's value can be found.</param>
         public static void AddDeferredAttribute(Element elem, string key, long offset)
         {
-            if (offset <= 0) throw new ArgumentOutOfRangeException("offset","Address must be greater than 0.");
+            if (offset <= 0) throw new ArgumentOutOfRangeException("offset", "Address must be greater than 0.");
             elem.Add(key, offset);
         }
     }

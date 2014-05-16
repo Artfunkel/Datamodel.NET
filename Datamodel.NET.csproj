@@ -59,6 +59,7 @@
     <Reference Include="System.Drawing" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Arrays.cs" />
     <Compile Include="Attributes.cs" />
     <Compile Include="Codecs\Binary.cs" />
     <Compile Include="Codecs\KeyValues2.cs" />

@@ -15,7 +15,7 @@ using System.Security;
 [assembly: ComVisible(false)]
 [assembly: Guid("2df8c991-dfe3-4d62-9fae-705c73ca54db")]
 
-[assembly: AssemblyVersion("1.1.*")]
+[assembly: AssemblyVersion("1.1.0.0")]
 
 [assembly: System.CLSCompliant(true)]
 

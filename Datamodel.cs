@@ -670,19 +670,7 @@ namespace Datamodel
                     best_element = local_element ?? new Element(this, foreign_element.ID);
 
                 return best_element;
-            }
-            else if (attr_type == typeof(Vector2))
-                return new Vector2((Vector2)value);
-            else if (attr_type == typeof(Vector3))
-                return new Vector3((Vector3)value);
-            else if (attr_type == typeof(Vector4))
-                return new Vector4((Vector4)value);
-            else if (attr_type == typeof(Angle))
-                return new Angle((Angle)value);
-            else if (attr_type == typeof(Quaternion))
-                return new Quaternion((Quaternion)value);
-            else if (attr_type == typeof(Matrix))
-                return new Matrix((Matrix)value);
+            }            
             else if (attr_type == typeof(byte[]))
             {
                 var inbytes = (byte[])value;
@@ -717,14 +705,17 @@ namespace Datamodel
                         if (elem != null)
                             foreign_element[attr.Key] = ImportElement_internal(elem, job);
 
-                        var elem_array = attr.Value as IList<Element>;
+                        var elem_array = attr.Value as ElementArray;
                         if (elem_array != null)
+                        {
+                            elem_array.Owner = foreign_element;
                             for (int i = 0; i < elem_array.Count; i++)
                             {
                                 var item = elem_array[i];
                                 if (item != null && item.Owner != null)
                                     elem_array[i] = ImportElement_internal(item, job);
                             }
+                        }
                     }
                     return foreign_element;
                 }
