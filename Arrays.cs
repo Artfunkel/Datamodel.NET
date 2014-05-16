@@ -276,7 +276,15 @@ namespace Datamodel
 
         void ICollection.CopyTo(Array array, int index)
         {
-            CopyTo((T[])array, index);
+            RWLock.EnterReadLock();
+            try
+            {
+                ((IList)Inner).CopyTo(array, index);
+            }
+            finally
+            {
+                RWLock.ExitReadLock();
+            }
         }
 
         bool ICollection.IsSynchronized { get { return true; } }
@@ -312,6 +320,7 @@ namespace Datamodel
                 {
                     foreach (var elem in this)
                     {
+                        if (elem == null) continue;
                         if (elem.Owner == null)
                             OwnerDatamodel.ImportElement(elem, true, false);
                         else if (elem.Owner != OwnerDatamodel)
@@ -325,7 +334,7 @@ namespace Datamodel
         {
             base.Insert_Internal(index, item);
 
-            if (OwnerDatamodel != null)
+            if (item != null && OwnerDatamodel != null)
             {
                 if (item.Owner == null)
                     OwnerDatamodel.ImportElement(item, true, false);
