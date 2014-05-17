@@ -124,13 +124,6 @@ namespace Datamodel
                     var elem = _Value as Element;
                     if (elem != null && elem.Stub)
                         _Value = OwnerDatamodel.OnStubRequest(elem.ID) ?? _Value;
-                    var elem_list = _Value as IList<Element>;
-                    if (elem_list != null)
-                        for (int i = 0; i < elem_list.Count; i++)
-                        {
-                            if (elem_list[i] == null || !elem_list[i].Stub) continue;
-                            elem_list[i] = OwnerDatamodel.OnStubRequest(elem_list[i].ID) ?? elem_list[i];
-                        }
                 }
 
                 return _Value;

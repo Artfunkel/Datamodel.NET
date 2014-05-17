@@ -83,7 +83,7 @@ namespace Datamodel
             OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item, index));
         }
 
-        public T this[int index]
+        public virtual T this[int index]
         {
             get
             {
@@ -103,7 +103,7 @@ namespace Datamodel
                 RWLock.EnterUpgradeableReadLock();
                 try
                 {
-                    current = this[index];
+                    current = Inner[index];
                     RWLock.EnterWriteLock();
                     try
                     {
@@ -340,6 +340,21 @@ namespace Datamodel
                     OwnerDatamodel.ImportElement(item, true, false);
                 else if (item.Owner != OwnerDatamodel)
                     throw new ElementOwnershipException();
+            }
+        }
+
+        public override Element this[int index]
+        {
+            get
+            {
+                var elem = base[index];
+                if (elem != null && elem.Stub && elem.Owner != null)
+                    elem = base[index] = elem.Owner.OnStubRequest(elem.ID);
+                return elem;
+            }
+            set
+            {
+                base[index] = value;
             }
         }
     }
