@@ -5,13 +5,14 @@ using System.Collections.Specialized;
 using System.Linq;
 using System.Text;
 using System.Drawing;
+using System.Threading;
 
 namespace Datamodel
 {
     public abstract class Array<T> : IList<T>, IList, INotifyCollectionChanged
     {
-        List<T> Inner;
-        System.Threading.ReaderWriterLockSlim RWLock = new System.Threading.ReaderWriterLockSlim();
+        protected List<T> Inner;
+        protected ReaderWriterLockSlim RWLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
         object _SyncRoot = new object();
 
         public virtual Element Owner { get; internal set; }
@@ -157,14 +158,23 @@ namespace Datamodel
 
         public void CopyTo(T[] array, int arrayIndex)
         {
-            RWLock.EnterReadLock();
+            CopyTo_Internal(array, arrayIndex);
+        }
+
+        protected virtual void CopyTo_Internal(Array array, int index)
+        {
+            RWLock.EnterUpgradeableReadLock();
             try
             {
-                Inner.CopyTo(array, arrayIndex);
+                foreach (var item in this.Take(Math.Min(array.Length - index, Inner.Count)).ToArray())
+                {
+                    array.SetValue(item, index);
+                    index++;
+                }
             }
             finally
             {
-                RWLock.ExitReadLock();
+                RWLock.ExitUpgradeableReadLock();
             }
         }
 
@@ -216,12 +226,13 @@ namespace Datamodel
 
         public IEnumerator<T> GetEnumerator()
         {
-            return Inner.GetEnumerator();
+            for (int i = 0; i < Inner.Count; i++)
+                yield return this[i];
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return Inner.GetEnumerator();
+            return GetEnumerator();
         }
 
         public event NotifyCollectionChangedEventHandler CollectionChanged;
@@ -276,15 +287,7 @@ namespace Datamodel
 
         void ICollection.CopyTo(Array array, int index)
         {
-            RWLock.EnterReadLock();
-            try
-            {
-                ((IList)Inner).CopyTo(array, index);
-            }
-            finally
-            {
-                RWLock.ExitReadLock();
-            }
+            CopyTo_Internal(array, index);
         }
 
         bool ICollection.IsSynchronized { get { return true; } }
@@ -314,18 +317,38 @@ namespace Datamodel
             }
             internal set
             {
-                base.Owner = value;
-
-                if (OwnerDatamodel != null)
+                RWLock.EnterUpgradeableReadLock();
+                try
                 {
-                    foreach (var elem in this)
+                    base.Owner = value;
+
+                    if (OwnerDatamodel != null)
                     {
-                        if (elem == null) continue;
-                        if (elem.Owner == null)
-                            OwnerDatamodel.ImportElement(elem, true, false);
-                        else if (elem.Owner != OwnerDatamodel)
-                            throw new ElementOwnershipException();
+                        for (int i = 0; i < Count; i++)
+                        {
+                            var elem = Inner[i];
+
+                            if (elem == null) continue;
+                            if (elem.Owner == null)
+                            {
+                                RWLock.EnterWriteLock();
+                                try
+                                {
+                                    Inner[i] = OwnerDatamodel.ImportElement(elem, Datamodel.ImportRecursionMode.Stubs, Datamodel.ImportOverwriteMode.Stubs);
+                                }
+                                finally
+                                {
+                                    RWLock.ExitWriteLock();
+                                }
+                            }
+                            else if (elem.Owner != OwnerDatamodel)
+                                throw new ElementOwnershipException();
+                        }
                     }
+                }
+                finally
+                {
+                    RWLock.ExitUpgradeableReadLock();
                 }
             }
         }
@@ -337,7 +360,7 @@ namespace Datamodel
             if (item != null && OwnerDatamodel != null)
             {
                 if (item.Owner == null)
-                    OwnerDatamodel.ImportElement(item, true, false);
+                    OwnerDatamodel.ImportElement(item, Datamodel.ImportRecursionMode.Recursive, Datamodel.ImportOverwriteMode.Stubs);
                 else if (item.Owner != OwnerDatamodel)
                     throw new ElementOwnershipException();
             }
@@ -347,10 +370,28 @@ namespace Datamodel
         {
             get
             {
-                var elem = base[index];
-                if (elem != null && elem.Stub && elem.Owner != null)
-                    elem = base[index] = elem.Owner.OnStubRequest(elem.ID);
-                return elem;
+                RWLock.EnterUpgradeableReadLock();
+                try
+                {
+                    var elem = Inner[index];
+                    if (elem != null && elem.Stub && elem.Owner != null)
+                    {
+                        RWLock.EnterWriteLock();
+                        try
+                        {
+                            elem = Inner[index] = elem.Owner.OnStubRequest(elem.ID);
+                        }
+                        finally
+                        {
+                            RWLock.ExitWriteLock();
+                        }
+                    }
+                    return elem;
+                }
+                finally
+                {
+                    RWLock.ExitUpgradeableReadLock();
+                }
             }
             set
             {

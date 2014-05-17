@@ -1,7 +1,7 @@
 ﻿<Datamodel xmlns="clr-namespace:Datamodel;assembly=Datamodel.NET" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib"
            Format="View">
     <Datamodel.Root>
-        <Element>
+        <Element Name="Root">
             <Element x:Key="NonStub" Name="NonStub Element" ID="22DF5745-641A-434D-9722-CAAF2D8CEE28">
                 <s:String x:Key="UTF8">こんいちは</s:String>
             </Element>

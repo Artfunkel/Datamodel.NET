@@ -255,7 +255,7 @@ namespace Datamodel
                 if (result != null && result.ID != id)
                     throw new InvalidOperationException("Datamodel.StubRequest returned an Element with a an ID different from the one requested.");
                 if (result.Owner != this)
-                    result = ImportElement(result, false, true);
+                    result = ImportElement(result, ImportRecursionMode.Stubs, ImportOverwriteMode.Stubs);
             }
 
             return result ?? AllElements[id];
@@ -572,7 +572,7 @@ namespace Datamodel
                 if (value != null)
                 {
                     if (value.Owner == null)
-                        value = ImportElement(value,true,true);
+                        value = ImportElement(value, ImportRecursionMode.Recursive, ImportOverwriteMode.All);
                     else if (value.Owner != this)
                         throw new ElementOwnershipException();
                 }
@@ -592,53 +592,72 @@ namespace Datamodel
         /// <summary>
         /// Copies another Datamodel's <see cref="Element"/> into this one.
         /// </summary>
-        /// <remarks>An imported Element will automatically replace any stub Elements which share its ID.</remarks>
+        /// <remarks>The return value will be owned by this Datamodel. It can be:
+        /// 1. foreign_element. This is the case when foreign_element has no owner and no Element with the same ID exists in this Datamodel.
+        /// 2. An existing Element owned by this Datamodel with the same ID as foreign_element.
+        /// 3. A copy of foreign_element. This is the case when foreign_element already had an owner and a corresponding Element was not found in this Datamodel.</remarks>
         /// <param name="foreign_element">The Element to import. Must be owned by a different Datamodel.</param>
-        /// <param name="deep">Whether to import child Elements as well.</param>
-        /// <param name="overwrite">If true, foreign Elements will replace local stub Elements which share their ID. If false, the same foregin Elements will be skipped.</param>
-        /// <returns>A copy of the input Element owned by this Datamodel.</returns>
+        /// <param name="import_mode">How to respond when foreign_element references other foreign Elements.</param>
+        /// <param name="overwrite_mode">How to respond when the ID of a foreign Element is already in use in this Datamodel.</param>
+        /// <returns>foreign_element, a local Element, or a new copy of foreign_element. See Remarks for more details.</returns>
         /// <exception cref="ArgumentNullException">Thrown if foreign_element is null.</exception>
         /// <exception cref="ElementOwnershipException">Thrown if foreign_element is already owned by this Datamodel.</exception>
         /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Elements allowed in a Datamodel has been reached.</exception>
         /// <seealso cref="Element.Stub"/>
         /// <seealso cref="Element.ID"/>
-        public Element ImportElement(Element foreign_element, bool deep, bool overwrite)
+        public Element ImportElement(Element foreign_element, ImportRecursionMode import_mode, ImportOverwriteMode overwrite_mode)
         {
             if (foreign_element == null) throw new ArgumentNullException("element");
             if (foreign_element.Owner == this) throw new ElementOwnershipException("Element is already a part of this Datamodel.");
             
-            ImportMode mode = ImportMode.Normal;
-            if (deep) mode |= ImportMode.Deep;
-            if (overwrite) mode |= ImportMode.Overwrite;
-
-            return ImportElement_internal(foreign_element, new ImportJob(mode));
+            return ImportElement_internal(foreign_element, new ImportJob(import_mode, overwrite_mode));
         }
 
-        [Flags]
-        enum ImportMode
+        public enum ImportRecursionMode
         {
-            Normal,
+            /// <summary>
+            /// Import the given Element only. Any Element reference will become null.
+            /// </summary>
+            Nulls,
+            /// <summary>
+            /// Import the given Element only. Any Element references will be represented with stubs.
+            /// </summary>
+            Stubs,
             /// <summary>
             /// Recursively import all referenced Elements.
             /// </summary>
-            Deep,
+            Recursive,
+        }
+
+        public enum ImportOverwriteMode
+        {
             /// <summary>
-            /// Replace local Elements, even if they are not stubs.
+            /// If a local Element has the same ID as a foreign Element, ignore the foreign Element.
             /// </summary>
-            Overwrite
+            None,
+            /// <summary>
+            /// If a local stub Element has the same ID as a non-stub foreign Element, replace it.
+            /// </summary>
+            Stubs,
+            /// <summary>
+            /// If a local Element has the same ID as a non-stub foreign Element, replace it.
+            /// </summary>
+            All,
         }
 
         struct ImportJob
         {
-            public ImportMode Mode;
-            public Dictionary<Element, Element> ImportMap;
-            public int Depth;
+            public ImportRecursionMode ImportMode { get; private set; }
+            public ImportOverwriteMode OverwriteMode { get; private set; }
+            public Dictionary<Element, Element> ImportMap { get; private set; }
+            public int Depth { get; set; }
 
-            public ImportJob(ImportMode mode)
+            public ImportJob(ImportRecursionMode import_mode, ImportOverwriteMode overwrite_mode)
+                :this()
             {
-                Mode = mode;
+                ImportMode = import_mode;
+                OverwriteMode = overwrite_mode;
                 ImportMap = new Dictionary<Element, Element>();
-                Depth = 0;
             }
         }
 
@@ -660,14 +679,14 @@ namespace Datamodel
 
                 if (local_element != null && !local_element.Stub)
                     best_element = local_element;
-                else if (!foreign_element.Stub && job.Mode.HasFlag(ImportMode.Deep))
+                else if (!foreign_element.Stub && job.ImportMode == ImportRecursionMode.Recursive)
                 {
                     job.Depth++;
                     best_element = ImportElement_internal(foreign_element, job);
                     job.Depth--;
                 }
                 else
-                    best_element = local_element ?? new Element(this, foreign_element.ID);
+                    best_element = local_element ?? (job.ImportMode == ImportRecursionMode.Stubs ? new Element(this, foreign_element.ID) : (Element)null);
 
                 return best_element;
             }            
@@ -696,7 +715,7 @@ namespace Datamodel
             lock (foreign_element.SyncRoot)
             {
                 // Claim an unowned Element
-                if (foreign_element.Owner == null)
+                if (foreign_element.Owner == null && AllElements[foreign_element.ID] == null)
                 {
                     foreign_element.Owner = this;
                     foreach (var attr in foreign_element)
@@ -724,7 +743,7 @@ namespace Datamodel
                 local_element = AllElements[foreign_element.ID];
                 if (local_element != null)
                 {
-                    if (!foreign_element.Stub && (local_element.Stub || job.Mode.HasFlag(ImportMode.Overwrite)))
+                    if (!foreign_element.Stub && job.OverwriteMode == ImportOverwriteMode.All || (job.OverwriteMode == ImportOverwriteMode.Stubs && local_element.Stub))
                     {
                         local_element.Name = foreign_element.Name;
                         local_element.ClassName = foreign_element.ClassName;
@@ -736,15 +755,19 @@ namespace Datamodel
                 else
                 {
                     // Create a new local Element
-                    if (foreign_element.Stub || (!job.Mode.HasFlag(ImportMode.Deep) && job.Depth > 0))
+                    if (foreign_element.Stub || (job.ImportMode == ImportRecursionMode.Stubs && job.Depth > 0))
                         local_element = new Element(this, foreign_element.ID);
-                    else
+                    else if (job.ImportMode == ImportRecursionMode.Recursive || job.Depth == 0)
                         local_element = new Element(this, foreign_element.Name, foreign_element.ID, foreign_element.ClassName);
+                    else
+                        local_element = null;
                 }
                 job.ImportMap.Add(foreign_element, local_element);
 
                 // Copy attributes
-                if (!local_element.Stub)
+                if (local_element != null && !local_element.Stub)
+                {
+                    local_element.Clear();
                     foreach (var attr in foreign_element)
                     {
                         if (attr.Value == null)
@@ -763,6 +786,7 @@ namespace Datamodel
                         else
                             local_element[attr.Key] = CopyValue(attr.Value, job);
                     }
+                }
                 return local_element;
             }
         }

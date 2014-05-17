@@ -241,7 +241,7 @@ namespace Datamodel_Tests
             Populate(dm, 2);
 
             var dm2 = MakeDatamodel();
-            dm2.Root = dm2.ImportElement(dm.Root, true, true);
+            dm2.Root = dm2.ImportElement(dm.Root, DM.ImportRecursionMode.Recursive, DM.ImportOverwriteMode.All);
 
             SaveAndConvert(dm, "keyvalues2", 1);
             SaveAndConvert(dm, "binary", 5);
