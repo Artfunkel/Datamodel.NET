@@ -6,16 +6,23 @@ using System.Linq;
 using System.Text;
 using System.Drawing;
 using System.Threading;
+using System.ComponentModel;
 
 namespace Datamodel
 {
-    public abstract class Array<T> : IList<T>, IList, INotifyCollectionChanged
+    public abstract class Array<T> : IList<T>, IList, INotifyCollectionChanged, INotifyPropertyChanged
     {
         protected List<T> Inner;
         protected ReaderWriterLockSlim RWLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
         object _SyncRoot = new object();
 
-        public virtual Element Owner { get; internal set; }
+        public virtual Element Owner
+        {
+            get { return _Owner; }
+            internal set { _Owner = value; OnPropertyChanged("Owner"); }
+        }
+        Element _Owner;
+
         protected Datamodel OwnerDatamodel { get { return Owner == null ? null : Owner.Owner; } }
 
         internal Array()
@@ -238,8 +245,24 @@ namespace Datamodel
         public event NotifyCollectionChangedEventHandler CollectionChanged;
         protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
         {
+            switch (e.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                case NotifyCollectionChangedAction.Remove:
+                case NotifyCollectionChangedAction.Reset:
+                    OnPropertyChanged("Count");
+                    break;
+            }
+
             if (CollectionChanged != null)
                 CollectionChanged(this, e);
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected virtual void OnPropertyChanged(string property_name)
+        {
+            if (PropertyChanged != null)
+                PropertyChanged(this, new PropertyChangedEventArgs(property_name));
         }
 
         #region IList
