@@ -393,6 +393,15 @@ namespace Datamodel
         {
             System.Diagnostics.Debug.Assert(!(e.NewItems != null && e.NewItems.OfType<Attribute>().Any()) && !(e.OldItems != null && e.OldItems.OfType<Attribute>().Any()));
 
+            switch (e.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                case NotifyCollectionChangedAction.Remove:
+                case NotifyCollectionChangedAction.Reset:
+                    OnPropertyChanged("Count");
+                    break;
+            }
+
             OnPropertyChanged("Item[]"); // this is the magic value of System.Windows.Data.Binding.IndexerName that tells the binding engine an indexer has changed
 
             if (CollectionChanged != null)
