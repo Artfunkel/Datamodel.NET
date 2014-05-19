@@ -743,7 +743,7 @@ namespace Datamodel
                 local_element = AllElements[foreign_element.ID];
                 if (local_element != null)
                 {
-                    if (!foreign_element.Stub && job.OverwriteMode == ImportOverwriteMode.All || (job.OverwriteMode == ImportOverwriteMode.Stubs && local_element.Stub))
+                    if (!foreign_element.Stub && (job.OverwriteMode == ImportOverwriteMode.All || (job.OverwriteMode == ImportOverwriteMode.Stubs && local_element.Stub)))
                     {
                         local_element.Name = foreign_element.Name;
                         local_element.ClassName = foreign_element.ClassName;
