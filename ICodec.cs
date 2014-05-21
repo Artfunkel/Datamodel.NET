@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.IO;
 using System.Collections.Generic;
 
@@ -113,6 +114,43 @@ namespace Datamodel.Codecs
                 return new QuaternionArray(count);
             if (t == typeof(Matrix))
                 return new MatrixArray(count);
+
+            throw new ArgumentException("Unrecognised Type.");
+        }
+
+        /// <summary>
+        /// Creates a <see cref="List&lt;T&gt;"/> for the given Type, copying items the given IEnumerable
+        /// </summary>
+        public static System.Collections.IList MakeList(Type t, System.Collections.IEnumerable source)
+        {
+            if (t == typeof(Element))
+                return new ElementArray(source.Cast<Element>());
+            if (t == typeof(int))
+                return new IntArray(source.Cast<int>());
+            if (t == typeof(float))
+                return new FloatArray(source.Cast<float>());
+            if (t == typeof(bool))
+                return new BoolArray(source.Cast<bool>());
+            if (t == typeof(string))
+                return new StringArray(source.Cast<string>());
+            if (t == typeof(byte[]))
+                return new BinaryArray(source.Cast<byte[]>());
+            if (t == typeof(TimeSpan))
+                return new TimeSpanArray(source.Cast<TimeSpan>());
+            if (t == typeof(System.Drawing.Color))
+                return new ColorArray(source.Cast<System.Drawing.Color>());
+            if (t == typeof(Vector2))
+                return new Vector2Array(source.Cast<Vector2>());
+            if (t == typeof(Vector3))
+                return new Vector3Array(source.Cast<Vector3>());
+            if (t == typeof(Vector4))
+                return new Vector4Array(source.Cast<Vector4>());
+            if (t == typeof(Angle))
+                return new AngleArray(source.Cast<Angle>());
+            if (t == typeof(Quaternion))
+                return new QuaternionArray(source.Cast<Quaternion>());
+            if (t == typeof(Matrix))
+                return new MatrixArray(source.Cast<Matrix>());
 
             throw new ArgumentException("Unrecognised Type.");
         }

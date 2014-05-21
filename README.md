@@ -2,8 +2,7 @@ Datamodel.NET is a CLR library which implements the Datamodel structure and Data
 
 Datamodel is a strongly-typed generic data structure designed by Valve Corporation for use in their games. Datamodel Exchange is a Datamodel container file format with multiple possible encodings; binary and ASCII ("keyvalues2") are included.
 
-Datamodel Attributes
---------------------
+## Datamodel Attributes
 
 The following CLR types are supported as Datamodel attributes:
 
@@ -25,8 +24,7 @@ Additionally, the following Datamodel.NET types are supported:
 
 `IList<T>` collections of the above types are also supported.
 
-Datamodel.NET features
-----------------------
+## Datamodel.NET features
 
 * Threaded, thread-safe
 * Support for all known versions of Valve's `binary` and `keyvalues2` DMX encodings
@@ -37,8 +35,15 @@ Datamodel.NET features
 * Binary codec supports just-in-time attribute loading
 * Write your own codecs with the `ICodec` interface
 
-Quick example
--------------
+### ObservableAttribute
+
+In order to correctly implement `IDictionary`, attributes are exposed as `KeyValuePair` objects. Since these aren't great for data binding the utility type `ObservableAttribute` is provided.
+
+`ObservableAttribute` will automatically wrap its descendants. For further binding convenience it will also wrap array items, generating an index-based label in place of an attribute key for each.
+
+An `IValueConverter` class is provided in a comment block at the start of `ObservableAttribute`'s class definition.
+
+## Quick example
 
 ```c#
 var HelloWorld = new Datamodel.Datamodel("helloworld", 1); // must provide a format name (can be anything) and version

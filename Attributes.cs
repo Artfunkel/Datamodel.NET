@@ -188,6 +188,209 @@ namespace Datamodel
         }
     }
 
+    /// <summary>
+    /// Wraps around an <see cref="Element"/> attribute or array item. Provides notifications of changes to the wrapped value(s) and provides an enumeration of ObservableAttribute children.
+    /// </summary>
+    /// <remarks>This type is provided as a utility. You must invoke it yourself, probably via a <see cref="System.Windows.Data.IValueConverter"/> implementation.</remarks>
+    public class ObservableAttribute : INotifyPropertyChanged, INotifyCollectionChanged, IEnumerable
+    {
+        /*
+        public class WrapAttributesConverter : System.Windows.Data.IValueConverter
+        {
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                var elem = (Element)value;
+                return new ObservableAttribute(elem, null, elem);
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                return ((ObservableAttribute)value).Value;
+            }
+        }
+        */
+
+        /// <summary>
+        /// Gets the attribute's name, or a generated label for an array item.
+        /// </summary>
+        public string Key
+        {
+            get
+            {
+                return _Key ?? String.Format("[{0}]", Index);
+            }
+            private set
+            {
+                _Key = value;
+                OnPropertyChanged("Key");
+            }
+        }
+        string _Key;
+
+        /// <summary>
+        /// Gets the attribute's value, or the array item.
+        /// </summary>
+        public object Value
+        {
+            get { return _Value; }
+            private set
+            {
+                var incc = _Value as INotifyCollectionChanged;
+                if (incc != null) incc.CollectionChanged -= OnValueCollectionChanged;
+
+                _Value = value;
+                OnPropertyChanged("Value");
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+                WrappedAttributeMap.Clear();
+
+                incc = _Value as INotifyCollectionChanged;
+                if (incc != null) incc.CollectionChanged += OnValueCollectionChanged;
+            }
+        }
+        object _Value;
+
+        /// <summary>
+        /// Gets the Element which holds the attribute or source array.
+        /// </summary>
+        public Element Owner { get; private set; }
+
+        /// <summary>
+        /// Gets the index of the attribute or array item.
+        /// </summary>
+        public int Index
+        {
+            get { return _Index; }
+            private set { _Index = value; OnPropertyChanged("Index", "Key"); }
+        }
+        int _Index;
+
+        protected Dictionary<AttrKVP, ObservableAttribute> WrappedAttributeMap { get; private set; }
+
+        private ObservableAttribute(Element owner)
+        {
+            Owner = owner;
+            WrappedAttributeMap = new Dictionary<AttrKVP, ObservableAttribute>();
+        }
+
+        /// <summary>
+        /// Creates a new ObservableAttribute which represents an attribute of the given Element.
+        /// </summary>
+        public ObservableAttribute(Element owner, AttrKVP attribute)
+            : this(owner)
+        {
+            Key = attribute.Key;
+            Value = attribute.Value;
+        }
+
+        /// <summary>
+        /// Creates a new ObservableAttribute which represents a fake attribute.
+        /// </summary>
+        public ObservableAttribute(Element owner, string key, object value)
+            : this(owner)
+        {
+            Key = key;
+            Value = value;
+        }
+
+        static ObservableAttribute()
+        {
+            ArrayExpansion = ArrayExpandMode.AllArrays;
+        }
+
+        protected IEnumerable<ObservableAttribute> WrapEnumerable(IEnumerable list, int starting_index = 0)
+        {
+            if (list == null) yield break;
+            int i = 0;
+            foreach (var source_item in list)
+            {
+                var output_attr = source_item is AttrKVP ? (AttrKVP)source_item : new AttrKVP(null, source_item);
+                ObservableAttribute output_item = null;
+                if (source_item != null && !WrappedAttributeMap.TryGetValue(output_attr, out output_item))
+                {
+                    var elem = source_item as Element;
+                    output_item = WrappedAttributeMap[output_attr] = new ObservableAttribute(Owner, output_attr) { Index = starting_index + i };
+                }
+                yield return output_item;
+                i++;
+            }
+        }
+
+        private void OnValueCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            NotifyCollectionChangedEventArgs wrapped_event;
+
+            switch (e.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                    wrapped_event = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, WrapEnumerable(e.NewItems, e.NewStartingIndex).ToArray());
+                    break;
+                case NotifyCollectionChangedAction.Move:
+                    wrapped_event = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Move, WrapEnumerable(e.OldItems).ToArray(), e.NewStartingIndex, e.OldStartingIndex);
+                    for (int i = 0; i < e.OldItems.Count; i++)
+                        ((ObservableAttribute)e.OldItems[i]).Index = e.OldStartingIndex + i;
+                    break;
+                case NotifyCollectionChangedAction.Remove:
+                    wrapped_event = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, WrapEnumerable(e.OldItems).ToArray(), e.OldStartingIndex);
+                    foreach (var item in e.OldItems) WrappedAttributeMap.Remove((AttrKVP)item);
+                    break;
+                case NotifyCollectionChangedAction.Replace:
+                    wrapped_event = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, WrapEnumerable(e.NewItems).ToArray(), WrapEnumerable(e.OldItems).ToArray(), e.NewStartingIndex);
+                    foreach (var item in e.OldItems) WrappedAttributeMap.Remove((AttrKVP)item);
+                    break;
+                case NotifyCollectionChangedAction.Reset:
+                    wrapped_event = e;
+                    WrappedAttributeMap.Clear();
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+
+            OnCollectionChanged(wrapped_event);
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected virtual void OnPropertyChanged(params string[] property_names)
+        {
+            if (PropertyChanged != null)
+                foreach (var prop_name in property_names)
+                    PropertyChanged(this, new PropertyChangedEventArgs(prop_name));
+        }
+
+        public event NotifyCollectionChangedEventHandler CollectionChanged;
+        protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
+        {
+            if (CollectionChanged != null)
+                CollectionChanged(this, e);
+        }
+
+        public enum ArrayExpandMode
+        {
+            /// <summary>
+            /// Enumerate the children of all arrays.
+            /// </summary>
+            AllArrays,
+            /// <summary>
+            /// Enumerate only the children of Element arrays.
+            /// </summary>
+            ElementArrays,
+        }
+
+        /// <summary>
+        /// Gets a value which determines the array types which expose their children.
+        /// </summary>
+        /// <remarks>Default value is AllArrays.</remarks>
+        public static ArrayExpandMode ArrayExpansion { get; set; }
+
+        public IEnumerator GetEnumerator()
+        {
+            if (Value == null) yield break;
+
+            if (Value is Element || Value is ElementArray || (Datamodel.IsDatamodelArrayType(Value.GetType()) && ArrayExpansion == ArrayExpandMode.AllArrays))
+                foreach (var item in WrapEnumerable((IEnumerable)Value))
+                    yield return item;
+        }
+    }
+
     [Serializable]
     [TypeConverter(typeof(TypeConverters.Vector2Converter))]
     public struct Vector2 : IEnumerable<float>, IEquatable<Vector2>
