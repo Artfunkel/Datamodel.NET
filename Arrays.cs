@@ -383,15 +383,15 @@ namespace Datamodel
 
         protected override void Insert_Internal(int index, Element item)
         {
-            base.Insert_Internal(index, item);
-
             if (item != null && OwnerDatamodel != null)
             {
                 if (item.Owner == null)
-                    OwnerDatamodel.ImportElement(item, Datamodel.ImportRecursionMode.Recursive, Datamodel.ImportOverwriteMode.Stubs);
+                    item = OwnerDatamodel.ImportElement(item, Datamodel.ImportRecursionMode.Recursive, Datamodel.ImportOverwriteMode.Stubs);
                 else if (item.Owner != OwnerDatamodel)
                     throw new ElementOwnershipException();
             }
+
+            base.Insert_Internal(index, item);
         }
 
         public override Element this[int index]

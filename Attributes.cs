@@ -105,6 +105,10 @@ namespace Datamodel
                 throw new CodecException(String.Format("Deferred loading of attribute \"{0}\" on element {1} using codec {2} threw an exception.", Name, Owner.ID, OwnerDatamodel.Codec), err);
             }
             Offset = 0;
+
+            var elem_array = _Value as ElementArray;
+            if (elem_array != null)
+                elem_array.Owner = Owner;
         }
 
         /// <summary>
