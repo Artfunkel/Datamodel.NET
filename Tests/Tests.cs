@@ -144,7 +144,7 @@ namespace Datamodel_Tests
             dm.Dispose();
         }
 
-        protected void Create(string encoding, int version, bool memory_save = false)
+        protected DM Create(string encoding, int version, bool memory_save = false)
         {
             var dm = MakeDatamodel();
             var attr_version = encoding == "keyvalues2" || version >= 5 ? 2 : 1;
@@ -162,6 +162,11 @@ namespace Datamodel_Tests
                 ValidatePopulated(attr_version);
                 Cleanup();
             }
+
+            dm.AllElements.Remove(dm.Root, DM.ElementList.RemoveMode.MakeStubs);
+            Assert.AreEqual<bool>(true, dm.Root.Stub);
+
+            return dm;
         }
     }
 

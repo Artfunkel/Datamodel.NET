@@ -381,7 +381,7 @@ namespace Datamodel
 
             internal bool Contains(Element elem)
             {
-                return Lookup.ContainsKey(elem.ID);
+                return store.Contains(elem);
             }
 
             /// <summary>
@@ -399,10 +399,11 @@ namespace Datamodel
                 MakeNulls
             }
             /// <summary>
-            /// Removes an <see cref="Element"/> from the collection.
+            /// Removes an <see cref="Element"/> from the Datamodel.
             /// </summary>
-            /// <param name="item">The Element to remove</param>
-            /// <param name="mode">The action to take if a reference to this Element is found other Elements.</param>
+            /// <remarks>This method will access all values in the Datamodel, potentially triggering deferred loading and destubbing.</remarks>
+            /// <param name="item">The Element to remove.</param>
+            /// <param name="mode">The action to take if a reference to this Element is found in another Element.</param>
             /// <returns>true if item is successfully removed; otherwise, false.</returns>
             public bool Remove(Element item, RemoveMode mode)
             {
@@ -412,11 +413,23 @@ namespace Datamodel
                     if (store.Remove(item))
                     {
                         Lookup.Remove(item.ID);
-                        foreach (var elem in store.ToArray())
-                            foreach (var attr in elem.Where(a => a.Value == item).ToArray())
-                                elem[attr.Key] = (mode == RemoveMode.MakeStubs) ? new Element(Owner, ((Element)attr.Value).ID) : (Element)null;
+                        Element replacement = (mode == RemoveMode.MakeStubs) ? new Element(Owner, item.ID) : (Element)null;
 
-                        if (Owner.Root == item) Owner.Root = null;
+                        foreach (var elem in store.ToArray())
+                        {
+                            lock (elem.SyncRoot)
+                            {
+                                foreach (var attr in elem.Where(a => a.Value == item).ToArray())
+                                    elem[attr.Key] = replacement;
+                                foreach (var array in elem.OfType<ElementArray>())
+                                    for (int i = 0; i < array.Count; i++)
+                                        if (array[i] == item)
+                                            array[i] = replacement;
+                            }
+                        }
+                        if (Owner.Root == item) Owner.Root = replacement;
+                        
+                        item.Owner = null;
 
                         if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item));
                         return true;
