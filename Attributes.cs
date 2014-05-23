@@ -111,6 +111,7 @@ namespace Datamodel
         /// Gets or sets the value held by this Attribute.
         /// </summary>
         /// <exception cref="CodecException">Thrown when deferred value loading fails.</exception>
+        /// <exception cref="DestubException">Thrown when Element destubbing fails.</exception>
         public object Value
         {
             get
@@ -123,7 +124,10 @@ namespace Datamodel
                     // expand stubs
                     var elem = _Value as Element;
                     if (elem != null && elem.Stub)
-                        _Value = OwnerDatamodel.OnStubRequest(elem.ID) ?? _Value;
+                    {
+                        try { _Value = OwnerDatamodel.OnStubRequest(elem.ID) ?? _Value; }
+                        catch (Exception err) { throw new DestubException(this, err); }
+                    }
                 }
 
                 return _Value;
@@ -171,6 +175,12 @@ namespace Datamodel
             }
         }
         object _Value;
+
+        /// <summary>
+        /// Gets the Attribute's Value without attempting deferred loading or destubbing.
+        /// </summary>
+        public object RawValue { get { return _Value; } }
+
         #endregion
 
         long Offset;
@@ -335,7 +345,11 @@ namespace Datamodel
                     break;
                 case NotifyCollectionChangedAction.Replace:
                     wrapped_event = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, WrapEnumerable(e.NewItems).ToArray(), WrapEnumerable(e.OldItems).ToArray(), e.NewStartingIndex);
-                    foreach (var item in e.OldItems) WrappedAttributeMap.Remove((AttrKVP)item);
+                    foreach (var item in e.OldItems)
+                    {
+                        if (!e.NewItems.Contains(item))
+                            WrappedAttributeMap.Remove((AttrKVP)item);
+                    }
                     break;
                 case NotifyCollectionChangedAction.Reset:
                     wrapped_event = e;

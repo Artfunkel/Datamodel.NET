@@ -88,7 +88,7 @@ namespace Datamodel
 
         #endregion
 
-        private List<Attribute> Attributes = new List<Attribute>();
+        internal List<Attribute> Attributes = new List<Attribute>();
         private object Attribute_ChangeLock = new object();
 
         #region Properties
@@ -151,7 +151,7 @@ namespace Datamodel
             get { return _Owner; }
             internal set
             {
-                if (_Owner != null) throw new InvalidOperationException("Element already has an owner.");
+                if (_Owner != null && _Owner.AllElements.Contains(this)) throw new InvalidOperationException("Element already has an owner.");
                 _Owner = value;
                 if (value != null)
                 {

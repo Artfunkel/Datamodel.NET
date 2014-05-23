@@ -274,7 +274,7 @@ namespace Datamodel
         public class ElementList : IEnumerable<Element>, INotifyCollectionChanged, IDisposable
         {
             internal ReaderWriterLockSlim ChangeLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
-            
+
             List<Element> store = new List<Element>();
             Dictionary<Guid, Element> Lookup = new Dictionary<Guid, Element>();
             Datamodel Owner;
@@ -356,18 +356,18 @@ namespace Datamodel
                     try
                     {
                         Element elem;
-                        Lookup.TryGetValue(id,out elem);
+                        Lookup.TryGetValue(id, out elem);
                         return elem;
                     }
                     finally { ChangeLock.ExitReadLock(); }
                 }
-            } 
+            }
 
             /// <summary>
             /// Gets the number of <see cref="Element"/>s in this collection.
             /// </summary>
             public int Count
-            { 
+            {
                 get
                 {
                     ChangeLock.EnterReadLock();
@@ -377,6 +377,11 @@ namespace Datamodel
                     }
                     finally { ChangeLock.ExitReadLock(); }
                 }
+            }
+
+            internal bool Contains(Element elem)
+            {
+                return Lookup.ContainsKey(elem.ID);
             }
 
             /// <summary>
@@ -419,6 +424,62 @@ namespace Datamodel
                     else return false;
                 }
                 finally { ChangeLock.ExitWriteLock(); }
+            }
+
+            /// <summary>
+            /// Removes unreferenced Elements from the Datamodel.
+            /// </summary>
+            public void Trim()
+            {
+                ChangeLock.EnterUpgradeableReadLock();
+                try
+                {
+                    var used = new HashSet<Element>();
+                    WalkElemTree(Owner.Root, used);
+                    if (used.Count == Count) return;
+
+                    ChangeLock.EnterWriteLock();
+                    try
+                    {
+                        foreach (var elem in this.Except(used).ToArray())
+                        {
+                            store.Remove(elem);
+                            Lookup.Remove(elem.ID);
+                            elem.Owner = null;
+                        }
+                        if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, (System.Collections.IList)used));
+                    }
+                    finally
+                    {
+                        ChangeLock.ExitWriteLock();
+                    }
+                }
+                finally
+                {
+                    ChangeLock.ExitUpgradeableReadLock();
+                }
+            }
+
+            protected void WalkElemTree(Element elem, HashSet<Element> found)
+            {
+                found.Add(elem);
+                foreach (var value in elem.Attributes.Select(a => a.RawValue))
+                {
+                    var value_elem = value as Element;
+                    if (value_elem != null)
+                    {
+                        if (found.Add(value_elem))
+                            WalkElemTree(value_elem, found);
+                        continue;
+                    }
+                    var elem_array = value as ElementArray;
+                    if (elem_array != null)
+                        foreach (var item in elem_array.RawList)
+                        {
+                            if (item != null && found.Add(item))
+                                WalkElemTree(item, found);
+                        }
+                }
             }
 
             #region Interfaces
@@ -609,7 +670,7 @@ namespace Datamodel
         {
             if (foreign_element == null) throw new ArgumentNullException("element");
             if (foreign_element.Owner == this) throw new ElementOwnershipException("Element is already a part of this Datamodel.");
-            
+
             return ImportElement_internal(foreign_element, new ImportJob(import_mode, overwrite_mode));
         }
 
@@ -653,7 +714,7 @@ namespace Datamodel
             public int Depth { get; set; }
 
             public ImportJob(ImportRecursionMode import_mode, ImportOverwriteMode overwrite_mode)
-                :this()
+                : this()
             {
                 ImportMode = import_mode;
                 OverwriteMode = overwrite_mode;
@@ -689,7 +750,7 @@ namespace Datamodel
                     best_element = local_element ?? (job.ImportMode == ImportRecursionMode.Stubs ? new Element(this, foreign_element.ID) : (Element)null);
 
                 return best_element;
-            }            
+            }
             else if (attr_type == typeof(byte[]))
             {
                 var inbytes = (byte[])value;
@@ -705,7 +766,7 @@ namespace Datamodel
         {
             if (foreign_element == null) return null;
             if (foreign_element.Owner == this) return foreign_element;
-            
+
             Element local_element;
 
             // don't import the same Element twice
@@ -847,7 +908,7 @@ namespace Datamodel
         }
 
         #endregion
-        
+
         #endregion
 
         #region Events
@@ -914,7 +975,7 @@ namespace Datamodel
         { }
 
         internal ElementOwnershipException()
-            :base("Cannot add an Element from a different Datamodel. Use ImportElement() first.")
+            : base("Cannot add an Element from a different Datamodel. Use ImportElement() first.")
         { }
 
         [SecuritySafeCritical]
@@ -942,6 +1003,33 @@ namespace Datamodel
             : base(info, context)
         { }
     }
+
+    /// <summary>
+    /// The exception that is thrown when an error occurs while destubbing an attribute value.
+    /// </summary>
+    [Serializable]
+    public class DestubException : Exception
+    {
+        internal DestubException(Attribute attr, Exception innerException)
+            : base("An exception occured while destubbing the value of an attribute.", innerException)
+        {
+            Data.Add("Element", attr.Owner.ID);
+            Data.Add("Attribute", attr.Name);
+        }
+
+        internal DestubException(ElementArray array, int index, Exception innerException)
+            : base("An exception occured while destubbing an array item.", innerException)
+        {
+            Data.Add("Element", array.Owner.ID);
+            Data.Add("Index", index);
+        }
+
+        [SecuritySafeCritical]
+        protected DestubException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        { }
+    }
+
     #endregion
 
     static class Extensions

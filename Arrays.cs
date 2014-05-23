@@ -332,6 +332,11 @@ namespace Datamodel
             : base(capacity)
         { }
 
+        /// <summary>
+        /// Gets the values in the list without attempting destubbing.
+        /// </summary>
+        internal IEnumerable<Element> RawList { get { foreach (var elem in Inner) yield return elem; } }
+
         public override Element Owner
         {
             get
@@ -403,6 +408,10 @@ namespace Datamodel
                         try
                         {
                             elem = Inner[index] = elem.Owner.OnStubRequest(elem.ID);
+                        }
+                        catch (Exception err)
+                        {
+                            throw new DestubException(this, index, err);
                         }
                         finally
                         {
