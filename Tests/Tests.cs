@@ -110,7 +110,7 @@ namespace Datamodel_Tests
 
             dm.Root["Recursive"] = dm.Root;
             dm.Root["NoName"] = new Element();
-            dm.Root["SpecialElemArray"] = new ElementArray(new Element[] { new Element(dm, Guid.NewGuid()), new Element(), dm.Root });
+            dm.Root["ElemArray"] = new ElementArray(new Element[] { new Element(dm, Guid.NewGuid()), new Element(), dm.Root, new Element(dm, "TestElement") });
             dm.Root["ElementStub"] = new Element(dm, Guid.NewGuid());
         }
 
@@ -162,6 +162,9 @@ namespace Datamodel_Tests
                 ValidatePopulated(attr_version);
                 Cleanup();
             }
+
+            dm.AllElements.Remove(dm.Root.GetArray<Element>("ElemArray")[3], DM.ElementList.RemoveMode.MakeStubs);
+            Assert.AreEqual<bool>(true, dm.Root.GetArray<Element>("ElemArray")[3].Stub);
 
             dm.AllElements.Remove(dm.Root, DM.ElementList.RemoveMode.MakeStubs);
             Assert.AreEqual<bool>(true, dm.Root.Stub);

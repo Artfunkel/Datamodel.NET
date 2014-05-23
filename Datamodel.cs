@@ -421,14 +421,14 @@ namespace Datamodel
                             {
                                 foreach (var attr in elem.Where(a => a.Value == item).ToArray())
                                     elem[attr.Key] = replacement;
-                                foreach (var array in elem.OfType<ElementArray>())
+                                foreach (var array in elem.Select(a => a.Value).OfType<IList<Element>>())
                                     for (int i = 0; i < array.Count; i++)
                                         if (array[i] == item)
                                             array[i] = replacement;
                             }
                         }
                         if (Owner.Root == item) Owner.Root = replacement;
-                        
+
                         item.Owner = null;
 
                         if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item));
