@@ -101,7 +101,7 @@ namespace Datamodel
             get { return _ID; }
             set
             {
-                if (!Initialising) throw new InvalidOperationException("ID can only be changed during initialisation.");
+                if (!Initialising && value != _ID) throw new InvalidOperationException("ID can only be changed during initialisation.");
                 _ID = value;
             }
         }

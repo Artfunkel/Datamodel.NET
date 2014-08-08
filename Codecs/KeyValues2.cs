@@ -366,28 +366,33 @@ namespace Datamodel.Codecs
                 var attr_type_s = Decode_NextToken();
                 var attr_type = TypeNames.FirstOrDefault(kv => kv.Value == attr_type_s.Split('_')[0]).Key;
 
-                if (elem == null)
+                if (elem == null && attr_name == "id" && attr_type_s == "elementid")
                 {
-                    if (attr_name == "name" && attr_type == typeof(string))
-                        elem_name = Decode_NextToken();
-                    if (attr_name == "id" && attr_type_s == "elementid")
-                        elem_id = Decode_NextToken();
-                    if (elem_name != null && elem_id != null)
+                    elem_id = Decode_NextToken();
+                    var id = new Guid(elem_id);
+                    var local_element = DM.AllElements[id];
+                    if (local_element != null)
                     {
-                        var id = new Guid(elem_id);
-                        var local_element = DM.AllElements[id];
-                        if (local_element != null)
-                        {
-                            elem = local_element;
-                            elem.Name = elem_name;
-                            elem.ClassName = elem_class;
-                            elem.Stub = false;
-                        }
-                        else
-                            elem = new Element(DM, elem_name, new Guid(elem_id), elem_class);
+                        elem = local_element;
+                        elem.Name = elem_name;
+                        elem.ClassName = elem_class;
+                        elem.Stub = false;
                     }
+                    else
+                        elem = new Element(DM, elem_name, new Guid(elem_id), elem_class);
                     continue;
                 }
+
+                if (attr_name == "name" && attr_type == typeof(string))
+                {
+                    elem_name = Decode_NextToken();
+                    if (elem != null)
+                        elem.Name = elem_name;
+                    continue;
+                }
+
+                if (elem == null)
+                    continue;
 
                 if (attr_type_s == "element")
                 {
