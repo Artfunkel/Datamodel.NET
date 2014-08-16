@@ -94,10 +94,11 @@ namespace DmxPad
 
     public class AttributeView : INotifyPropertyChanged
     {
-        public AttributeView(Element elem, string key)
+        public AttributeView(Element elem, string key, int index = -1)
         {
             _Owner = elem;
             _Key = key;
+            Index = index;
         }
 
         public string Key
@@ -112,9 +113,23 @@ namespace DmxPad
         }
         string _Key;
 
+        public int Index { get; protected set; }
+
         public object Value
         {
-            get { return Owner[Key]; }
+            get
+            {
+                var value = Owner[Key];
+
+                if (Index < 0) return value;
+
+                var array = (System.Collections.IList)value;
+                
+                if (Index >= array.Count)
+                    return null; // TODO: account for comparison array changes
+                
+                return array[Index];
+            }
             set
             {
                 var value_type = value == null ? typeof(Element) : value.GetType();

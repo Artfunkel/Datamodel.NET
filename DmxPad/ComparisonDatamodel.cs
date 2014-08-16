@@ -14,29 +14,10 @@ namespace DmxPad
     {
         #region Properties
 
-        public Datamodel.Datamodel Datamodel_Left
-        {
-            get { return _Datamodel_Left; }
-            private set { _Datamodel_Left = value; }
-        }
-        Datamodel.Datamodel _Datamodel_Left;
-
-        public Datamodel.Datamodel Datamodel_Right
-        {
-            get { return _Datamodel_Right; }
-            private set { _Datamodel_Right = value; }
-        }
-        Datamodel.Datamodel _Datamodel_Right;
-
-        public Dictionary<Guid, Element> ComparedElements { get { return _ComparedElements; } }
-        Dictionary<Guid, Element> _ComparedElements = new Dictionary<Guid, Element>();
-
-        public Element Root
-        {
-            get { return _Root; }
-            protected set { _Root = value; }
-        }
-        Element _Root;
+        public Datamodel.Datamodel Datamodel_Left { get; private set; }
+        public Datamodel.Datamodel Datamodel_Right { get; private set; }
+        public Dictionary<Guid, Element> ComparedElements { get; private set; }
+        public Element Root { get; protected set; }
 
         #endregion
 
@@ -44,6 +25,8 @@ namespace DmxPad
         {
             Datamodel_Left = dm_left;
             Datamodel_Right = dm_right;
+            ComparedElements = new Dictionary<Guid, Element>();
+
             Root = new ComparisonDatamodel.Element(this, Datamodel_Left.Root, Datamodel_Right.Root);
         }
 
@@ -64,12 +47,7 @@ namespace DmxPad
         public class Element : IComparisonItem, IEnumerable<Attribute>
         {
             #region Properties
-            public ComparisonDatamodel Owner
-            {
-                get { return _Owner; }
-                protected set { _Owner = value; }
-            }
-            ComparisonDatamodel _Owner;
+            public ComparisonDatamodel Owner { get; protected set; }
 
             public ComparisonState State
             {
@@ -84,19 +62,8 @@ namespace DmxPad
             }
             ComparisonState _State = ComparisonState.Unchanged;
 
-            public Datamodel.Element Element_Left
-            {
-                get { return _Element_Left; }
-                protected set { _Element_Left = value; }
-            }
-            Datamodel.Element _Element_Left;
-
-            public Datamodel.Element Element_Right
-            {
-                get { return _Element_Right; }
-                protected set { _Element_Right = value; }
-            }
-            Datamodel.Element _Element_Right;
+            public Datamodel.Element Element_Left { get; protected set; }
+            public Datamodel.Element Element_Right { get; protected set; }
 
             OrderedDictionary Attributes = new OrderedDictionary();
 
@@ -160,7 +127,7 @@ namespace DmxPad
             }
         }
 
-        public class Attribute : IComparisonItem
+        public class Attribute : IComparisonItem, IEnumerable<IComparisonItem>
         {
             #region Properties
             public Element Owner
@@ -237,8 +204,7 @@ namespace DmxPad
                 }
                 else
                 {
-                    //if (!Datamodel.Attribute.ValueComparer.Default.Equals(attr_left, attr_right))
-                    if (!object.Equals(value_left,value_right))
+                    if (!Datamodel.ValueComparer.Default.Equals(value_left, value_right))
                         State = ComparisonState.Changed;
 
                     if (Value_Left == null)
@@ -248,20 +214,67 @@ namespace DmxPad
                     else
                     {
                         if (Value_Left.GetType() == typeof(Datamodel.Element))
-                            Value_Combined = new Element(cdm, (Datamodel.Element)Value_Left, (Datamodel.Element)Value_Right);
+                        {
+                            var compare_elem = new Element(cdm, (Datamodel.Element)Value_Left, (Datamodel.Element)Value_Right);
+                            Value_Combined  = compare_elem;
+                            State = compare_elem.State;
+                        }
                         else
                         {
                             var inner = Datamodel.Datamodel.GetArrayInnerType(Value_Left.GetType());
                             if (inner == typeof(Datamodel.Element))
-                                Value_Combined = ((IList<Datamodel.Element>)Value_Left)
+                            {
+                                var combined_array = ((IList<Datamodel.Element>)Value_Left)
                                     .Concat((IList<Datamodel.Element>)Value_Right)
                                     .Distinct(Datamodel.Element.IDComparer.Default)
                                     .Select(e => new Element(cdm, cdm.Datamodel_Left.AllElements[e.ID], cdm.Datamodel_Right.AllElements[e.ID])).ToArray();
+                                Value_Combined = combined_array;
+
+                                foreach (var elem_ in combined_array)
+                                {
+                                    switch (elem_.State)
+                                    {
+                                        case ComparisonState.ChildChanged:
+                                        case ComparisonState.Changed:
+                                            if (State < ComparisonState.ChildChanged)
+                                                State = ComparisonState.ChildChanged;
+                                            break;
+                                        case ComparisonState.Added:
+                                        case ComparisonState.Removed:
+                                            if (State < ComparisonState.Changed)
+                                                State = ComparisonState.Changed;
+                                            break;
+                                    }
+                                }
+                            }
                             else
                                 Value_Combined = Value_Right;
                         }
                     }
                 }
+            }
+
+            public IEnumerator<IComparisonItem> GetEnumerator()
+            {
+                var elem = Value_Combined as Element;
+                if (elem != null)
+                {
+                    foreach (var attr in elem)
+                        yield return attr;
+                    yield break;
+                }
+
+                var elem_arr = Value_Combined as IEnumerable<Element>;
+                if (elem_arr != null)
+                {
+                    foreach (var elem_ in elem_arr)
+                        yield return elem_;
+                }
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return GetEnumerator();
             }
         }
     }

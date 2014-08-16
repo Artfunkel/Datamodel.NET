@@ -52,7 +52,7 @@
             </Grid>
         </HierarchicalDataTemplate>
 
-        <DataTemplate DataType="{x:Type l:ComparisonDatamodel+Element}">
+        <HierarchicalDataTemplate DataType="{x:Type l:ComparisonDatamodel+Element}" ItemsSource="{Binding}">
             <Grid VerticalAlignment="Center" Background="Transparent">
                 <Grid.ToolTip>
                     <StackPanel>
@@ -76,14 +76,14 @@
                 <ContentControl Content="{Binding Converter={StaticResource AttributeIconConverter}}" IsTabStop="False" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                 <TextBlock Text="{Binding Element_Left.Name}" Margin="20,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
             </Grid>
-        </DataTemplate>
+        </HierarchicalDataTemplate>
 
-        <DataTemplate DataType="{x:Type l:ComparisonDatamodel+Attribute}">
+        <HierarchicalDataTemplate DataType="{x:Type l:ComparisonDatamodel+Attribute}" ItemsSource="{Binding}">
             <Grid VerticalAlignment="Center">
                 <ContentControl Content="{Binding Converter={StaticResource AttributeIconConverter}}" IsTabStop="False" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                 <TextBlock Text="{Binding Name}" Margin="20,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
             </Grid>
-        </DataTemplate>
+        </HierarchicalDataTemplate>
 
         <DataTemplate x:Key="Attr_Generic">
             <TextBox Text="{Binding Path=Value, Mode=TwoWay}"/>

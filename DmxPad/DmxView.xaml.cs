@@ -23,7 +23,8 @@ namespace DmxPad
         public DmxView()
         {
             InitializeComponent();
-            ElementListSearch.FilterPredicate = (o) => {
+            ElementListSearch.FilterPredicate = (o) =>
+            {
                 var elem = (Element)o;
                 return elem.Name.ContainsCI(ElementListSearch.Terms) || elem.ClassName.ContainsCI(ElementListSearch.Terms);
             };
@@ -33,7 +34,7 @@ namespace DmxPad
         private void DmxTree_Loaded(object sender, RoutedEventArgs e)
         {
             var tgv = ((Controls.TreeGridView)sender);
-            
+
             tgv.Items.Filter = ShowChangesOnly_Filter;
         }
 
@@ -44,14 +45,14 @@ namespace DmxPad
             if (e.NewValue != null)
             {
                 ContextChanging = true;
-                
+
                 var vm = (ViewModel)e.NewValue;
                 Root = vm.DisplayRoot;
 
                 ContextChanging = false;
             }
         }
-        
+
 
         private void ExpandNode(object sender, EventArgs e)
         {
@@ -87,7 +88,7 @@ namespace DmxPad
         {
             List<string> path_components = new List<string>();
             object array_item = null;
-            
+
             for (FrameworkElement current_control = control; !(current_control is TreeView); current_control = (FrameworkElement)VisualTreeHelper.GetParent(current_control))
             {
                 if (!(current_control is TreeViewItem)) continue;
@@ -104,8 +105,12 @@ namespace DmxPad
                 var value = attr != null ? attr.Value : cattr.Value_Combined;
 
                 IEnumerable array = null;
-                if (value != null && Datamodel.Datamodel.IsDatamodelArrayType(value.GetType()))
-                    array = value as System.Collections.IEnumerable;
+                if (value != null)
+                {
+                    var type = value.GetType();
+                    if (Datamodel.Datamodel.IsDatamodelArrayType(type) || type.IsArray)
+                        array = value as System.Collections.IEnumerable;
+                }
 
                 if (array != null)
                 {
@@ -176,10 +181,11 @@ namespace DmxPad
 
         public Element Root
         {
-            get { 
+            get
+            {
                 var source_list = DmxTree.ItemsSource as IList<Element>;
                 if (source_list == null || source_list.Count == 0) return null;
-                return source_list[0]; 
+                return source_list[0];
             }
             set
             {
@@ -212,13 +218,6 @@ namespace DmxPad
             }
         }
 
-        private void DeleteButton_Click(object sender, RoutedEventArgs e)
-        {
-            var attr = ((Button)sender).DataContext as AttributeView;
-            if (attr != null)
-                attr.Owner.Remove(attr.Key);
-        }
-
         private void ChooseElement_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var attr = DmxTree.SelectedItem as AttributeView;
@@ -234,13 +233,6 @@ namespace DmxPad
                 attr.Value = select.SelectedElement;
                 e.Handled = true;
             }
-        }
-
-        private void GUIDCopy_Click(object sender, RoutedEventArgs e)
-        {
-            var elem = ((Element)((Hyperlink)sender).CommandParameter);
-            System.Windows.Clipboard.SetText(elem.ID.ToString());
-            e.Handled = true;
         }
 
         private void PathBox_SourceUpdated(object sender, DataTransferEventArgs e)

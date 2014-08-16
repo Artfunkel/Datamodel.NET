@@ -155,12 +155,12 @@
                     </Style>
                 </c:TreeGridView.Resources>
                 <c:TreeGridView.TitleTemplate>
-                    <DataTemplate>
+                    <HierarchicalDataTemplate ItemsSource="{Binding}">
                         <StackPanel Orientation="Horizontal">
                             <ContentPresenter Content="{Binding State,Converter={StaticResource ComparisonIcon}}"/>
                             <ContentPresenter Content="{Binding}"/>
                         </StackPanel>
-                    </DataTemplate>
+                    </HierarchicalDataTemplate>
                 </c:TreeGridView.TitleTemplate>
             </c:TreeGridView>
         </Grid>
@@ -182,188 +182,24 @@
                     </ColumnDefinition.Style>
                 </ColumnDefinition>
             </Grid.ColumnDefinitions>
-            <Grid.Resources>
-                <ControlTemplate x:Key="Props">
-                    <Grid x:Name="AttributeProperties" Margin="5,0" Background="{DynamicResource {x:Static SystemColors.WindowColor}}">
-                        <Grid.DataContext>
-                            <MultiBinding Converter="{StaticResource DatamodelPathConverter}">
-                                <Binding Path="Datamodel"/>
-                                <Binding ElementName="PathBox" Path="Text"/>
-                            </MultiBinding>
-                        </Grid.DataContext>
-                        <Grid.Resources>
-                            <Style TargetType="{x:Type c:LabelledControl}">
-                                <Setter Property="LabelWidth" Value="45"/>
-                                <Setter Property="Margin" Value="3,0"/>
-                            </Style>
-                            <Style TargetType="{x:Type GroupBox}">
-                                <Setter Property="Margin" Value="0,3"/>
-                                <Setter Property="Padding" Value="5"/>
-                                <Setter Property="HeaderTemplate">
-                                    <Setter.Value>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding}" FontWeight="Bold"/>
-                                        </DataTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </Grid.Resources>
 
-                        <Grid.Visibility>
-                            <Binding Converter="{StaticResource VisibleIfNotNull}" ElementName="DmxTree" FallbackValue="Visible" Path="SelectedItem"/>
-                        </Grid.Visibility>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
+            <l:AttributePanel Grid.Column="0" File="{Binding File}">
+                <l:AttributePanel.Selected>
+                    <MultiBinding Converter="{StaticResource DatamodelPathConverter}">
+                        <Binding Path="Datamodel"/>
+                        <Binding ElementName="PathBox" Path="Text"/>
+                    </MultiBinding>
+                </l:AttributePanel.Selected>
+            </l:AttributePanel>
 
-                        <GroupBox Header="{Binding RelativeSource={RelativeSource Mode=TemplatedParent}, Path=DataContext.File.Name, FallbackValue=Datamodel}" DataContext="{Binding Converter={StaticResource EnsureElementConverter}}">
-                            <StackPanel Orientation="Horizontal" DataContext="{Binding Owner}">
-                                <StackPanel.Resources>
-                                    <Style TargetType="{x:Type TextBlock}">
-                                        <Setter Property="VerticalAlignment" Value="Center"/>
-                                        <Setter Property="Margin" Value="5,0"/>
-                                    </Style>
-                                </StackPanel.Resources>
-                                <TextBlock Text="Format:"/>
-                                <TextBox Text="{Binding Format}" Width="90"/>
-                                <TextBox Text="{Binding FormatVersion}" Width="25"/>
-                                <Separator/>
-                                <TextBlock Text="Encoding:"/>
-                                <ComboBox ItemsSource="{x:Static dm:Datamodel.CodecsRegistered}" Width="100">
-                                    <ComboBox.SelectedItem>
-                                        <MultiBinding Converter="{StaticResource EncodingConverter}">
-                                            <Binding Path="Encoding"/>
-                                            <Binding Path="EncodingVersion"/>
-                                        </MultiBinding>
-                                    </ComboBox.SelectedItem>
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Converter={StaticResource EncodingDisplay}}"/>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Grid.Row="1" Header="Element" DataContext="{Binding Converter={StaticResource EnsureElementConverter}}">
-                            <StackPanel>
-                                <c:LabelledControl LabelText="Name:">
-                                    <TextBox Text="{Binding Name}" />
-                                </c:LabelledControl>
-
-                                <c:LabelledControl LabelText="Class:">
-                                    <TextBox Text="{Binding ClassName}" />
-                                </c:LabelledControl>
-
-                                <c:LabelledControl LabelText="GUID:">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock TextTrimming="CharacterEllipsis">
-                                            <TextBlock.Inlines>
-                                                <Run Text="{Binding ID, Mode=OneWay, FallbackValue=Unknown}" FontFamily="Consolas" />
-                                                <Run Text=""/>
-                                                <!-- Ensures proper vertical alignment for the Consolas run above -->
-                                            </TextBlock.Inlines>
-                                        </TextBlock>
-                                        <TextBlock Grid.Column="1">
-                                            <TextBlock.Inlines>
-                                                <Hyperlink Click="GUIDCopy_Click" CommandParameter="{Binding}">
-                                                    Copy
-                                                    <Hyperlink.ToolTip>
-                                                        <ToolTip Content="{Binding Path=ID}" ContentStringFormat="Copy '{0}' to the clipboard." />
-                                                    </Hyperlink.ToolTip>
-                                                </Hyperlink>
-                                            </TextBlock.Inlines>
-                                        </TextBlock>
-                                    </Grid>
-                                </c:LabelledControl>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Header="Attribute" Grid.Row="2" DataContext="{Binding Converter={StaticResource EnsureAttributeViewConverter}}"
-                                  Visibility="{Binding Converter={StaticResource AttributeDisplay}, Mode=OneWay}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <c:LabelledControl LabelText="Name:" Grid.Row="0">
-                                    <TextBox Text="{Binding Key}" />
-                                </c:LabelledControl>
-                                <c:LabelledControl LabelText="Type:" Grid.Row="1">
-                                    <ContentControl Content="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>
-                                    <!--<ComboBox ItemsSource="{x:Static dm:Datamodel.AttributeTypes}" SelectedItem="{Binding Converter={StaticResource DebugConverter}}" ItemTemplate="{Binding Converter={StaticResource GetFriendlyTypeName}}"/>-->
-                                </c:LabelledControl>
-                                <c:LabelledControl LabelText="Value:" Grid.Row="2">
-                                    <ContentPresenter Content="{Binding}" ContentTemplateSelector="{StaticResource InspectPaneTemplateSelector}"/>
-                                </c:LabelledControl>
-                                <c:LabelledControl LabelText="" Grid.Row="3" VerticalContentAlignment="Top"
-                                                   Visibility="{Binding Value, Converter={StaticResource AttributeListView}}">
-                                    <ContentPresenter Content="{Binding}" ContentTemplateSelector="{StaticResource CollectionTemplateSelector}">
-                                        <ContentPresenter.Resources>
-                                            <Style TargetType="DataGrid">
-                                                <Setter Property="HeadersVisibility" Value="Column"/>
-                                                <Setter Property="AutoGenerateColumns" Value="False"/>
-                                                <Setter Property="CanUserReorderColumns" Value="False"/>
-                                                <Setter Property="MinColumnWidth" Value="50"/>
-                                            </Style>
-                                            <DataTemplate x:Key="Vector2">
-                                                <DataGrid ItemsSource="{Binding Value}">
-                                                    <DataGrid.Columns>
-                                                        <DataGridTextColumn Header="X" Binding="{Binding X}"/>
-                                                        <DataGridTextColumn Header="Y" Binding="{Binding Y}"/>
-                                                    </DataGrid.Columns>
-                                                </DataGrid>
-                                            </DataTemplate>
-                                            <DataTemplate x:Key="Vector3">
-                                                <DataGrid ItemsSource="{Binding Value}">
-                                                    <DataGrid.Columns>
-                                                        <DataGridTextColumn Header="X" Binding="{Binding X}"/>
-                                                        <DataGridTextColumn Header="Y" Binding="{Binding Y}"/>
-                                                        <DataGridTextColumn Header="Z" Binding="{Binding Z}"/>
-                                                    </DataGrid.Columns>
-                                                </DataGrid>
-                                            </DataTemplate>
-                                            <DataTemplate x:Key="Vector4">
-                                                <DataGrid ItemsSource="{Binding Value}">
-                                                    <DataGrid.Columns>
-                                                        <DataGridTextColumn Header="W" Binding="{Binding W}"/>
-                                                        <DataGridTextColumn Header="X" Binding="{Binding X}"/>
-                                                        <DataGridTextColumn Header="Y" Binding="{Binding Y}"/>
-                                                        <DataGridTextColumn Header="Z" Binding="{Binding Z}"/>
-                                                    </DataGrid.Columns>
-                                                </DataGrid>
-                                            </DataTemplate>
-                                            <DataTemplate x:Key="Solo">
-                                                <DataGrid ItemsSource="{Binding Value}" HeadersVisibility="None">
-                                                    <DataGrid.Columns>
-                                                        <DataGridTextColumn Binding="{Binding}"/>
-                                                    </DataGrid.Columns>
-                                                </DataGrid>
-                                            </DataTemplate>
-                                        </ContentPresenter.Resources>
-                                    </ContentPresenter>
-                                    <!--<ListBox ItemsSource="{Binding Value}"/>-->
-                                </c:LabelledControl>
-                                <StackPanel Orientation="Horizontal" Grid.Row="4">
-                                    <Button Content="Delete" Click="DeleteButton_Click"/>
-                                </StackPanel>
-                            </Grid>
-                        </GroupBox>
-                    </Grid>
-                </ControlTemplate>
-            </Grid.Resources>
-
-            <Control Grid.Column="0" Template="{StaticResource Props}"/>
-            <Control Grid.Column="1" Name="CompareProps" Template="{StaticResource Props}" DataContext="{Binding ComparisonDatamodel.Datamodel_Right}"/>
+            <l:AttributePanel Grid.Column="1" x:Name="CompareProps" File="{Binding ComparisonFile}">
+                <l:AttributePanel.Selected>
+                    <MultiBinding Converter="{StaticResource DatamodelPathConverter}">
+                        <Binding Path="ComparisonDatamodel.Datamodel_Right"/>
+                        <Binding ElementName="PathBox" Path="Text"/>
+                    </MultiBinding>
+                </l:AttributePanel.Selected>
+            </l:AttributePanel>
         </Grid>
 
     </Grid>

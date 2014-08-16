@@ -245,6 +245,11 @@ namespace DmxPad.Converters
                 array = true;
                 type = type.GetGenericArguments()[0];
             }
+            else if (type.IsArray && type != typeof(byte[]))
+            {
+                array = true;
+                type = type.GetElementType();
+            }
 
             if ((type == typeof(Element) || type == typeof(ComparisonDatamodel.Element)) && !array)
             {
@@ -461,9 +466,7 @@ namespace DmxPad.Converters
 
                 if (!elem.ContainsKey(name)) return null;
 
-                current = attr = new AttributeView(elem, name);
-                if (index != -1)
-                    current = ((System.Collections.IList)attr.Value)[index];
+                current = attr = new AttributeView(elem, name, index);
             }
 
             return current;
