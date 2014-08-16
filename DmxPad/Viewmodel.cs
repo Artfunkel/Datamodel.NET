@@ -31,7 +31,7 @@ namespace DmxPad
 
         public Element DisplayRoot
         {
-            get { return _DisplayRoot ?? Datamodel.Root; }
+            get { return _DisplayRoot ?? (Datamodel != null ? Datamodel.Root : null); }
             set { _DisplayRoot = value; }
         }
         Element _DisplayRoot;
