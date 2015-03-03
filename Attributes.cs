@@ -410,7 +410,13 @@ namespace Datamodel
                     break;
                 case NotifyCollectionChangedAction.Remove:
                     wrapped_event = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, WrapEnumerable(e.OldItems).ToArray(), e.OldStartingIndex);
-                    foreach (var item in e.OldItems) WrappedAttributeMap.Remove((AttrKVP)item);
+                    foreach (var item in e.OldItems)
+                    {
+                        if (item is AttrKVP)
+                            WrappedAttributeMap.Remove((AttrKVP)item);
+                        else
+                            WrappedAttributeMap.Remove(new AttrKVP(null, item));
+                    }
                     break;
                 case NotifyCollectionChangedAction.Replace:
                     wrapped_event = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, WrapEnumerable(e.NewItems).ToArray(), WrapEnumerable(e.OldItems).ToArray(), e.NewStartingIndex);
