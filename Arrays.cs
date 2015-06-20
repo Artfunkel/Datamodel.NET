@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Drawing;
@@ -10,8 +11,22 @@ using System.ComponentModel;
 
 namespace Datamodel
 {
+    [DebuggerTypeProxy(typeof(Array<>.DebugView))]
+    [DebuggerDisplay("Count = {Inner.Count}")]
     public abstract class Array<T> : IList<T>, IList, INotifyCollectionChanged, INotifyPropertyChanged
     {
+        internal class DebugView
+        {
+            public DebugView(Array<T> arr)
+            {
+                Arr = arr;
+            }
+            Array<T> Arr;
+
+            [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+            T[] Items { get { return Arr.Inner.ToArray(); } }
+        }
+
         protected List<T> Inner;
         protected ReaderWriterLockSlim RWLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
         object _SyncRoot = new object();

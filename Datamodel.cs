@@ -3,20 +3,34 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Security;
 using System.Threading;
-using Codec_t = System.Tuple<string, int>;
+using CodecRegistration = System.Tuple<string, int>;
 
 namespace Datamodel
 {
     /// <summary>
     /// Represents a thread-safe tree of <see cref="Element"/>s.
     /// </summary>
+    [DebuggerDisplay("Format = {Format,nq} {FormatVersion}, Encoding = {Encoding,nq} {EncodingVersion}")]
+    [DebuggerTypeProxy(typeof(DebugView))]
     public class Datamodel : INotifyPropertyChanged, IDisposable, ISupportInitialize
     {
+        internal class DebugView
+        {
+            public DebugView(Datamodel dm)
+            {
+                DM = dm;
+            }
+            Datamodel DM;
+
+            public Element Root { get { return DM.Root; } }
+            public Element[] AllElements { get { return DM.AllElements.ToArray(); } }
+        }
         #region Attribute types
         public static Type[] AttributeTypes { get { return _AttributeTypes; } }
         static Type[] _AttributeTypes = { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), 

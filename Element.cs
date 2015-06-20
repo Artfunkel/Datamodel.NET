@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -18,6 +19,8 @@ namespace Datamodel
     /// <seealso cref="Attribute"/>
     [DefaultProperty("Name")]
     [TypeConverter(typeof(TypeConverters.ElementConverter))]
+    [DebuggerTypeProxy(typeof(DebugView))]
+    [DebuggerDisplay("{Name}", Type = "{ClassName,nq}")]
     public class Element : IDictionary<string, object>, IDictionary, INotifyPropertyChanged, INotifyCollectionChanged, ISupportInitialize
     {
         #region Constructors and Init
@@ -90,6 +93,36 @@ namespace Datamodel
 
         internal List<Attribute> Attributes = new List<Attribute>();
         private object Attribute_ChangeLock = new object();
+
+        internal class DebugView
+        {
+            public DebugView(Element elem)
+            {
+                Elem = elem;
+            }
+            Element Elem;
+
+            public Datamodel Owner { get { return Elem.Owner; } }
+            public Guid ID { get { return Elem.ID; } }
+
+            [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+            public DebugAttribute[] Attributes { get { return Elem.Attributes.Select(attr => new DebugAttribute(attr)).ToArray(); } }
+
+            [DebuggerDisplay("{Attr.RawValue}", Name = "{Attr.Name}", Type = "{Attr.ValueType.FullName,nq}")]
+            internal class DebugAttribute
+            {
+                public DebugAttribute(Attribute attr)
+                {
+                    Attr = attr;
+                }
+
+                [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+                Attribute Attr;
+
+                [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+                object Value { get { return Attr.RawValue; } }
+            }
+        }
 
         #region Properties
 
@@ -391,7 +424,7 @@ namespace Datamodel
         public event NotifyCollectionChangedEventHandler CollectionChanged;
         protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
         {
-            System.Diagnostics.Debug.Assert(!(e.NewItems != null && e.NewItems.OfType<Attribute>().Any()) && !(e.OldItems != null && e.OldItems.OfType<Attribute>().Any()));
+            Debug.Assert(!(e.NewItems != null && e.NewItems.OfType<Attribute>().Any()) && !(e.OldItems != null && e.OldItems.OfType<Attribute>().Any()));
 
             switch (e.Action)
             {
