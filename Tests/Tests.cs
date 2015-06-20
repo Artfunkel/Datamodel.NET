@@ -23,8 +23,13 @@ namespace Datamodel_Tests
             var quat = new Quaternion(1, 2, 3, 4);
             quat.Normalise(); // dmxconvert will normalise this if I don't!
 
-            TestValues = new object[] { "hello_world", 1, 1.5f, true, binary, TimeSpan.FromMinutes(5), System.Drawing.Color.Blue, 
-                new Vector2(1,2), new Vector3(1,2,3), new Angle(1,2,3), new Vector4(1,2,3,4), quat, new Matrix(Enumerable.Range(0,4*4).Select(i => (float)i)) };
+            TestValues_V1 = new List<object>(new object[] { "hello_world", 1, 1.5f, true, binary, null, System.Drawing.Color.Blue, 
+                new Vector2(1,2), new Vector3(1,2,3), new Angle(1,2,3), new Vector4(1,2,3,4), quat, new Matrix(Enumerable.Range(0,4*4).Select(i => (float)i))});
+
+            TestValues_V2 = TestValues_V1.ToList();
+            TestValues_V2[5] = TimeSpan.FromMinutes(5);
+
+            TestValues_V3 = TestValues_V1.Concat(new object[] { (byte)0xFF, (UInt64)0xFFFFFFFF }).ToList();
         }
 
         private TestContext testContextInstance;
@@ -60,17 +65,24 @@ namespace Datamodel_Tests
                 Arguments = String.Format("-i \"{0}\" -o \"{1}\" -oe {2}", DmxSavePath, DmxConvertPath, encoding),
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
 
+            Console.WriteLine(String.Join(" ", dmxconvert.StartInfo.FileName, dmxconvert.StartInfo.Arguments));
             Assert.IsTrue(File.Exists(dmxconvert.StartInfo.FileName), String.Format("Could not find dmxconvert at {0}", dmxconvert.StartInfo.FileName));
-
+            
+            Console.WriteLine();
+            
             dmxconvert.Start();
-            var err = dmxconvert.StandardError.ReadToEnd(); // dmxconvert writes to CON instead of STD...this does nothing!
+            var err = dmxconvert.StandardOutput.ReadToEnd();
+            err += dmxconvert.StandardError.ReadToEnd();
             dmxconvert.WaitForExit();
 
+            Console.WriteLine(err);
+
             if (dmxconvert.ExitCode != 0)
-                throw new AssertFailedException("dmxconvert reported an error.");
+                throw new AssertFailedException(err);
 
         }
 
@@ -85,16 +97,37 @@ namespace Datamodel_Tests
             });
         }
 
-        protected static object[] TestValues;
+        protected static List<object> TestValues_V1;
+        protected static List<object> TestValues_V2;
+        protected static List<object> TestValues_V3;
         protected static Guid RootGuid = Guid.NewGuid();
 
-        protected static void Populate(Datamodel.Datamodel dm, int attr_version)
+        protected static List<object> AttributeValuesFor(string encoding_name, int encoding_version)
+        {
+            if (encoding_name == "keyvalues2")
+            {
+                return encoding_version >= 4 ? TestValues_V3 : TestValues_V2;
+            }
+            else if (encoding_name == "binary")
+            {
+                if (encoding_version >= 9)
+                    return TestValues_V3;
+                else if (encoding_version >= 3)
+                    return TestValues_V2;
+                else
+                    return TestValues_V1;
+            }
+            else
+                throw new ArgumentException("Unrecognised encoding.");
+        }
+
+        protected static void Populate(Datamodel.Datamodel dm, string encoding_name, int encoding_version)
         {
             dm.Root = new Element(dm, "root", RootGuid);
-            foreach (var value in TestValues)
+
+            foreach (var value in AttributeValuesFor(encoding_name, encoding_version))
             {
-                if (attr_version < 2 && value is TimeSpan)
-                    continue;
+                if (value == null) continue;
                 var name = value.GetType().Name;
 
                 dm.Root[name] = value;
@@ -114,15 +147,15 @@ namespace Datamodel_Tests
             dm.Root["ElementStub"] = new Element(dm, Guid.NewGuid());
         }
 
-        protected void ValidatePopulated(int attr_version)
+        protected void ValidatePopulated(string encoding_name, int encoding_version)
         {
             var dm = DM.Load(DmxConvertPath);
             Assert.AreEqual(RootGuid, dm.Root.ID);
-            foreach (var value in TestValues)
+            foreach (var value in AttributeValuesFor(encoding_name, encoding_version))
             {
-                if (attr_version < 2 && value is TimeSpan)
-                    continue;
+                if (value == null) continue;
                 var name = value.GetType().Name;
+
                 if (value is ICollection)
                     CollectionAssert.AreEqual((ICollection)value, (ICollection)dm.Root[name]);
                 else if (value is System.Drawing.Color)
@@ -147,8 +180,7 @@ namespace Datamodel_Tests
         protected DM Create(string encoding, int version, bool memory_save = false)
         {
             var dm = MakeDatamodel();
-            var attr_version = encoding == "keyvalues2" || version >= 5 ? 2 : 1;
-            Populate(dm, attr_version);
+            Populate(dm, encoding, version);
 
             dm.Root["Arr"] = new System.Collections.ObjectModel.ObservableCollection<int>();
             dm.Root.GetArray<int>("Arr");
@@ -159,7 +191,7 @@ namespace Datamodel_Tests
             {
                 dm.Save(DmxSavePath, encoding, version);
                 SaveAndConvert(dm, encoding, version);
-                ValidatePopulated(attr_version);
+                ValidatePopulated(encoding, version);
                 Cleanup();
             }
 
@@ -177,6 +209,11 @@ namespace Datamodel_Tests
     public class Functionality : DatamodelTests
     {
 
+        [TestMethod]
+        public void Create_Binary_9()
+        {
+            Create("binary", 9);
+        }
         [TestMethod]
         public void Create_Binary_5()
         {
@@ -199,6 +236,13 @@ namespace Datamodel_Tests
         }
 
         [TestMethod]
+        public void Create_KeyValues2_4()
+        {
+            Create("keyvalues2", 4);
+        }
+
+
+        [TestMethod]
         public void Create_KeyValues2_1()
         {
             Create("keyvalues2", 1);
@@ -207,6 +251,7 @@ namespace Datamodel_Tests
         void Get_TF2(Datamodel.Datamodel dm)
         {
             dm.Root.Get<Element>("skeleton").GetArray<Element>("children")[0].Any();
+            dm.FormatVersion = 22; // otherwise recent versions of dmxconvert fail
         }
 
         [TestMethod]
@@ -246,13 +291,13 @@ namespace Datamodel_Tests
         public void Import()
         {
             var dm = MakeDatamodel();
-            Populate(dm, 2);
+            Populate(dm, "binary", 9);
 
             var dm2 = MakeDatamodel();
             dm2.Root = dm2.ImportElement(dm.Root, DM.ImportRecursionMode.Recursive, DM.ImportOverwriteMode.All);
 
-            SaveAndConvert(dm, "keyvalues2", 1);
-            SaveAndConvert(dm, "binary", 5);
+            SaveAndConvert(dm, "keyvalues2", 4);
+            SaveAndConvert(dm, "binary", 9);
         }
 
         [TestMethod]

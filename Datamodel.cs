@@ -34,7 +34,8 @@ namespace Datamodel
         #region Attribute types
         public static Type[] AttributeTypes { get { return _AttributeTypes; } }
         static Type[] _AttributeTypes = { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), 
-                typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3),typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
+                typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3),typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix),
+				typeof(byte), typeof(UInt64) };
 
         /// <summary>
         /// Determines whether the given Type is valid as a Datamodel <see cref="Attribute"/>.
@@ -70,7 +71,7 @@ namespace Datamodel
             if (i_type == null) return null;
 
             var inner = i_type.GetGenericArguments()[0];
-            return inner == typeof(byte) ? null : inner; // exception for byte[]
+            return inner;
         }
         #endregion
 
@@ -83,7 +84,7 @@ namespace Datamodel
 
         #region Codecs
         static Dictionary<CodecRegistration, Type> Codecs = new Dictionary<CodecRegistration, Type>();
-        public static IEnumerable<CodecRegistration> CodecsRegistered { get { return Codecs.Keys.ToArray(); } }
+        public static IEnumerable<CodecRegistration> CodecsRegistered { get { return Codecs.Keys.OrderBy(reg => String.Join(null, reg.Item1, reg.Item2)).ToArray(); } }
 
         /// <summary>
         /// Registers a new <see cref="ICodec"/> with an encoding name and one or more encoding versions.
@@ -227,7 +228,7 @@ namespace Datamodel
             var match = System.Text.RegularExpressions.Regex.Match(header, CodecUtilities.HeaderPattern_Regex);
 
             if (!match.Success || match.Groups.Count != 5)
-                throw new InvalidOperationException(String.Format("Could not read DMX header ({0}).", header));
+                throw new InvalidOperationException("Could not read file header.");
 
             string encoding = match.Groups[1].Value;
             int encoding_version = int.Parse(match.Groups[2].Value);

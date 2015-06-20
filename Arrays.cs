@@ -589,4 +589,27 @@ namespace Datamodel
             : base(capacity)
         { }
     }
+
+    public class ByteArray : Array<byte>
+    {
+        public ByteArray() { }
+        public ByteArray(IEnumerable<byte> enumerable)
+            : base(enumerable)
+        { }
+        public ByteArray(int capacity)
+            : base(capacity)
+        { }
+    }
+
+    [CLSCompliant(false)]
+    public class UInt64Array : Array<UInt64>
+    {
+        public UInt64Array() { }
+        public UInt64Array(IEnumerable<UInt64> enumerable)
+            : base(enumerable)
+        { }
+        public UInt64Array(int capacity)
+            : base(capacity)
+        { }
+    }
 }

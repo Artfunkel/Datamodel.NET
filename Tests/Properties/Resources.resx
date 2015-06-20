@@ -125,6 +125,6 @@
     <value>..\resources\taunt05_b5.dmx;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="ValveSourceBinaries" xml:space="preserve">
-    <value>F:\Program Files (x86)\Steam\steamapps\common\SourceFilmmaker\game\bin\</value>
+    <value>E:\Program Files (x86)\Steam\steamapps\common\dota 2 beta\game\bin\win64</value>
   </data>
 </root>

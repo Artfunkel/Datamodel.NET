@@ -11,6 +11,7 @@ namespace Datamodel.Codecs
     [CodecFormat("binary", 3)]
     [CodecFormat("binary", 4)]
     [CodecFormat("binary", 5)]
+    [CodecFormat("binary", 9)]
     class Binary : IDeferredAttributeCodec, IDisposable
     {
         protected BinaryReader Reader;
@@ -21,6 +22,7 @@ namespace Datamodel.Codecs
         {
             SupportedAttributes[1] = SupportedAttributes[2] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), null /* ObjectID */, typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
             SupportedAttributes[3] = SupportedAttributes[4] = SupportedAttributes[5] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
+            SupportedAttributes[9] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix), typeof(UInt64), typeof(byte) };
         }
 
         public void Dispose()
@@ -33,6 +35,11 @@ namespace Datamodel.Codecs
             bool array = Datamodel.IsDatamodelArrayType(type);
             var search_type = array ? Datamodel.GetArrayInnerType(type) : type;
 
+            if (array && search_type == typeof(byte) && !SupportedAttributes[version].Contains(typeof(byte)))
+            {
+                search_type = typeof(byte[]); // Recent version of DMX support both "binary" and "uint8_array" attributes. These are the same thing!
+                array = false;
+            }
             var type_list = SupportedAttributes[version];
             byte i = 0;
             foreach (var list_type in type_list)
@@ -41,26 +48,40 @@ namespace Datamodel.Codecs
                 else i++;
             }
             if (i == type_list.Length)
-                throw new CodecException(String.Format("{0} is not supported in encoding binary {1}", type.Name, version));
-            if (array) i += (byte)type_list.Length;
+                throw new CodecException(String.Format("\"{0}\" is not supported in encoding binary {1}", type.Name, version));
+            if (array) i += (byte)(type_list.Length * (version >= 9 ? 2 : 1));
             return ++i;
         }
 
-        static Type IdToType(byte id, int version)
+        Type IdToType(byte id)
         {
-            id--;
-            var type_list = SupportedAttributes[version];
-
-            if (id >= type_list.Length * 2)
-                throw new CodecException("Unrecognised attribute type: " + id);
-
+            var type_list = SupportedAttributes[EncodingVersion];
             bool array = false;
-            if (id >= type_list.Length)
+
+            id--;
+
+            if (EncodingVersion >= 9 && id >= type_list.Length * 2)
             {
-                id -= (byte)(type_list.Length);
                 array = true;
+                id -= (byte)(type_list.Length * 2);
             }
-            return array ? type_list[id].MakeListType() : type_list[id];
+            else
+            {
+                if (id >= type_list.Length)
+                {
+                    id -= (byte)(type_list.Length);
+                    array = true;
+                }
+            }
+
+            try
+            {
+                return array ? type_list[id].MakeListType() : type_list[id];
+            }
+            catch (IndexOutOfRangeException)
+            {
+                throw new CodecException(String.Format("Unrecognised attribute type: {}", id + 1));
+            }
         }
 
         protected string ReadString_Raw()
@@ -242,6 +263,11 @@ namespace Datamodel.Codecs
             if (type == typeof(Matrix))
                 return new Matrix(ReadVector(4 * 4));
 
+            if (type == typeof(byte))
+                return Reader.ReadByte();
+            if (type == typeof(UInt64))
+                return Reader.ReadUInt64();
+
             throw new ArgumentException(type == null ? "No type provided to GetValue()" : "Cannot read value of type " + type.Name);
         }
 
@@ -256,6 +282,10 @@ namespace Datamodel.Codecs
             var dm = new Datamodel(format, format_version);
 
             EncodingVersion = encoding_version;
+
+            if (EncodingVersion == 9)
+                stream.Seek(4, SeekOrigin.Current); // mystery value!
+
             Reader = new BinaryReader(stream, Datamodel.TextEncoding);
             StringDict = new StringDictionary(this, Reader);
 
@@ -284,7 +314,7 @@ namespace Datamodel.Codecs
 
                     if (defer_mode == DeferredMode.Automatic)
                     {
-                        CodecUtilities.AddDeferredAttribute(elem,name,Reader.BaseStream.Position);
+                        CodecUtilities.AddDeferredAttribute(elem, name, Reader.BaseStream.Position);
                         SkipAttribte();
                     }
                     else
@@ -306,7 +336,7 @@ namespace Datamodel.Codecs
 
         object DecodeAttribute(Datamodel dm)
         {
-            var type = IdToType(Reader.ReadByte(), EncodingVersion);
+            var type = IdToType(Reader.ReadByte());
 
             if (!Datamodel.IsDatamodelArrayType(type))
                 return ReadValue(dm, type, EncodingVersion < 4);
@@ -325,7 +355,7 @@ namespace Datamodel.Codecs
 
         void SkipAttribte()
         {
-            var type = IdToType(Reader.ReadByte(), EncodingVersion);
+            var type = IdToType(Reader.ReadByte());
 
             int count = 1;
             bool array = false;
@@ -410,6 +440,9 @@ namespace Datamodel.Codecs
             public void Encode()
             {
                 Writer.Write(String.Format(CodecUtilities.HeaderPattern, "binary", EncodingVersion, Datamodel.Format, Datamodel.FormatVersion) + "\n");
+
+                if (EncodingVersion >= 9)
+                    Writer.Seek(4, SeekOrigin.Current); // Mystery value
 
                 StringDict.WriteSelf();
 
@@ -502,9 +535,9 @@ namespace Datamodel.Codecs
                     return;
                 }
 
-                var child_elem = value as Element;
-                if (child_elem != null)
+                if (value is Element)
                 {
+                    var child_elem = (Element)value;
                     if (child_elem.Stub)
                     {
                         Writer.Write(-2);
@@ -516,62 +549,66 @@ namespace Datamodel.Codecs
                     return;
                 }
 
-                var str_value = value as string;
-                if (str_value != null)
+                if (value is string)
                 {
                     if (EncodingVersion < 4 || in_array)
-                        Writer.Write(str_value);
+                        Writer.Write((string)value);
                     else
-                        StringDict.WriteString(str_value);
+                        StringDict.WriteString((string)value);
                     return;
                 }
 
-                var bool_value = value as bool?;
-                if (bool_value.HasValue)
+                if (value is bool)
                 {
-                    Writer.Write(bool_value == true ? (byte)1 : (byte)0);
+                    Writer.Write((bool)value == true ? (byte)1 : (byte)0);
                     return;
                 }
 
-                var byte_value = value as byte[];
-                if (byte_value != null)
+                if (value is byte[])
                 {
-                    Writer.Write(byte_value.Length);
-                    Writer.Write(byte_value);
+                    var binary_value = (byte[])value;
+                    Writer.Write(binary_value.Length);
+                    Writer.Write(binary_value);
                     return;
                 }
 
-                var timespan_value = value as TimeSpan?;
-                if (timespan_value != null)
+                if (value is TimeSpan)
                 {
-                    Writer.Write((int)(timespan_value.Value.TotalSeconds * 10000));
+                    Writer.Write((int)(((TimeSpan)value).TotalSeconds * 10000));
                     return;
                 }
 
-                var colour_value = value as System.Drawing.Color?;
-                if (colour_value != null)
+                if (value is System.Drawing.Color)
                 {
-                    Writer.Write(new byte[] { colour_value.Value.R, colour_value.Value.G, colour_value.Value.B, colour_value.Value.A });
+                    var colour_value = (System.Drawing.Color)value;
+                    Writer.Write(new byte[] { colour_value.R, colour_value.G, colour_value.B, colour_value.A });
                     return;
                 }
 
-                var vector_value = value as IEnumerable<float>;
-                if (vector_value != null)
+                if (value is IEnumerable<float>)
                 {
-                    Writer.Write(vector_value.SelectMany(f => BitConverter.GetBytes(f)).ToArray());
+                    Writer.Write(((IEnumerable<float>)value).SelectMany(f => BitConverter.GetBytes(f)).ToArray());
                     return;
                 }
 
-                var int_value = value as int?;
-                if (int_value != null)
+                if (value is int)
                 {
-                    Writer.Write(int_value.Value);
+                    Writer.Write((int)value);
                     return;
                 }
-                var float_value = value as float?;
-                if (float_value != null)
+                if (value is float)
                 {
-                    Writer.Write(float_value.Value);
+                    Writer.Write((float)value);
+                    return;
+                }
+                if (value is byte)
+                {
+                    Writer.Write((byte)value);
+                    return;
+                }
+                if (value is UInt64)
+                {
+                    Writer.Write((UInt64)value);
                     return;
                 }
 

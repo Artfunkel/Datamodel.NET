@@ -9,6 +9,7 @@ namespace Datamodel.Codecs
     [CodecFormat("keyvalues2", 1)]
     [CodecFormat("keyvalues2", 2)]
     [CodecFormat("keyvalues2", 3)]
+    [CodecFormat("keyvalues2", 4)]
     class KeyValues2 : ICodec, IDisposable
     {
         TextReader Reader;
@@ -34,7 +35,12 @@ namespace Datamodel.Codecs
             TypeNames[typeof(Quaternion)] = "quaternion";
             TypeNames[typeof(Matrix)] = "matrix";
 
-            ValidAttributes[1] = TypeNames.Select(kv => kv.Key).ToArray();
+            ValidAttributes[1] = ValidAttributes[2] = ValidAttributes[3] = TypeNames.Select(kv => kv.Key).ToArray();
+
+            TypeNames[typeof(byte)] = "uint8";
+            TypeNames[typeof(UInt64)] = "uint64";
+
+            ValidAttributes[4] = TypeNames.Select(kv => kv.Key).ToArray();
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed", MessageId = "DM")]
@@ -168,8 +174,13 @@ namespace Datamodel.Codecs
                 {
                     bool is_element = type == typeof(Element);
 
-                    var inner_type = Datamodel.GetArrayInnerType(type);
-
+                    Type inner_type = null;
+                    if (!in_array)
+                    {
+                        inner_type = Datamodel.GetArrayInnerType(type);
+                        if (inner_type == typeof(byte) && !ValidAttributes[EncodingVersion].Contains(typeof(byte)))
+                            inner_type = null; // fall back on the "binary" type in older KV2 versions
+                    }
                     if (!ValidAttributes[EncodingVersion].Contains(inner_type ?? type))
                         throw new CodecException(type.Name + " is not valid in KeyValues2 " + EncodingVersion);
 
@@ -241,6 +252,8 @@ namespace Datamodel.Codecs
                             var c = (System.Drawing.Color)value;
                             value = String.Join(" ", new int[] { c.R, c.G, c.B, c.A });
                         }
+                        else if (type == typeof(UInt64))
+                            value = ((UInt64)value).ToString("X");
 
                         if (in_array)
                             Writer.Write(String.Format(" \"{0}\",", value.ToString()));
@@ -478,6 +491,9 @@ namespace Datamodel.Codecs
             else if (type == typeof(Quaternion)) return new Quaternion(f_list);
             else if (type == typeof(Matrix)) return new Matrix(f_list);
 
+            if (type == typeof(byte)) return byte.Parse(value);
+            if (type == typeof(UInt64)) return UInt64.Parse(value.Remove(0, 2),System.Globalization.NumberStyles.HexNumber);
+
             else throw new ArgumentException("Internal error: ParseValue passed unsupported Type.");
         }
 
@@ -501,7 +517,7 @@ namespace Datamodel.Codecs
                 try
                 { Decode_ParseElement(next); }
                 catch (Exception err)
-                { throw new CodecException(String.Format("KeyValues2 decode failed on line {0}.", Line), err); }
+                { throw new CodecException(String.Format("KeyValues2 decode failed on line {0}:\n\n{1}", Line, err.Message), err); }
             }
 
             return DM;

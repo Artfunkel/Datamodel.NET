@@ -10,7 +10,9 @@ The following CLR types are supported as Datamodel attributes:
 * `float`
 * `bool`
 * `string`
+* `byte`
 * `byte[]`
+* `ulong`
 * `System.TimeSpan`
 * `System.Drawing.Color`
 
@@ -22,7 +24,7 @@ Additionally, the following Datamodel.NET types are supported:
 * `Vector4` / `Quaternion`
 * `Matrix` (4x4)
 
-`IList<T>` collections of the above types are also supported.
+`IList<T>` collections of the above types are also supported. (This can be a bit confusing given that both `byte` and `byte[]` are valid attribute types; use the `ByteArray` type if you run into trouble.)
 
 ## Datamodel.NET features
 

@@ -114,6 +114,10 @@ namespace Datamodel.Codecs
                 return new QuaternionArray(count);
             if (t == typeof(Matrix))
                 return new MatrixArray(count);
+            if (t == typeof(byte))
+                return new ByteArray(count);
+            if (t == typeof(UInt64))
+                return new UInt64Array(count);
 
             throw new ArgumentException("Unrecognised Type.");
         }
@@ -151,6 +155,10 @@ namespace Datamodel.Codecs
                 return new QuaternionArray(source.Cast<Quaternion>());
             if (t == typeof(Matrix))
                 return new MatrixArray(source.Cast<Matrix>());
+            if (t == typeof(byte))
+                return new ByteArray(source.Cast<byte>());
+            if (t == typeof(UInt64))
+                return new UInt64Array(source.Cast<UInt64>());
 
             throw new ArgumentException("Unrecognised Type.");
         }
