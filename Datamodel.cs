@@ -76,45 +76,38 @@ namespace Datamodel
 
         static Datamodel()
         {
-            Datamodel.RegisterCodec(typeof(Codecs.Binary), "binary", 1, 2, 3, 4, 5);
-            Datamodel.RegisterCodec(typeof(Codecs.KeyValues2), "keyvalues2", 1, 2, 3);
+            Datamodel.RegisterCodec(typeof(Codecs.Binary));
+            Datamodel.RegisterCodec(typeof(Codecs.KeyValues2));
             TextEncoding = new System.Text.UTF8Encoding(false);
         }
 
         #region Codecs
-        struct CodecRegistration
-        {
-            public CodecRegistration(string encoding, int version)
-            {
-                Encoding = encoding;
-                Version = version;
-            }
-
-            public string Encoding;
-            public int Version;
-        }
         static Dictionary<CodecRegistration, Type> Codecs = new Dictionary<CodecRegistration, Type>();
-
-        public static IEnumerable<Codec_t> CodecsRegistered { get { return Codecs.Select(t => new Codec_t(t.Key.Encoding, t.Key.Version)); } }
+        public static IEnumerable<CodecRegistration> CodecsRegistered { get { return Codecs.Keys.ToArray(); } }
 
         /// <summary>
         /// Registers a new <see cref="ICodec"/> with an encoding name and one or more encoding versions.
         /// </summary>
         /// <remarks>Existing codecs will be replaced.</remarks>
         /// <param name="type">The ICodec implementation being registered.</param>
-        /// <param name="encoding_name">The encoding name that the codec handles.</param>
-        /// <param name="encoding_versions">The encoding version(s) that the codec handles.</param>
-        public static void RegisterCodec(Type type, string encoding_name, params int[] encoding_versions)
+        public static void RegisterCodec(Type type)
         {
-            if (type.GetInterface(typeof(ICodec).FullName) == null) throw new CodecException(String.Format("{0} does not implement Datamodel.ICodec.", type.Name));
+            if (type.GetInterface(typeof(ICodec).FullName) == null) throw new CodecException(String.Format("{0} does not implement Datamodel.Codecs.ICodec.", type.Name));
             if (type.GetConstructor(Type.EmptyTypes) == null) throw new CodecException(String.Format("{0} does not have a default constructor.", type.Name));
 
-            foreach (var version in encoding_versions)
+            var format_attrs = (CodecFormatAttribute[])type.GetCustomAttributes(typeof(CodecFormatAttribute), true);
+            if (format_attrs.Length == 0)
+                throw new CodecException(String.Format("{0} does not provide Datamodel.Codecs.CodecFormatAttribute.", type.Name));
+
+            foreach (var format_attr in format_attrs)
             {
-                var reg = new CodecRegistration(encoding_name, version);
-                if (Codecs.ContainsKey(reg) && Codecs[reg] != type)
-                    System.Diagnostics.Trace.TraceInformation("Datamodel.NET: Replacing existing codec for {0} {1} ({2}) with {3}", encoding_name, version, Codecs[reg].Name, type.Name);
-                Codecs[reg] = type;
+                foreach (var version in format_attr.Versions)
+                {
+                    var reg = new CodecRegistration(format_attr.Name, version);
+                    if (Codecs.ContainsKey(reg) && Codecs[reg] != type)
+                        System.Diagnostics.Trace.TraceInformation("Datamodel.NET: Replacing existing codec for {0} {1} ({2}) with {3}", format_attr.Name, version, Codecs[reg].Name, type.Name);
+                    Codecs[reg] = type;
+                }
             }
         }
 

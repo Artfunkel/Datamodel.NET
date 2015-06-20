@@ -6,6 +6,9 @@ using System.IO;
 
 namespace Datamodel.Codecs
 {
+    [CodecFormat("keyvalues2", 1)]
+    [CodecFormat("keyvalues2", 2)]
+    [CodecFormat("keyvalues2", 3)]
     class KeyValues2 : ICodec, IDisposable
     {
         TextReader Reader;

@@ -6,6 +6,11 @@ using System.IO;
 
 namespace Datamodel.Codecs
 {
+    [CodecFormat("binary", 1)]
+    [CodecFormat("binary", 2)]
+    [CodecFormat("binary", 3)]
+    [CodecFormat("binary", 4)]
+    [CodecFormat("binary", 5)]
     class Binary : IDeferredAttributeCodec, IDisposable
     {
         protected BinaryReader Reader;
