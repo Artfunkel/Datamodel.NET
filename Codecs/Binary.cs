@@ -80,7 +80,7 @@ namespace Datamodel.Codecs
             }
             catch (IndexOutOfRangeException)
             {
-                throw new CodecException(String.Format("Unrecognised attribute type: {}", id + 1));
+                throw new CodecException(String.Format("Unrecognised attribute type: {0}", id + 1));
             }
         }
 
@@ -207,6 +207,14 @@ namespace Datamodel.Codecs
                 new Encoder(this, writer, dm, encoding_version).Encode();
         }
 
+        float[] ReadVector(int dim)
+        {
+            var output = new float[dim];
+            foreach (int i in Enumerable.Range(0, dim))
+                output[i] = Reader.ReadSingle();
+            return output;
+        }
+
         object ReadValue(Datamodel dm, Type type, bool raw_string)
         {
             if (type == typeof(Element))
@@ -242,14 +250,6 @@ namespace Datamodel.Codecs
                 return System.Drawing.Color.FromArgb(rgba[3], rgba[0], rgba[1], rgba[2]);
             }
 
-            Func<int, float[]> ReadVector = dim =>
-                {
-                    var output = new float[dim];
-                    foreach (int i in Enumerable.Range(0, dim))
-                        output[i] = Reader.ReadSingle();
-                    return output;
-                };
-
             if (type == typeof(Vector2))
                 return new Vector2(ReadVector(2));
             if (type == typeof(Vector3))
@@ -282,13 +282,24 @@ namespace Datamodel.Codecs
             var dm = new Datamodel(format, format_version);
 
             EncodingVersion = encoding_version;
-
-            if (EncodingVersion == 9)
-                stream.Seek(4, SeekOrigin.Current); // mystery value!
-
             Reader = new BinaryReader(stream, Datamodel.TextEncoding);
-            StringDict = new StringDictionary(this, Reader);
 
+            if (EncodingVersion >= 9)
+            {
+                // Read prefix elements
+                foreach (int prefix_elem in Enumerable.Range(0, Reader.ReadInt32()))
+                {
+                    foreach (int attr_index in Enumerable.Range(0, Reader.ReadInt32()))
+                    {
+                        var name = ReadString_Raw();
+                        var value = DecodeAttribute(dm);
+                        if (prefix_elem == 0) // skip subsequent elements...are they considered "old versions"?
+                            dm.PrefixAttributes[name] = value;
+                    }
+                }
+            }
+
+            StringDict = new StringDictionary(this, Reader);
             var num_elements = Reader.ReadInt32();
 
             // read index
@@ -298,7 +309,8 @@ namespace Datamodel.Codecs
                 var name = EncodingVersion >= 4 ? StringDict.ReadString() : ReadString_Raw();
                 var id_bits = Reader.ReadBytes(16);
                 var id = new Guid(BitConverter.IsLittleEndian ? id_bits : id_bits.Reverse().ToArray());
-                new Element(dm, name, id, type);
+
+                var elem = new Element(dm, name, id, type);
             }
 
             // read attributes (or not, if we're deferred)
@@ -442,7 +454,7 @@ namespace Datamodel.Codecs
                 Writer.Write(String.Format(CodecUtilities.HeaderPattern, "binary", EncodingVersion, Datamodel.Format, Datamodel.FormatVersion) + "\n");
 
                 if (EncodingVersion >= 9)
-                    Writer.Seek(4, SeekOrigin.Current); // Mystery value
+                    Writer.Write((int)0); // Prefix elements
 
                 StringDict.WriteSelf();
 

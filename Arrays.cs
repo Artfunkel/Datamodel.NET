@@ -31,12 +31,12 @@ namespace Datamodel
         protected ReaderWriterLockSlim RWLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
         object _SyncRoot = new object();
 
-        public virtual Element Owner
+        public virtual AttributeList Owner
         {
             get { return _Owner; }
             internal set { _Owner = value; OnPropertyChanged("Owner"); }
         }
-        Element _Owner;
+        AttributeList _Owner;
 
         protected Datamodel OwnerDatamodel { get { return Owner == null ? null : Owner.Owner; } }
 
@@ -352,7 +352,7 @@ namespace Datamodel
         /// </summary>
         internal IEnumerable<Element> RawList { get { foreach (var elem in Inner) yield return elem; } }
 
-        public override Element Owner
+        public override AttributeList Owner
         {
             get
             {

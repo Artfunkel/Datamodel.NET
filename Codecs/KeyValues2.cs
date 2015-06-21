@@ -157,6 +157,121 @@ namespace Datamodel.Codecs
             }
         }
 
+        void WriteAttribute(string name, Type type, object value, bool in_array)
+        {
+            bool is_element = type == typeof(Element);
+
+            Type inner_type = null;
+            if (!in_array)
+            {
+                inner_type = Datamodel.GetArrayInnerType(type);
+                if (inner_type == typeof(byte) && !ValidAttributes[EncodingVersion].Contains(typeof(byte)))
+                    inner_type = null; // fall back on the "binary" type in older KV2 versions
+            }
+            if (!ValidAttributes[EncodingVersion].Contains(inner_type ?? type))
+                throw new CodecException(type.Name + " is not valid in KeyValues2 " + EncodingVersion);
+
+            if (inner_type != null)
+            {
+                is_element = inner_type == typeof(Element);
+
+                Writer.WriteTokenLine(name, TypeNames[inner_type] + "_array");
+
+                if (((System.Collections.IList)value).Count == 0)
+                {
+                    Writer.Write(" [ ]");
+                    return;
+                }
+
+                if (is_element) Writer.WriteLine("[");
+                else Writer.Write(" [");
+
+                Writer.Indent++;
+                foreach (var array_value in (System.Collections.IList)value)
+                    WriteAttribute(null, inner_type, array_value, true);
+                Writer.Indent--;
+                Writer.TrimEnd(1); // remove trailing comma
+
+                if (inner_type == typeof(Element)) Writer.WriteLine("]");
+                else Writer.Write(" ]");
+                return;
+            }
+
+            if (is_element)
+            {
+                var elem = value as Element;
+                var id = elem == null ? "" : elem.ID.ToString();
+
+                if (in_array)
+                {
+                    if (elem != null && Users[elem] == 1)
+                    {
+                        Writer.WriteLine();
+                        WriteElement(elem);
+                    }
+                    else
+                        Writer.WriteTokenLine("element", id);
+                    Writer.Write(",");
+                }
+                else
+                {
+                    if (elem != null && Users.ContainsKey(elem) && Users[elem] == 1)
+                    {
+                        Writer.WriteLine(String.Format("\"{0}\" ", name));
+                        WriteElement(elem);
+                    }
+                    else
+                        Writer.WriteTokenLine(name, "element", id);
+                }
+            }
+            else
+            {
+                if (type == typeof(bool))
+                    value = (bool)value ? 1 : 0;
+                else if (type == typeof(float))
+                    value = (float)value;
+                else if (type == typeof(byte[]))
+                    value = BitConverter.ToString((byte[])value).Replace("-", String.Empty);
+                else if (type == typeof(TimeSpan))
+                    value = ((TimeSpan)value).TotalSeconds;
+                else if (type == typeof(System.Drawing.Color))
+                {
+                    var c = (System.Drawing.Color)value;
+                    value = String.Join(" ", new int[] { c.R, c.G, c.B, c.A });
+                }
+                else if (type == typeof(UInt64))
+                    value = ((UInt64)value).ToString("X");
+
+                if (in_array)
+                    Writer.Write(String.Format(" \"{0}\",", value.ToString()));
+                else
+                    Writer.WriteTokenLine(name, TypeNames[type], value.ToString());
+            }
+
+        }
+
+        void WriteElement(Element element)
+        {
+            if (TypeNames.ContainsValue(element.ClassName))
+                throw new CodecException(String.Format("Element {} uses reserved type name \"{1}\".", element.ID, element.ClassName));
+            Writer.WriteTokens(element.ClassName);
+            Writer.WriteLine("{");
+            Writer.Indent++;
+            Writer.WriteTokenLine("id", "elementid", element.ID.ToString());
+            Writer.WriteTokenLine("name", "string", element.Name);
+
+            foreach (var attr in element)
+            {
+                if (attr.Value == null)
+                    WriteAttribute(attr.Key, typeof(Element), null, false);
+                else
+                    WriteAttribute(attr.Key, attr.Value.GetType(), attr.Value, false);
+            }
+
+            Writer.Indent--;
+            Writer.WriteLine("}");
+        }
+
         public void Encode(Datamodel dm, int encoding_version, Stream stream)
         {
             Writer = new KV2Writer(stream);
@@ -167,126 +282,19 @@ namespace Datamodel.Codecs
 
             Users = new Dictionary<Element, int>();
 
-            Action<Element> write_element = null;
-            Action<string, Type, object, bool> write_attribute = null;
-
-            write_attribute = (name, type, value, in_array) =>
-                {
-                    bool is_element = type == typeof(Element);
-
-                    Type inner_type = null;
-                    if (!in_array)
-                    {
-                        inner_type = Datamodel.GetArrayInnerType(type);
-                        if (inner_type == typeof(byte) && !ValidAttributes[EncodingVersion].Contains(typeof(byte)))
-                            inner_type = null; // fall back on the "binary" type in older KV2 versions
-                    }
-                    if (!ValidAttributes[EncodingVersion].Contains(inner_type ?? type))
-                        throw new CodecException(type.Name + " is not valid in KeyValues2 " + EncodingVersion);
-
-                    if (inner_type != null)
-                    {
-                        is_element = inner_type == typeof(Element);
-
-                        Writer.WriteTokenLine(name, TypeNames[inner_type] + "_array");
-
-                        if (((System.Collections.IList)value).Count == 0)
-                        {
-                            Writer.Write(" [ ]");
-                            return;
-                        }
-
-                        if (is_element) Writer.WriteLine("[");
-                        else Writer.Write(" [");
-
-                        Writer.Indent++;
-                        foreach (var array_value in (System.Collections.IList)value)
-                            write_attribute(null, inner_type, array_value, true);
-                        Writer.Indent--;
-                        Writer.TrimEnd(1); // remove trailing comma
-
-                        if (inner_type == typeof(Element)) Writer.WriteLine("]");
-                        else Writer.Write(" ]");
-                        return;
-                    }
-
-                    if (is_element)
-                    {
-                        var elem = value as Element;
-                        var id = elem == null ? "" : elem.ID.ToString();
-
-                        if (in_array)
-                        {
-                            if (elem != null && Users[elem] == 1)
-                            {
-                                Writer.WriteLine();
-                                write_element(elem);
-                            }
-                            else
-                                Writer.WriteTokenLine("element", id);
-                            Writer.Write(",");
-                        }
-                        else
-                        {
-                            if (elem != null && Users.ContainsKey(elem) && Users[elem] == 1)
-                            {
-                                Writer.WriteLine(String.Format("\"{0}\" ", name));
-                                write_element(elem);
-                            }
-                            else
-                                Writer.WriteTokenLine(name, "element", id);
-                        }
-                    }
-                    else
-                    {
-                        if (type == typeof(bool))
-                            value = (bool)value ? 1 : 0;
-                        else if (type == typeof(float))
-                            value = (float)value;
-                        else if (type == typeof(byte[]))
-                            value = BitConverter.ToString((byte[])value).Replace("-", String.Empty);
-                        else if (type == typeof(TimeSpan))
-                            value = ((TimeSpan)value).TotalSeconds;
-                        else if (type == typeof(System.Drawing.Color))
-                        {
-                            var c = (System.Drawing.Color)value;
-                            value = String.Join(" ", new int[] { c.R, c.G, c.B, c.A });
-                        }
-                        else if (type == typeof(UInt64))
-                            value = ((UInt64)value).ToString("X");
-
-                        if (in_array)
-                            Writer.Write(String.Format(" \"{0}\",", value.ToString()));
-                        else
-                            Writer.WriteTokenLine(name, TypeNames[type], value.ToString());
-                    }
-
-                };
-
-            write_element = (element) =>
+            if (EncodingVersion >= 9 && dm.PrefixAttributes.Count > 0)
             {
-                if (TypeNames.ContainsValue(element.ClassName))
-                    throw new CodecException(String.Format("Element {} uses reserved type name \"{1}\".", element.ID, element.ClassName));
-                Writer.WriteTokens(element.ClassName);
+                Writer.WriteTokens("$prefix_element$");
                 Writer.WriteLine("{");
                 Writer.Indent++;
-                Writer.WriteTokenLine("id", "elementid", element.ID.ToString());
-                Writer.WriteTokenLine("name", "string", element.Name);
-
-                foreach (var attr in element)
-                {
-                    if (attr.Value == null)
-                        write_attribute(attr.Key, typeof(Element), null, false);
-                    else
-                        write_attribute(attr.Key, attr.Value.GetType(), attr.Value, false);
-                }
-
+                foreach (var attr in dm.PrefixAttributes)
+                    WriteAttribute(attr.Key, attr.Value.GetType(), attr.Value, false);
                 Writer.Indent--;
                 Writer.WriteLine("}");
-            };
+            }
 
             CountUsers(dm.Root);
-            write_element(dm.Root);
+            WriteElement(dm.Root);
             Writer.WriteLine();
 
             foreach (var pair in Users.Where(pair => pair.Value > 1))
@@ -294,7 +302,7 @@ namespace Datamodel.Codecs
                 if (pair.Key == dm.Root)
                     continue;
                 Writer.WriteLine();
-                write_element(pair.Key);
+                WriteElement(pair.Key);
                 Writer.WriteLine();
             }
 
@@ -394,8 +402,9 @@ namespace Datamodel.Codecs
                         elem.ClassName = elem_class;
                         elem.Stub = false;
                     }
-                    else
+                    else if (elem_class != "$prefix_element$")
                         elem = new Element(DM, elem_name, new Guid(elem_id), elem_class);
+
                     continue;
                 }
 
@@ -443,7 +452,10 @@ namespace Datamodel.Codecs
                 else
                     attr_value = Decode_ParseValue(attr_type, Decode_NextToken());
 
-                elem.Add(attr_name, attr_value);
+                if (elem != null)
+                    elem.Add(attr_name, attr_value);
+                else
+                    DM.PrefixAttributes[attr_name] = attr_value;
             }
             return elem;
         }

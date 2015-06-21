@@ -29,7 +29,8 @@ namespace Datamodel
             Datamodel DM;
 
             public Element Root { get { return DM.Root; } }
-            public Element[] AllElements { get { return DM.AllElements.ToArray(); } }
+            public ElementList AllElements { get { return DM.AllElements; } }
+            public AttributeList PrefixAttributes { get { return DM.PrefixAttributes; } }
         }
         #region Attribute types
         public static Type[] AttributeTypes { get { return _AttributeTypes; } }
@@ -279,12 +280,23 @@ namespace Datamodel
         /// <summary>
         /// A collection of <see cref="Element"/>s owned by a single <see cref="Datamodel"/>.
         /// </summary>
+        [DebuggerDisplay("Count = {Count}")]
+        [DebuggerTypeProxy(typeof(DebugView))]
         public class ElementList : IEnumerable<Element>, INotifyCollectionChanged, IDisposable
         {
             internal ReaderWriterLockSlim ChangeLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
 
-            List<Element> store = new List<Element>();
-            Dictionary<Guid, Element> Lookup = new Dictionary<Guid, Element>();
+            internal class DebugView
+            {
+                public DebugView(ElementList item)
+                { Item = item; }
+                ElementList Item;
+
+                [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+                public Element[] Elements { get { return (Element[])Item.store.Values; } }
+            }
+
+            OrderedDictionary store = new OrderedDictionary();
             Datamodel Owner;
 
             internal ElementList(Datamodel owner)
@@ -297,11 +309,8 @@ namespace Datamodel
                 ChangeLock.EnterUpgradeableReadLock();
                 try
                 {
-                    if (Count == Int32.MaxValue) // jinkies!
-                        throw new IndexOutOfRangeException("Maximum Element count reached.");
-
-                    Element existing;
-                    if (Lookup.TryGetValue(item.ID, out existing) && !existing.Stub)
+                    Element existing = (Element)store[item.ID];
+                    if (existing != null && !existing.Stub)
                     {
                         throw new ElementIdException(String.Format("Element ID {0} already in use in this Datamodel.", item.ID));
                     }
@@ -313,11 +322,10 @@ namespace Datamodel
                     ChangeLock.EnterWriteLock();
                     try
                     {
-                        store.Add(item);
-                        Lookup[item.ID] = item;
+                        store.Add(item.ID, item);
 
                         if (existing != null)
-                            store.Remove(existing);
+                            store.Remove(existing.ID);
                     }
                     finally
                     {
@@ -345,7 +353,7 @@ namespace Datamodel
                     ChangeLock.EnterReadLock();
                     try
                     {
-                        return store[index];
+                        return (Element)store[index];
                     }
                     finally { ChangeLock.ExitReadLock(); }
                 }
@@ -363,9 +371,7 @@ namespace Datamodel
                     ChangeLock.EnterReadLock();
                     try
                     {
-                        Element elem;
-                        Lookup.TryGetValue(id, out elem);
-                        return elem;
+                        return (Element)store[id];
                     }
                     finally { ChangeLock.ExitReadLock(); }
                 }
@@ -415,36 +421,46 @@ namespace Datamodel
             /// <returns>true if item is successfully removed; otherwise, false.</returns>
             public bool Remove(Element item, RemoveMode mode)
             {
-                ChangeLock.EnterWriteLock();
+                if (item == null) throw new ArgumentNullException("item");
+
+                ChangeLock.EnterUpgradeableReadLock();
                 try
                 {
-                    if (store.Remove(item))
+                    if (store.Contains(item.ID))
                     {
-                        Lookup.Remove(item.ID);
-                        Element replacement = (mode == RemoveMode.MakeStubs) ? new Element(Owner, item.ID) : (Element)null;
-
-                        foreach (var elem in store.ToArray())
+                        ChangeLock.EnterWriteLock();
+                        try
                         {
-                            lock (elem.SyncRoot)
-                            {
-                                foreach (var attr in elem.Where(a => a.Value == item).ToArray())
-                                    elem[attr.Key] = replacement;
-                                foreach (var array in elem.Select(a => a.Value).OfType<IList<Element>>())
-                                    for (int i = 0; i < array.Count; i++)
-                                        if (array[i] == item)
-                                            array[i] = replacement;
-                            }
-                        }
-                        if (Owner.Root == item) Owner.Root = replacement;
+                            store.Remove(item.ID);
+                            Element replacement = (mode == RemoveMode.MakeStubs) ? new Element(Owner, item.ID) : (Element)null;
 
-                        item.Owner = null;
+                            foreach (Element elem in store.Values)
+                            {
+                                lock (elem.SyncRoot)
+                                {
+                                    foreach (var attr in elem.Where(a => a.Value == item).ToArray())
+                                        elem[attr.Key] = replacement;
+                                    foreach (var array in elem.Select(a => a.Value).OfType<IList<Element>>())
+                                        for (int i = 0; i < array.Count; i++)
+                                            if (array[i] == item)
+                                                array[i] = replacement;
+                                }
+                            }
+                            if (Owner.Root == item) Owner.Root = replacement;
+
+                            item.Owner = null;
+                        }
+                        finally
+                        {
+                            ChangeLock.ExitWriteLock();
+                        }
 
                         if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, item));
                         return true;
                     }
                     else return false;
                 }
-                finally { ChangeLock.ExitWriteLock(); }
+                finally { ChangeLock.ExitUpgradeableReadLock(); }
             }
 
             /// <summary>
@@ -464,8 +480,7 @@ namespace Datamodel
                     {
                         foreach (var elem in this.Except(used).ToArray())
                         {
-                            store.Remove(elem);
-                            Lookup.Remove(elem.ID);
+                            store.Remove(elem.ID);
                             elem.Owner = null;
                         }
                         if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, (System.Collections.IList)used));
@@ -484,7 +499,7 @@ namespace Datamodel
             protected void WalkElemTree(Element elem, HashSet<Element> found)
             {
                 found.Add(elem);
-                foreach (var value in elem.Attributes.Select(a => a.RawValue))
+                foreach (var value in elem.Inner.Select(a => a.RawValue))
                 {
                     var value_elem = value as Element;
                     if (value_elem != null)
@@ -513,7 +528,8 @@ namespace Datamodel
             /// </summary>
             public IEnumerator<Element> GetEnumerator()
             {
-                return store.GetEnumerator();
+                foreach (Element elem in store.Values)
+                    yield return elem;
             }
             /// <summary>
             /// Raised when an <see cref="Element"/> is added, removed, or replaced.
@@ -545,6 +561,7 @@ namespace Datamodel
         public Datamodel()
         {
             AllElements = new ElementList(this);
+            PrefixAttributes = new AttributeList(this);
         }
 
         protected bool Initialising { get; private set; }
@@ -663,6 +680,8 @@ namespace Datamodel
             }
         }
         Element _Root;
+
+        public AttributeList PrefixAttributes { get; protected set; }
 
         /// <summary>
         /// Gets all Elements owned by this Datamodel. Only Elements which are referenced by the Root element or one of its children are actually considered part of the Datamodel.
@@ -1034,14 +1053,14 @@ namespace Datamodel
         internal DestubException(Attribute attr, Exception innerException)
             : base("An exception occured while destubbing the value of an attribute.", innerException)
         {
-            Data.Add("Element", attr.Owner.ID);
+            Data.Add("Element", ((Element)attr.Owner).ID);
             Data.Add("Attribute", attr.Name);
         }
 
         internal DestubException(ElementArray array, int index, Exception innerException)
             : base("An exception occured while destubbing an array item.", innerException)
         {
-            Data.Add("Element", array.Owner.ID);
+            Data.Add("Element", ((Element)array.Owner).ID);
             Data.Add("Index", index);
         }
 

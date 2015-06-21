@@ -19,9 +19,9 @@ namespace Datamodel
     /// <seealso cref="Attribute"/>
     [DefaultProperty("Name")]
     [TypeConverter(typeof(TypeConverters.ElementConverter))]
-    [DebuggerTypeProxy(typeof(DebugView))]
-    [DebuggerDisplay("{Name}", Type = "{ClassName,nq}")]
-    public class Element : IDictionary<string, object>, IDictionary, INotifyPropertyChanged, INotifyCollectionChanged, ISupportInitialize
+    [DebuggerTypeProxy(typeof(AttributeList.DebugView))]
+    [DebuggerDisplay("{Name} {ID}", Type = "{ClassName,nq}")]
+    public class Element : AttributeList, INotifyPropertyChanged, ISupportInitialize
     {
         #region Constructors and Init
 
@@ -34,6 +34,7 @@ namespace Datamodel
         /// <param name="class_name">An arbitrary string which loosely defines the type of Element this is. Cannot be null.</param>
         /// <exception cref="IndexOutOfRangeException">Thrown when the owner already contains the maximum number of Elements allowed in a Datamodel.</exception>
         public Element(Datamodel owner, string name, Guid? id = null, string class_name = "DmElement")
+            : base(owner)
         {
             if (owner == null) throw new ArgumentNullException("owner");
             if (class_name == null) throw new ArgumentNullException("class_name");
@@ -58,6 +59,7 @@ namespace Datamodel
         /// <param name="owner">The owner of this Element. Cannot be null.</param>
         /// <param name="id">The ID of the remote Element that this stub represents.</param>
         public Element(Datamodel owner, Guid id)
+            : base(owner)
         {
             if (owner == null) throw new ArgumentNullException("owner");
 
@@ -71,6 +73,7 @@ namespace Datamodel
         /// Creates a new Element with a random GUID.
         /// </summary>
         public Element()
+            : base(null)
         {
             _ID = Guid.NewGuid();
         }
@@ -90,40 +93,7 @@ namespace Datamodel
         }
 
         #endregion
-
-        internal List<Attribute> Attributes = new List<Attribute>();
-        private object Attribute_ChangeLock = new object();
-
-        internal class DebugView
-        {
-            public DebugView(Element elem)
-            {
-                Elem = elem;
-            }
-            Element Elem;
-
-            public Datamodel Owner { get { return Elem.Owner; } }
-            public Guid ID { get { return Elem.ID; } }
-
-            [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-            public DebugAttribute[] Attributes { get { return Elem.Attributes.Select(attr => new DebugAttribute(attr)).ToArray(); } }
-
-            [DebuggerDisplay("{Attr.RawValue}", Name = "{Attr.Name}", Type = "{Attr.ValueType.FullName,nq}")]
-            internal class DebugAttribute
-            {
-                public DebugAttribute(Attribute attr)
-                {
-                    Attr = attr;
-                }
-
-                [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-                Attribute Attr;
-
-                [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-                object Value { get { return Attr.RawValue; } }
-            }
-        }
-
+        
         #region Properties
 
         /// <summary>
@@ -179,13 +149,13 @@ namespace Datamodel
         /// <summary>
         /// Gets the <see cref="Datamodel"/> that this Element is owned by.
         /// </summary>
-        public Datamodel Owner
+        public new Datamodel Owner
         {
-            get { return _Owner; }
+            get { return base.Owner; }
             internal set
             {
-                if (_Owner != null && _Owner.AllElements.Contains(this)) throw new InvalidOperationException("Element already has an owner.");
-                _Owner = value;
+                if (value != null && base.Owner != null && base.Owner.AllElements.Contains(this)) throw new InvalidOperationException("Element already has an owner.");
+                base.Owner = value;
                 if (value != null)
                 {
                     value.AllElements.ChangeLock.EnterWriteLock();
@@ -198,7 +168,6 @@ namespace Datamodel
                 }
             }
         }
-        Datamodel _Owner;
 
         #endregion
 
@@ -256,137 +225,18 @@ namespace Datamodel
         /// <exception cref="ElementOwnershipException">Thrown when an attempt is made to set the value of the attribute to an Element from a different <see cref="Datamodel"/>.</exception>
         /// <exception cref="AttributeTypeException">Thrown when an attempt is made to set a value that is not of a valid Datamodel attribute type.</exception>
         /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Attributes allowed in an Element has been reached.</exception>
-        public object this[string name]
+        public override object this[string name]
         {
             get
             {
-                if (name == null) throw new ArgumentNullException("name");
                 if (Stub) throw new InvalidOperationException("Cannot get attributes from a stub element.");
-                var attr = Attributes.Find(a => a.Name == name);
-                if (attr.Name == null) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
-                return attr.Value;
+                return base[name];
             }
             set
             {
-                if (name == null) throw new ArgumentNullException("name");
                 if (Stub) throw new InvalidOperationException("Cannot set attributes on a stub element.");
-
-                if (value != null && !Datamodel.IsDatamodelType(value.GetType()))
-                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", value.GetType().FullName));
-
-                Attribute old_attr, new_attr;
-                int old_index;
-                lock (Attribute_ChangeLock)
-                {
-                    old_attr = Attributes.Find(a => a.Name == name);
-                    new_attr = new Attribute(name, this, value);
-
-                    old_index = Attributes.IndexOf(old_attr);
-                    if (old_index != -1)
-                        Attributes.Remove(old_attr);
-                    Insert(old_index == -1 ? Count : old_index, new Attribute(name, this, value), notify: false);
-                }
-
-                NotifyCollectionChangedEventArgs change_args;
-                if (old_attr.Name != null)
-                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr.ToKeyValuePair(), old_attr.ToKeyValuePair(), old_index);
-                else
-                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr.ToKeyValuePair(), Count);
-
-                OnCollectionChanged(change_args);
+                base[name] = value;
             }
-        }
-
-        /// <summary>
-        /// Removes an <see cref="Attribute"/> by name.
-        /// </summary>
-        /// <param name="name">The name to search for</param>
-        /// <returns>true if item is successfully removed; otherwise, false. This method also returns false if item was not found.</returns>
-        public bool Remove(string name)
-        {
-            lock (Attribute_ChangeLock)
-            {
-                var attr = Attributes.FirstOrDefault(a => a.Name == name);
-                if (attr.Name == null) return false;
-                var index = Attributes.IndexOf(attr);
-                if (Attributes.Remove(attr))
-                {
-                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr.ToKeyValuePair(), index));
-                    return true;
-                }
-                else return false;
-            }
-        }
-
-        /// <summary>
-        /// Removes all Attributes from the Element.
-        /// </summary>
-        public void Clear()
-        {
-            lock (Attribute_ChangeLock)
-                Attributes.Clear();
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
-        }
-        /// <summary>
-        /// Gets the number of <see cref="Attribute"/>s in the Element.
-        /// </summary>
-        public int Count
-        {
-            get
-            {
-                lock (Attribute_ChangeLock)
-                    return Attributes.Count;
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets the attribute at the given index.
-        /// </summary>
-        public AttrKVP this[int index]
-        {
-            get
-            {
-                var attr = Attributes[index];
-                return attr.ToKeyValuePair();
-            }
-            set
-            {
-                RemoveAt(index);
-                Insert(index, new Attribute(value.Key, this, value.Value));
-            }
-        }
-
-        /// <summary>
-        /// Inserts an Attribute at the given index.
-        /// </summary>
-        private void Insert(int index, Attribute item, bool notify = true)
-        {
-            lock (Attribute_ChangeLock)
-            {
-                if (Attributes.Count == Int32.MaxValue)
-                    throw new IndexOutOfRangeException(String.Format("Maximum Attribute count reached for Element {0}.", ID));
-
-                Attributes.Insert(index, item);
-            }
-            item.Owner = this;
-
-            if (notify)
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item.ToKeyValuePair(), index));
-        }
-
-        /// <summary>
-        /// Removes the attribute at the given index.
-        /// </summary>
-        public void RemoveAt(int index)
-        {
-            Attribute attr;
-            lock (Attribute_ChangeLock)
-            {
-                attr = Attributes[index];
-                attr.Owner = null;
-                Attributes.RemoveAt(index);
-            }
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr, index));
         }
 
         [Obsolete("Use the ContainsKey method.")]
@@ -394,62 +244,6 @@ namespace Datamodel
         {
             return ContainsKey(name);
         }
-
-        public int IndexOf(string key)
-        {
-            lock (Attribute_ChangeLock)
-            {
-                int i = 0;
-                foreach (var attr in Attributes)
-                    if (attr.Name == key) return i;
-            }
-            return -1;
-        }
-
-        #region Interfaces
-
-        /// <summary>
-        /// Raised when <see cref="Element.Name"/>, <see cref="Element.ClassName"/>, or <see cref="Element.ID"/> has changed.
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged(string info)
-        {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(info));
-        }
-
-        /// <summary>
-        /// Raised when an <see cref="Attribute"/> is added, removed, or replaced.
-        /// </summary>
-        public event NotifyCollectionChangedEventHandler CollectionChanged;
-        protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
-        {
-            Debug.Assert(!(e.NewItems != null && e.NewItems.OfType<Attribute>().Any()) && !(e.OldItems != null && e.OldItems.OfType<Attribute>().Any()));
-
-            switch (e.Action)
-            {
-                case NotifyCollectionChangedAction.Add:
-                case NotifyCollectionChangedAction.Remove:
-                case NotifyCollectionChangedAction.Reset:
-                    OnPropertyChanged("Count");
-                    break;
-            }
-
-            OnPropertyChanged("Item[]"); // this is the magic value of System.Windows.Data.Binding.IndexerName that tells the binding engine an indexer has changed
-
-            if (CollectionChanged != null)
-                CollectionChanged(this, e);
-        }
-
-        public bool IsReadOnly { get { return false; } }
-        public bool IsSynchronized { get { return true; } }
-
-        /// <summary>
-        /// Gets an object which can be used to synchronise access to this Element's Attributes.
-        /// </summary>
-        public object SyncRoot { get { return Attribute_ChangeLock; } }
-
-        #endregion
 
         public override string ToString()
         {
@@ -579,16 +373,6 @@ namespace Datamodel
         #endregion
 
         /// <summary>
-        /// Adds a new attribute to this Element.
-        /// </summary>
-        /// <param name="key">The name of the attribute. Must be unique to this Element.</param>
-        /// <param name="value">The value of the Attribute. Must be of a valid Datamodel type.</param>
-        public void Add(string key, object value)
-        {
-            this[key] = value;
-        }
-
-        /// <summary>
         /// Adds a new deferred attribute to this Element.
         /// </summary>
         /// <param name="key">The name of the attribute. Must be unique to this Element.</param>
@@ -596,139 +380,13 @@ namespace Datamodel
         internal void Add(string key, long offset)
         {
             lock (Attribute_ChangeLock)
-                Attributes.Add(new Attribute(key, this, offset));
+                Inner.Add(new Attribute(key, this, offset));
         }
 
-        public bool ContainsKey(string key)
+        public override bool ContainsKey(string key)
         {
-            if (key == null) throw new ArgumentNullException("key");
             if (Stub) throw new InvalidOperationException("Cannot access attributes on a stub element.");
-            lock (Attribute_ChangeLock)
-                return Attributes.Any(a => a.Name == key);
-        }
-
-        public ICollection<string> Keys
-        {
-            get { lock (Attribute_ChangeLock) return Attributes.Select(a => a.Name).ToArray(); }
-        }
-
-        public bool TryGetValue(string key, out object value)
-        {
-            Attribute result;
-            lock (Attribute_ChangeLock)
-                result = Attributes.FirstOrDefault(a => a.Name == key);
-
-            if (result.Name != null)
-            {
-                value = result.Value;
-                return true;
-            }
-            else
-            {
-                value = null;
-                return false;
-            }
-        }
-
-        public ICollection<object> Values
-        {
-            get { lock (Attribute_ChangeLock) return Attributes.Select(a => a.Value).ToArray(); }
-        }
-
-        void ICollection<AttrKVP>.Add(AttrKVP item)
-        {
-            this[item.Key] = item.Value;
-        }
-
-        bool ICollection<AttrKVP>.Contains(AttrKVP item)
-        {
-            lock (Attribute_ChangeLock)
-                return Attributes.Any(a => a.Name == item.Key && a.Value == item.Value);
-        }
-
-        void ICollection<AttrKVP>.CopyTo(AttrKVP[] array, int arrayIndex)
-        {
-            lock (Attribute_ChangeLock)
-                foreach (var attr in Attributes)
-                {
-                    array[arrayIndex] = attr.ToKeyValuePair();
-                    arrayIndex++;
-                }
-        }
-
-        public IEnumerator<AttrKVP> GetEnumerator()
-        {
-            foreach (var attr in Attributes.ToArray())
-                yield return attr.ToKeyValuePair();
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        void IDictionary.Add(object key, object value)
-        {
-            Add((string)key, value);
-        }
-
-        public bool Contains(object key)
-        {
-            return ContainsKey((string)key);
-        }
-
-        IDictionaryEnumerator IDictionary.GetEnumerator()
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool IsFixedSize { get { return false; } }
-
-        ICollection IDictionary.Keys
-        {
-            get { lock (Attribute_ChangeLock) return Attributes.Select(a => a.Name).ToArray(); }
-        }
-
-        void IDictionary.Remove(object key)
-        {
-            Remove((string)key);
-        }
-
-        ICollection IDictionary.Values
-        {
-            get { lock (Attribute_ChangeLock) return Attributes.Select(a => a.Value).ToArray(); }
-        }
-
-        object IDictionary.this[object key]
-        {
-            get
-            {
-                return this[(string)key];
-            }
-            set
-            {
-                this[(string)key] = value;
-            }
-        }
-
-        bool ICollection<AttrKVP>.Remove(AttrKVP item)
-        {
-            lock (Attribute_ChangeLock)
-            {
-                var attr = Attributes.Find(a => a.Name == item.Key);
-                if (attr.Name == null || attr.Value != item.Value) return false;
-                Remove(attr.Name);
-                return true;
-            }
-        }
-
-        void ICollection.CopyTo(Array array, int index)
-        {
-            lock (Attribute_ChangeLock)
-                foreach (var attr in Attributes)
-                {
-                    array.SetValue(attr.ToKeyValuePair(), index);
-                    index++;
-                }
+            return base.ContainsKey(key);
         }
     }
 

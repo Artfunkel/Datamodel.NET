@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
@@ -21,7 +22,7 @@ namespace Datamodel
         /// </summary>
         /// <param name="name">The name of the Attribute, which must be unique to its owner.</param>
         /// <param name="value">The value of the Attribute, which must be of a supported Datamodel type.</param>
-        public Attribute(string name, Element owner, object value)
+        public Attribute(string name, AttributeList owner, object value)
             : this()
         {
             if (name == null)
@@ -36,9 +37,9 @@ namespace Datamodel
         /// Creates a new Attribute with deferred loading.
         /// </summary>
         /// <param name="name">The name of the Attribute, which must be unique to its owner.</param>
-        /// <param name="owner">The Element which owns this Attribute.</param>
+        /// <param name="owner">The AttributeList which owns this Attribute.</param>
         /// <param name="defer_offset">The location in the encoded DMX stream at which this Attribute's value can be found.</param>
-        public Attribute(string name, Element owner, long defer_offset)
+        public Attribute(string name, AttributeList owner, long defer_offset)
             : this(name, owner, null)
         {
             if (owner == null)
@@ -61,7 +62,7 @@ namespace Datamodel
         /// <summary>
         /// Gets the <see cref="Element"/> which this Attribute is part of.
         /// </summary>
-        public Element Owner
+        public AttributeList Owner
         {
             get { return _Owner; }
             internal set
@@ -72,7 +73,7 @@ namespace Datamodel
                 _Owner = value;
             }
         }
-        Element _Owner;
+        AttributeList _Owner;
 
         Datamodel OwnerDatamodel { get { return Owner != null ? Owner.Owner : null; } }
 
@@ -102,7 +103,7 @@ namespace Datamodel
             }
             catch (Exception err)
             {
-                throw new CodecException(String.Format("Deferred loading of attribute \"{0}\" on element {1} using codec {2} threw an exception.", Name, Owner.ID, OwnerDatamodel.Codec), err);
+                throw new CodecException(String.Format("Deferred loading of attribute \"{0}\" on element {1} using codec {2} threw an exception.", Name, ((Element)Owner).ID, OwnerDatamodel.Codec), err);
             }
             Offset = 0;
 
@@ -199,11 +200,376 @@ namespace Datamodel
         public AttrKVP ToKeyValuePair()
         {
             return new AttrKVP(Name, Value);
-        }        
+        }
     }
 
     /// <summary>
-    /// Compares two Attribute values, using <see cref="Element.IDComparer"/> for Element comparisons.
+    /// A thread-safe collection of <see cref="Attribute"/>s.
+    /// </summary>
+    [DebuggerTypeProxy(typeof(DebugView))]
+    [DebuggerDisplay("Count = {Count}")]
+    public class AttributeList : IDictionary<string, object>, IDictionary, INotifyCollectionChanged
+    {
+        internal List<Attribute> Inner;
+        protected object Attribute_ChangeLock = new object();
+        
+        internal class DebugView
+        {
+            public DebugView(AttributeList item)
+            {
+                Item = item;
+            }
+            [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+            protected AttributeList Item;
+            
+            [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+            public DebugAttribute[] Attributes { get { return Item.Inner.Select(attr => new DebugAttribute(attr)).ToArray(); } }
+
+            [DebuggerDisplay("{Attr.RawValue}", Name = "{Attr.Name}", Type = "{Attr.ValueType.FullName,nq}")]
+            public class DebugAttribute
+            {
+                public DebugAttribute(Attribute attr)
+                {
+                    Attr = attr;
+                }
+
+                [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+                Attribute Attr;
+
+                [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+                object Value { get { return Attr.RawValue; } }
+            }
+        }
+
+        public AttributeList(Datamodel owner)
+        {
+            Inner = new List<Attribute>();
+            Owner = owner;
+        }
+
+        /// <summary>
+        /// Gets the <see cref="Datamodel"/> that this AttributeList is owned by.
+        /// </summary>
+        public virtual Datamodel Owner { get; internal set; }
+
+        /// <summary>
+        /// Adds a new attribute to this AttributeList.
+        /// </summary>
+        /// <param name="key">The name of the attribute. Must be unique to this AttributeList.</param>
+        /// <param name="value">The value of the Attribute. Must be of a valid Datamodel type.</param>
+        public void Add(string key, object value)
+        {
+            this[key] = value;
+        }
+
+        /// <summary>
+        /// Inserts an Attribute at the given index.
+        /// </summary>
+        private void Insert(int index, Attribute item, bool notify = true)
+        {
+            lock (Attribute_ChangeLock)
+            {
+                Inner.Insert(index, item);
+            }
+            item.Owner = this;
+
+            if (notify)
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item.ToKeyValuePair(), index));
+        }
+        
+        public bool Remove(string key)
+        {
+            lock (Attribute_ChangeLock)
+            {
+                var attr = Inner.FirstOrDefault(a => a.Name == key);
+                if (attr.Name == null) return false;
+                var index = Inner.IndexOf(attr);
+                if (Inner.Remove(attr))
+                {
+                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr.ToKeyValuePair(), index));
+                    return true;
+                }
+                else return false;
+            }
+        }
+
+        public bool TryGetValue(string key, out object value)
+        {
+            Attribute result;
+            lock (Attribute_ChangeLock)
+                result = Inner.FirstOrDefault(a => a.Name == key);
+
+            if (result.Name != null)
+            {
+                value = result.Value;
+                return true;
+            }
+            else
+            {
+                value = null;
+                return false;
+            }
+        }
+
+        public virtual bool ContainsKey(string key)
+        {
+            if (key == null) throw new ArgumentNullException("key");
+            lock (Attribute_ChangeLock)
+                return Inner.Any(attr => attr.Name == key);
+        }
+        public ICollection<string> Keys
+        {
+            get { lock (Attribute_ChangeLock) return Inner.Select(attr => attr.Name).ToArray(); }
+        }
+        public ICollection<object> Values
+        {
+            get { lock (Attribute_ChangeLock) return Inner.Select(a => a.Value).ToArray(); }
+        }
+
+        public virtual object this[string name]
+        {
+            get
+            {
+                if (name == null) throw new ArgumentNullException("name");
+                var attr = Inner.Find(a => a.Name == name);
+                if (attr.Name == null) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
+                return attr.Value;
+            }
+            set
+            {
+                if (name == null) throw new ArgumentNullException("name");
+                if (value != null && !Datamodel.IsDatamodelType(value.GetType()))
+                    throw new AttributeTypeException(String.Format("{0} is not a valid Datamodel attribute type. (If this is an array, it must implement IList<T>).", value.GetType().FullName));
+
+                if (Owner != null && this == Owner.PrefixAttributes && value.GetType() == typeof(Element))
+                    throw new AttributeTypeException("Elements are not supported as prefix attributes.");
+
+                Attribute old_attr, new_attr;
+                int old_index;
+                lock (Attribute_ChangeLock)
+                {
+                    old_attr = Inner.Find(a => a.Name == name);
+                    new_attr = new Attribute(name, this, value);
+
+                    old_index = Inner.IndexOf(old_attr);
+                    if (old_index != -1)
+                        Inner.Remove(old_attr);
+                    Insert(old_index == -1 ? Count : old_index, new Attribute(name, this, value), notify: false);
+                }
+
+                NotifyCollectionChangedEventArgs change_args;
+                if (old_attr.Name != null)
+                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr.ToKeyValuePair(), old_attr.ToKeyValuePair(), old_index);
+                else
+                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr.ToKeyValuePair(), Count);
+
+                OnCollectionChanged(change_args);
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the attribute at the given index.
+        /// </summary>
+        public AttrKVP this[int index]
+        {
+            get
+            {
+                var attr = Inner[index];
+                return attr.ToKeyValuePair();
+            }
+            set
+            {
+                RemoveAt(index);
+                Insert(index, new Attribute(value.Key, this, value.Value));
+            }
+        }
+
+        /// <summary>
+        /// Removes the attribute at the given index.
+        /// </summary>
+        public void RemoveAt(int index)
+        {
+            Attribute attr;
+            lock (Attribute_ChangeLock)
+            {
+                attr = Inner[index];
+                attr.Owner = null;
+                Inner.RemoveAt(index);
+            }
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr, index));
+        }
+
+        public int IndexOf(string key)
+        {
+            lock (Attribute_ChangeLock)
+            {
+                int i = 0;
+                foreach (var attr in Inner)
+                    if (attr.Name == key) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Removes all Attributes from the Collection.
+        /// </summary>
+        public void Clear()
+        {
+            lock (Attribute_ChangeLock)
+                Inner.Clear();
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        }
+
+        public int Count
+        {
+            get
+            {
+                lock (Attribute_ChangeLock)
+                    return Inner.Count;
+            }
+        }
+
+        public bool IsFixedSize { get { return false; } }
+        public bool IsReadOnly { get { return false; } }
+        public bool IsSynchronized { get { return true; } }
+        /// <summary>
+        /// Gets an object which can be used to synchronise access to the items within this AttributeCollection.
+        /// </summary>
+        public object SyncRoot { get { return Attribute_ChangeLock; } }
+
+        public IEnumerator<AttrKVP> GetEnumerator()
+        {
+            foreach (var attr in Inner.ToArray())
+                yield return attr.ToKeyValuePair();
+        }
+
+        #region Interfaces
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+
+        /// <summary>
+        /// Raised when <see cref="Element.Name"/>, <see cref="Element.ClassName"/>, or <see cref="Element.ID"/> has changed.
+        /// </summary>
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected virtual void OnPropertyChanged(string info)
+        {
+            if (PropertyChanged != null)
+                PropertyChanged(this, new PropertyChangedEventArgs(info));
+        }
+
+        /// <summary>
+        /// Raised when an <see cref="Attribute"/> is added, removed, or replaced.
+        /// </summary>
+        public event NotifyCollectionChangedEventHandler CollectionChanged;
+        protected virtual void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
+        {
+            Debug.Assert(!(e.NewItems != null && e.NewItems.OfType<Attribute>().Any()) && !(e.OldItems != null && e.OldItems.OfType<Attribute>().Any()));
+
+            switch (e.Action)
+            {
+                case NotifyCollectionChangedAction.Add:
+                case NotifyCollectionChangedAction.Remove:
+                case NotifyCollectionChangedAction.Reset:
+                    OnPropertyChanged("Count");
+                    break;
+            }
+
+            OnPropertyChanged("Item[]"); // this is the magic value of System.Windows.Data.Binding.IndexerName that tells the binding engine an indexer has changed
+
+            if (CollectionChanged != null)
+                CollectionChanged(this, e);
+        }
+
+        
+        IDictionaryEnumerator IDictionary.GetEnumerator()
+        {
+            throw new NotImplementedException();
+        }
+        
+        void IDictionary.Remove(object key)
+        {
+            Remove((string)key);
+        }
+
+        void IDictionary.Add(object key, object value)
+        {
+            Add((string)key, value);
+        }
+
+        object IDictionary.this[object key]
+        {
+            get
+            {
+                return this[(string)key];
+            }
+            set
+            {
+                this[(string)key] = value;
+            }
+        }
+
+        bool IDictionary.Contains(object key)
+        {
+            return ContainsKey((string)key);
+        }
+
+        ICollection IDictionary.Keys
+        {
+            get { lock (Attribute_ChangeLock) return Inner.Select(a => a.Name).ToArray(); }
+        }
+
+        ICollection IDictionary.Values
+        {
+            get { lock (Attribute_ChangeLock) return Inner.Select(a => a.Value).ToArray(); }
+        }
+
+
+        bool ICollection<AttrKVP>.Remove(AttrKVP item)
+        {
+            lock (Attribute_ChangeLock)
+            {
+                var attr = Inner.Find(a => a.Name == item.Key);
+                if (attr.Name == null || attr.Value != item.Value) return false;
+                Remove(attr.Name);
+                return true;
+            }
+        }
+
+        void ICollection<AttrKVP>.CopyTo(AttrKVP[] array, int arrayIndex)
+        {
+            ((ICollection)this).CopyTo(array, arrayIndex);
+        }
+
+        void ICollection.CopyTo(Array array, int index)
+        {
+            lock (Attribute_ChangeLock)
+                foreach (var attr in Inner)
+                {
+                    array.SetValue(attr.ToKeyValuePair(), index);
+                    index++;
+                }
+        }
+        
+        void ICollection<AttrKVP>.Add(AttrKVP item)
+        {
+            this[item.Key] = item.Value;
+        }
+
+        bool ICollection<AttrKVP>.Contains(AttrKVP item)
+        {
+            lock (Attribute_ChangeLock)
+                return Inner.Any(a => a.Name == item.Key && a.Value == item.Value);
+        }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Compares two Attribute values, using <see cref="Element.IDComparer"/> for AttributeList comparisons.
     /// </summary>
     public class ValueComparer : IEqualityComparer
     {
@@ -239,7 +605,7 @@ namespace Datamodel
                 var array_right = (IList)y;
 
                 if (array_left.Count != array_right.Count) return false;
-                
+
                 return !Enumerable.Range(0, array_left.Count).Any(i => !Equals(array_left[i], array_right[i]));
             }
             else if (type_x == typeof(Element))
@@ -329,7 +695,7 @@ namespace Datamodel
         object _Value;
 
         /// <summary>
-        /// Gets the Element which holds the attribute or source array.
+        /// Gets the AttributeList which holds the attribute or source array.
         /// </summary>
         public Element Owner { get; private set; }
 
@@ -352,7 +718,7 @@ namespace Datamodel
         }
 
         /// <summary>
-        /// Creates a new ObservableAttribute which represents an attribute of the given Element.
+        /// Creates a new ObservableAttribute which represents an attribute of the given AttributeList.
         /// </summary>
         public ObservableAttribute(Element owner, AttrKVP attribute)
             : this(owner)
@@ -459,7 +825,7 @@ namespace Datamodel
             /// </summary>
             AllArrays,
             /// <summary>
-            /// Enumerate only the children of Element arrays.
+            /// Enumerate only the children of AttributeList arrays.
             /// </summary>
             ElementArrays,
         }
@@ -479,6 +845,8 @@ namespace Datamodel
                     yield return item;
         }
     }
+
+    #region Custom attribute types
 
     [Serializable]
     [TypeConverter(typeof(TypeConverters.Vector2Converter))]
@@ -1045,6 +1413,8 @@ namespace Datamodel
             return !a.Equals(b);
         }
     }
+
+    #endregion
 
     namespace TypeConverters
     {
