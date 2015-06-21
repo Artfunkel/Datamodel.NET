@@ -161,8 +161,8 @@ namespace Datamodel.Codecs
                 {
                     Strings.Add(attr.Key);
                     if (attr.Value is string) Strings.Add((string)attr.Value);
-                    if (attr.Value is Element) ScrapeElement((Element)attr.Value);
-                    if (attr.Value is IList<Element>)
+                    else if (attr.Value is Element) ScrapeElement((Element)attr.Value);
+                    else if (attr.Value is IList<Element>)
                         foreach (var array_elem in (IList<Element>)attr.Value)
                             ScrapeElement(array_elem);
                 }
@@ -470,16 +470,20 @@ namespace Datamodel.Codecs
                 if (elem.Stub) return 0;
                 int num_elems = 1;
                 counted.Add(elem);
-                foreach (var child in elem.Select(a => a.Value))
+                foreach (var attr in elem)
                 {
-                    if (child == null) continue;
+                    if (attr.Value == null) continue;
 
-                    var t = child.GetType();
-                    if (t == typeof(Element) && !counted.Contains(child))
-                        num_elems += CountChildren(child as Element, counted);
-                    else if (Datamodel.IsDatamodelArrayType(t) && Datamodel.GetArrayInnerType(t) == typeof(Element))
-                        foreach (var child_elem in (child as IEnumerable<Element>).Where(c => c != null && !counted.Contains(c)))
-                            num_elems += CountChildren(child_elem, counted);
+                    var child_elem = attr.Value as Element;
+                    if (child_elem != null && !counted.Contains(child_elem))
+                        num_elems += CountChildren(child_elem, counted);
+                    else
+                    {
+                        var child_array = attr.Value as IEnumerable<Element>;
+                        if (child_array != null)
+                            foreach (var array_elem in child_array.Where(c => c != null && !counted.Contains(c)))
+                                num_elems += CountChildren(array_elem, counted);
+                    }
                 }
                 return num_elems;
             }

@@ -210,7 +210,7 @@ namespace Datamodel
     [DebuggerDisplay("Count = {Count}")]
     public class AttributeList : IDictionary<string, object>, IDictionary, INotifyCollectionChanged
     {
-        internal List<Attribute> Inner;
+        internal OrderedDictionary Inner;
         protected object Attribute_ChangeLock = new object();
         
         internal class DebugView
@@ -223,9 +223,9 @@ namespace Datamodel
             protected AttributeList Item;
             
             [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-            public DebugAttribute[] Attributes { get { return Item.Inner.Select(attr => new DebugAttribute(attr)).ToArray(); } }
+            public DebugAttribute[] Attributes { get { return Item.Inner.Values.Cast<Attribute>().Select(attr => new DebugAttribute(attr)).ToArray(); } }
 
-            [DebuggerDisplay("{Attr.RawValue}", Name = "{Attr.Name}", Type = "{Attr.ValueType.FullName,nq}")]
+            [DebuggerDisplay("{Value}", Name = "{Attr.Name,nq}", Type = "{Attr.ValueType.FullName,nq}")]
             public class DebugAttribute
             {
                 public DebugAttribute(Attribute attr)
@@ -243,7 +243,7 @@ namespace Datamodel
 
         public AttributeList(Datamodel owner)
         {
-            Inner = new List<Attribute>();
+            Inner = new OrderedDictionary();
             Owner = owner;
         }
 
@@ -269,7 +269,8 @@ namespace Datamodel
         {
             lock (Attribute_ChangeLock)
             {
-                Inner.Insert(index, item);
+                Inner.Remove(item.Name);
+                Inner.Insert(index, item.Name, item);
             }
             item.Owner = this;
 
@@ -281,25 +282,23 @@ namespace Datamodel
         {
             lock (Attribute_ChangeLock)
             {
-                var attr = Inner.FirstOrDefault(a => a.Name == key);
-                if (attr.Name == null) return false;
-                var index = Inner.IndexOf(attr);
-                if (Inner.Remove(attr))
-                {
-                    OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr.ToKeyValuePair(), index));
-                    return true;
-                }
-                else return false;
+                var attr = Inner[key] as Attribute?;
+                if (!attr.HasValue) return false;
+
+                var index = IndexOf(key);
+                Inner.Remove(key);
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr.Value.ToKeyValuePair(), index));
+                return true;
             }
         }
 
         public bool TryGetValue(string key, out object value)
         {
-            Attribute result;
+            Attribute? result;
             lock (Attribute_ChangeLock)
-                result = Inner.FirstOrDefault(a => a.Name == key);
+                result = Inner[key] as Attribute?;
 
-            if (result.Name != null)
+            if (result.HasValue)
             {
                 value = result.Value;
                 return true;
@@ -315,25 +314,35 @@ namespace Datamodel
         {
             if (key == null) throw new ArgumentNullException("key");
             lock (Attribute_ChangeLock)
-                return Inner.Any(attr => attr.Name == key);
+                return Inner[key] != null;
         }
         public ICollection<string> Keys
         {
-            get { lock (Attribute_ChangeLock) return Inner.Select(attr => attr.Name).ToArray(); }
+            get { lock (Attribute_ChangeLock) return Inner.Keys.Cast<string>().ToArray(); }
         }
         public ICollection<object> Values
         {
-            get { lock (Attribute_ChangeLock) return Inner.Select(a => a.Value).ToArray(); }
+            get { lock (Attribute_ChangeLock) return Inner.Values.Cast<Attribute>().Select(attr => attr.Value).ToArray(); }
         }
 
+        /// <summary>
+        /// Gets or sets the value of the <see cref="Attribute"/> with the given name.
+        /// </summary>
+        /// <param name="name">The name to search for. Cannot be null.</param>
+        /// <returns>The value associated with the given name.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when the value of name is null.</exception>
+        /// <exception cref="KeyNotFoundException">Thrown when an attempt is made to get a name that is not present in this AttributeList.</exception>
+        /// <exception cref="ElementOwnershipException">Thrown when an attempt is made to set the value of the attribute to an Element from a different <see cref="Datamodel"/>.</exception>
+        /// <exception cref="AttributeTypeException">Thrown when an attempt is made to set a value that is not of a valid Datamodel attribute type.</exception>
+        /// <exception cref="IndexOutOfRangeException">Thrown when the maximum number of Attributes allowed in an AttributeList has been reached.</exception>        
         public virtual object this[string name]
         {
             get
             {
                 if (name == null) throw new ArgumentNullException("name");
-                var attr = Inner.Find(a => a.Name == name);
-                if (attr.Name == null) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
-                return attr.Value;
+                var attr = Inner[name] as Attribute?;
+                if (!attr.HasValue) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
+                return attr.Value.Value;
             }
             set
             {
@@ -344,22 +353,25 @@ namespace Datamodel
                 if (Owner != null && this == Owner.PrefixAttributes && value.GetType() == typeof(Element))
                     throw new AttributeTypeException("Elements are not supported as prefix attributes.");
 
-                Attribute old_attr, new_attr;
-                int old_index;
+                Attribute? old_attr;
+                Attribute new_attr;
+                int old_index = -1;
                 lock (Attribute_ChangeLock)
                 {
-                    old_attr = Inner.Find(a => a.Name == name);
+                    old_attr = Inner[name] as Attribute?;
                     new_attr = new Attribute(name, this, value);
 
-                    old_index = Inner.IndexOf(old_attr);
-                    if (old_index != -1)
+                    if (old_attr.HasValue)
+                    {
+                        old_index = IndexOf(old_attr.Value.Name);
                         Inner.Remove(old_attr);
+                    }
                     Insert(old_index == -1 ? Count : old_index, new Attribute(name, this, value), notify: false);
                 }
 
                 NotifyCollectionChangedEventArgs change_args;
-                if (old_attr.Name != null)
-                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr.ToKeyValuePair(), old_attr.ToKeyValuePair(), old_index);
+                if (old_attr.HasValue)
+                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr.ToKeyValuePair(), old_attr.Value.ToKeyValuePair(), old_index);
                 else
                     change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr.ToKeyValuePair(), Count);
 
@@ -374,7 +386,7 @@ namespace Datamodel
         {
             get
             {
-                var attr = Inner[index];
+                var attr = (Attribute)Inner[index];
                 return attr.ToKeyValuePair();
             }
             set
@@ -392,7 +404,7 @@ namespace Datamodel
             Attribute attr;
             lock (Attribute_ChangeLock)
             {
-                attr = Inner[index];
+                attr = (Attribute)Inner[index];
                 attr.Owner = null;
                 Inner.RemoveAt(index);
             }
@@ -404,8 +416,8 @@ namespace Datamodel
             lock (Attribute_ChangeLock)
             {
                 int i = 0;
-                foreach (var attr in Inner)
-                    if (attr.Name == key) return i;
+                foreach (string name in Inner.Keys)
+                    if (name == key) return i;
             }
             return -1;
         }
@@ -439,7 +451,7 @@ namespace Datamodel
 
         public IEnumerator<AttrKVP> GetEnumerator()
         {
-            foreach (var attr in Inner.ToArray())
+            foreach (var attr in Inner.Values.Cast<Attribute>().ToArray())
                 yield return attr.ToKeyValuePair();
         }
 
@@ -517,24 +529,16 @@ namespace Datamodel
             return ContainsKey((string)key);
         }
 
-        ICollection IDictionary.Keys
-        {
-            get { lock (Attribute_ChangeLock) return Inner.Select(a => a.Name).ToArray(); }
-        }
-
-        ICollection IDictionary.Values
-        {
-            get { lock (Attribute_ChangeLock) return Inner.Select(a => a.Value).ToArray(); }
-        }
-
-
+        ICollection IDictionary.Keys { get { return (ICollection)Keys; } }
+        ICollection IDictionary.Values { get { return (ICollection)Values; } }
+        
         bool ICollection<AttrKVP>.Remove(AttrKVP item)
         {
             lock (Attribute_ChangeLock)
             {
-                var attr = Inner.Find(a => a.Name == item.Key);
-                if (attr.Name == null || attr.Value != item.Value) return false;
-                Remove(attr.Name);
+                var attr = Inner[item.Key] as Attribute?;
+                if (!attr.HasValue || attr.Value.Value != item.Value) return false;
+                Remove(attr.Value.Name);
                 return true;
             }
         }
@@ -547,7 +551,7 @@ namespace Datamodel
         void ICollection.CopyTo(Array array, int index)
         {
             lock (Attribute_ChangeLock)
-                foreach (var attr in Inner)
+                foreach (Attribute attr in Inner.Values)
                 {
                     array.SetValue(attr.ToKeyValuePair(), index);
                     index++;
@@ -562,7 +566,10 @@ namespace Datamodel
         bool ICollection<AttrKVP>.Contains(AttrKVP item)
         {
             lock (Attribute_ChangeLock)
-                return Inner.Any(a => a.Name == item.Key && a.Value == item.Value);
+            {
+                var attr = Inner[item.Key] as Attribute?;
+                return attr.HasValue && attr.Value.Value == item.Value;
+            }
         }
 
         #endregion

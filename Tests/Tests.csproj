@@ -73,6 +73,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Resources\heavy_morphs_low.dmx" />
+    <None Include="Resources\overboss_run.dmx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Resources\taunt05.dmx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

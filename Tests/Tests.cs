@@ -11,6 +11,7 @@ namespace Datamodel_Tests
 {
     public class DatamodelTests
     {
+        protected FileStream Binary_9_File = System.IO.File.OpenRead(@"Resources\overboss_run.dmx");
         protected FileStream Binary_5_File = System.IO.File.OpenRead(@"Resources\taunt05_b5.dmx");
         protected FileStream Binary_4_File = System.IO.File.OpenRead(@"Resources\binary4.dmx");
         protected FileStream KeyValues2_1_File = System.IO.File.OpenRead(@"Resources\taunt05.dmx");
@@ -252,6 +253,17 @@ namespace Datamodel_Tests
         {
             dm.Root.Get<Element>("skeleton").GetArray<Element>("children")[0].Any();
             dm.FormatVersion = 22; // otherwise recent versions of dmxconvert fail
+        }
+
+        [TestMethod]
+        public void Dota2_Binary_9()
+        {
+            var dm = DM.Load(Binary_9_File);
+            PrintContents(dm);
+            dm.Root.Get<Element>("skeleton").GetArray<Element>("children")[0].Any();
+            SaveAndConvert(dm, "binary", 9);
+
+            Cleanup();
         }
 
         [TestMethod]

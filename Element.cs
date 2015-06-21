@@ -380,7 +380,7 @@ namespace Datamodel
         internal void Add(string key, long offset)
         {
             lock (Attribute_ChangeLock)
-                Inner.Add(new Attribute(key, this, offset));
+                Inner[key] = new Attribute(key, this, offset);
         }
 
         public override bool ContainsKey(string key)

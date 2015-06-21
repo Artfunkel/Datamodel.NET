@@ -293,7 +293,7 @@ namespace Datamodel
                 ElementList Item;
 
                 [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-                public Element[] Elements { get { return (Element[])Item.store.Values; } }
+                public Element[] Elements { get { return Item.store.Values.Cast<Element>().ToArray(); } }
             }
 
             OrderedDictionary store = new OrderedDictionary();
@@ -499,7 +499,7 @@ namespace Datamodel
             protected void WalkElemTree(Element elem, HashSet<Element> found)
             {
                 found.Add(elem);
-                foreach (var value in elem.Inner.Select(a => a.RawValue))
+                foreach (var value in elem.Inner.Values.Cast<Attribute>().Select(a => a.RawValue))
                 {
                     var value_elem = value as Element;
                     if (value_elem != null)
