@@ -60,7 +60,7 @@ namespace Datamodel
         public Type ValueType { get; private set; }
 
         /// <summary>
-        /// Gets the <see cref="Element"/> which this Attribute is part of.
+        /// Gets the <see cref="AttributeList"/> which this Attribute is a member of.
         /// </summary>
         public AttributeList Owner
         {
@@ -282,7 +282,7 @@ namespace Datamodel
         {
             lock (Attribute_ChangeLock)
             {
-                var attr = Inner[key] as Attribute?;
+                var attr = (Attribute?)Inner[key];
                 if (!attr.HasValue) return false;
 
                 var index = IndexOf(key);
@@ -296,7 +296,7 @@ namespace Datamodel
         {
             Attribute? result;
             lock (Attribute_ChangeLock)
-                result = Inner[key] as Attribute?;
+                result = (Attribute?)Inner[key];
 
             if (result.HasValue)
             {
@@ -340,7 +340,7 @@ namespace Datamodel
             get
             {
                 if (name == null) throw new ArgumentNullException("name");
-                var attr = Inner[name] as Attribute?;
+                var attr = (Attribute?)Inner[name];
                 if (!attr.HasValue) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
                 return attr.Value.Value;
             }
@@ -358,7 +358,7 @@ namespace Datamodel
                 int old_index = -1;
                 lock (Attribute_ChangeLock)
                 {
-                    old_attr = Inner[name] as Attribute?;
+                    old_attr = (Attribute?)Inner[name];
                     new_attr = new Attribute(name, this, value);
 
                     if (old_attr.HasValue)
@@ -536,7 +536,7 @@ namespace Datamodel
         {
             lock (Attribute_ChangeLock)
             {
-                var attr = Inner[item.Key] as Attribute?;
+                var attr = (Attribute?)Inner[item.Key];
                 if (!attr.HasValue || attr.Value.Value != item.Value) return false;
                 Remove(attr.Value.Name);
                 return true;
@@ -567,7 +567,7 @@ namespace Datamodel
         {
             lock (Attribute_ChangeLock)
             {
-                var attr = Inner[item.Key] as Attribute?;
+                var attr = (Attribute?)Inner[item.Key];
                 return attr.HasValue && attr.Value.Value == item.Value;
             }
         }
