@@ -322,10 +322,10 @@ namespace Datamodel
                     ChangeLock.EnterWriteLock();
                     try
                     {
-                        store.Add(item.ID, item);
-
                         if (existing != null)
                             store.Remove(existing.ID);
+
+                        store.Add(item.ID, item);
                     }
                     finally
                     {

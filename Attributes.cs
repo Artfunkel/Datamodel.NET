@@ -417,7 +417,10 @@ namespace Datamodel
             {
                 int i = 0;
                 foreach (string name in Inner.Keys)
+                {
                     if (name == key) return i;
+                    i++;
+                }
             }
             return -1;
         }
@@ -644,6 +647,7 @@ namespace Datamodel
     /// Wraps around an <see cref="Element"/> attribute or array item. Provides notifications of changes to the wrapped value(s) and provides an enumeration of ObservableAttribute children.
     /// </summary>
     /// <remarks>This type is provided as a utility. You must invoke it yourself, probably via a <see cref="System.Windows.Data.IValueConverter"/> implementation.</remarks>
+    [DebuggerDisplay("{Key}: {Value}")]
     public class ObservableAttribute : INotifyPropertyChanged, INotifyCollectionChanged, IEnumerable
     {
         /*
