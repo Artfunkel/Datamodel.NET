@@ -300,7 +300,7 @@ namespace Datamodel
 
             if (result.HasValue)
             {
-                value = result.Value;
+                value = result.Value.RawValue;
                 return true;
             }
             else
