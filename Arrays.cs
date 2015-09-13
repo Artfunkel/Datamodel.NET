@@ -24,7 +24,7 @@ namespace Datamodel
             Array<T> Arr;
 
             [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-            T[] Items { get { return Arr.Inner.ToArray(); } }
+            public T[] Items { get { return Arr.Inner.ToArray(); } }
         }
 
         protected List<T> Inner;
@@ -336,7 +336,7 @@ namespace Datamodel
     }
 
     public class ElementArray : Array<Element>
-    {
+    {    
         public ElementArray() { }
 
         public ElementArray(IEnumerable<Element> enumerable)

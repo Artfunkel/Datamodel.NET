@@ -15,7 +15,7 @@ namespace Datamodel
     /// <summary>
     /// A name/value pair associated with an <see cref="Element"/>.
     /// </summary>
-    struct Attribute
+    class Attribute
     {
         /// <summary>
         /// Creates a new Attribute with a specified name and value.
@@ -23,7 +23,6 @@ namespace Datamodel
         /// <param name="name">The name of the Attribute, which must be unique to its owner.</param>
         /// <param name="value">The value of the Attribute, which must be of a supported Datamodel type.</param>
         public Attribute(string name, AttributeList owner, object value)
-            : this()
         {
             if (name == null)
                 throw new ArgumentNullException("name");
@@ -50,9 +49,9 @@ namespace Datamodel
 
         #region Properties
         /// <summary>
-        /// Gets or sets the name of this Attribute.
+        /// Gets the name of this Attribute.
         /// </summary>
-        public string Name { get; set; }
+        public string Name { get; private set; }
 
         /// <summary>
         /// Gets the Type of this Attribute's Value.
@@ -212,7 +211,7 @@ namespace Datamodel
     {
         internal OrderedDictionary Inner;
         protected object Attribute_ChangeLock = new object();
-        
+
         internal class DebugView
         {
             public DebugView(AttributeList item)
@@ -221,7 +220,7 @@ namespace Datamodel
             }
             [DebuggerBrowsable(DebuggerBrowsableState.Never)]
             protected AttributeList Item;
-            
+
             [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
             public DebugAttribute[] Attributes { get { return Item.Inner.Values.Cast<Attribute>().Select(attr => new DebugAttribute(attr)).ToArray(); } }
 
@@ -237,7 +236,7 @@ namespace Datamodel
                 Attribute Attr;
 
                 [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-                object Value { get { return Attr.RawValue; } }
+                object Value { get { return Attr.Value; } }
             }
         }
 
@@ -277,30 +276,30 @@ namespace Datamodel
             if (notify)
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item.ToKeyValuePair(), index));
         }
-        
+
         public bool Remove(string key)
         {
             lock (Attribute_ChangeLock)
             {
-                var attr = (Attribute?)Inner[key];
-                if (!attr.HasValue) return false;
+                var attr = (Attribute)Inner[key];
+                if (attr == null) return false;
 
                 var index = IndexOf(key);
                 Inner.Remove(key);
-                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr.Value.ToKeyValuePair(), index));
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, attr.ToKeyValuePair(), index));
                 return true;
             }
         }
 
         public bool TryGetValue(string key, out object value)
         {
-            Attribute? result;
+            Attribute result;
             lock (Attribute_ChangeLock)
-                result = (Attribute?)Inner[key];
+                result = (Attribute)Inner[key];
 
-            if (result.HasValue)
+            if (result != null)
             {
-                value = result.Value.RawValue;
+                value = result.RawValue;
                 return true;
             }
             else
@@ -340,9 +339,9 @@ namespace Datamodel
             get
             {
                 if (name == null) throw new ArgumentNullException("name");
-                var attr = (Attribute?)Inner[name];
-                if (!attr.HasValue) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
-                return attr.Value.Value;
+                var attr = (Attribute)Inner[name];
+                if (attr == null) throw new KeyNotFoundException(String.Format("{0} does not have an attribute called \"{1}\"", this, name));
+                return attr.Value;
             }
             set
             {
@@ -353,25 +352,25 @@ namespace Datamodel
                 if (Owner != null && this == Owner.PrefixAttributes && value.GetType() == typeof(Element))
                     throw new AttributeTypeException("Elements are not supported as prefix attributes.");
 
-                Attribute? old_attr;
+                Attribute old_attr;
                 Attribute new_attr;
                 int old_index = -1;
                 lock (Attribute_ChangeLock)
                 {
-                    old_attr = (Attribute?)Inner[name];
+                    old_attr = (Attribute)Inner[name];
                     new_attr = new Attribute(name, this, value);
 
-                    if (old_attr.HasValue)
+                    if (old_attr != null)
                     {
-                        old_index = IndexOf(old_attr.Value.Name);
+                        old_index = IndexOf(old_attr.Name);
                         Inner.Remove(old_attr);
                     }
                     Insert(old_index == -1 ? Count : old_index, new Attribute(name, this, value), notify: false);
                 }
 
                 NotifyCollectionChangedEventArgs change_args;
-                if (old_attr.HasValue)
-                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr.ToKeyValuePair(), old_attr.Value.ToKeyValuePair(), old_index);
+                if (old_attr != null)
+                    change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Replace, new_attr.ToKeyValuePair(), old_attr.ToKeyValuePair(), old_index);
                 else
                     change_args = new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, new_attr.ToKeyValuePair(), Count);
 
@@ -499,12 +498,12 @@ namespace Datamodel
                 CollectionChanged(this, e);
         }
 
-        
+
         IDictionaryEnumerator IDictionary.GetEnumerator()
         {
             throw new NotImplementedException();
         }
-        
+
         void IDictionary.Remove(object key)
         {
             Remove((string)key);
@@ -534,14 +533,14 @@ namespace Datamodel
 
         ICollection IDictionary.Keys { get { return (ICollection)Keys; } }
         ICollection IDictionary.Values { get { return (ICollection)Values; } }
-        
+
         bool ICollection<AttrKVP>.Remove(AttrKVP item)
         {
             lock (Attribute_ChangeLock)
             {
-                var attr = (Attribute?)Inner[item.Key];
-                if (!attr.HasValue || attr.Value.Value != item.Value) return false;
-                Remove(attr.Value.Name);
+                var attr = (Attribute)Inner[item.Key];
+                if (attr == null || attr.Value != item.Value) return false;
+                Remove(attr.Name);
                 return true;
             }
         }
@@ -560,7 +559,7 @@ namespace Datamodel
                     index++;
                 }
         }
-        
+
         void ICollection<AttrKVP>.Add(AttrKVP item)
         {
             this[item.Key] = item.Value;
@@ -570,8 +569,8 @@ namespace Datamodel
         {
             lock (Attribute_ChangeLock)
             {
-                var attr = (Attribute?)Inner[item.Key];
-                return attr.HasValue && attr.Value.Value == item.Value;
+                var attr = (Attribute)Inner[item.Key];
+                return attr != null && attr.Value == item.Value;
             }
         }
 
