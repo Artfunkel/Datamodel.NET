@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
+using System.Numerics;
 using System.Drawing;
 using System.Threading;
 using System.ComponentModel;
@@ -546,17 +546,6 @@ namespace Datamodel
         { }
     }
 
-    public class AngleArray : Array<Angle>
-    {
-        public AngleArray() { }
-        public AngleArray(IEnumerable<Angle> enumerable)
-            : base(enumerable)
-        { }
-        public AngleArray(int capacity)
-            : base(capacity)
-        { }
-    }
-
     public class Vector4Array : Array<Vector4>
     {
         public Vector4Array() { }
@@ -579,10 +568,10 @@ namespace Datamodel
         { }
     }
 
-    public class MatrixArray : Array<Matrix>
+    public class MatrixArray : Array<Matrix4x4>
     {
         public MatrixArray() { }
-        public MatrixArray(IEnumerable<Matrix> enumerable)
+        public MatrixArray(IEnumerable<Matrix4x4> enumerable)
             : base(enumerable)
         { }
         public MatrixArray(int capacity)

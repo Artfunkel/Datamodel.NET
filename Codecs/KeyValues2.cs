@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Numerics;
 using System.IO;
 
 namespace Datamodel.Codecs
@@ -31,9 +32,8 @@ namespace Datamodel.Codecs
             TypeNames[typeof(Vector2)] = "vector2";
             TypeNames[typeof(Vector3)] = "vector3";
             TypeNames[typeof(Vector4)] = "vector4";
-            TypeNames[typeof(Angle)] = "qangle";
             TypeNames[typeof(Quaternion)] = "quaternion";
-            TypeNames[typeof(Matrix)] = "matrix";
+            TypeNames[typeof(Matrix4x4)] = "matrix";
 
             ValidAttributes[1] = ValidAttributes[2] = ValidAttributes[3] = TypeNames.Select(kv => kv.Key).ToArray();
 
@@ -241,6 +241,36 @@ namespace Datamodel.Codecs
                 }
                 else if (type == typeof(UInt64))
                     value = ((UInt64)value).ToString("X");
+                else if (type == typeof(Vector2))
+                {
+                    var arr = new float[2];
+                    ((Vector2)value).CopyTo(arr);
+                    value = string.Join(" ", arr);
+                }
+                else if (type == typeof(Vector3))
+                {
+                    var arr = new float[3];
+                    ((Vector3)value).CopyTo(arr);
+                    value = string.Join(" ", arr);
+                }
+                else if (type == typeof(Vector4))
+                {
+                    var arr = new float[4];
+                    ((Vector4)value).CopyTo(arr);
+                    value = string.Join(" ", arr);
+                }
+                else if (type == typeof(Quaternion))
+                {
+                    var arr = new float[4];
+                    var q = (Quaternion)value;
+                    value = string.Join(" ", q.X, q.Y, q.Z, q.W);
+                }
+                else if (type == typeof(Matrix4x4))
+                {
+                    var arr = new float[4*4];
+                    var m = (Matrix4x4)value;
+                    value = string.Join(" ", m.M11, m.M12, m.M13, m.M14, m.M21, m.M22, m.M23, m.M24, m.M31, m.M32, m.M33, m.M34, m.M41, m.M42, m.M43, m.M44);
+                }
 
                 if (in_array)
                     Writer.Write(String.Format(" \"{0}\",", value.ToString()));
@@ -495,16 +525,19 @@ namespace Datamodel.Codecs
                 return System.Drawing.Color.FromArgb(rgba[3], rgba[0], rgba[1], rgba[2]);
             }
 
-            var f_list = num_list.Select(i => float.Parse(i));
-            if (type == typeof(Vector2)) return new Vector2(f_list);
-            else if (type == typeof(Vector3)) return new Vector3(f_list);
-            else if (type == typeof(Vector4)) return new Vector4(f_list);
-            else if (type == typeof(Angle)) return new Angle(f_list);
-            else if (type == typeof(Quaternion)) return new Quaternion(f_list);
-            else if (type == typeof(Matrix)) return new Matrix(f_list);
-
+            if (type == typeof(UInt64)) return UInt64.Parse(value.Remove(0, 2), System.Globalization.NumberStyles.HexNumber);
             if (type == typeof(byte)) return byte.Parse(value);
-            if (type == typeof(UInt64)) return UInt64.Parse(value.Remove(0, 2),System.Globalization.NumberStyles.HexNumber);
+
+            var f_list = num_list.Select(i => float.Parse(i)).ToArray();
+            if (type == typeof(Vector2)) return new Vector2(f_list[0], f_list[1]);
+            else if (type == typeof(Vector3)) return new Vector3(f_list[0], f_list[1], f_list[2]);
+            else if (type == typeof(Vector4)) return new Vector4(f_list[0], f_list[1], f_list[2], f_list[3]);
+            else if (type == typeof(Quaternion)) return new Quaternion(f_list[0], f_list[1], f_list[2], f_list[3]);
+            else if (type == typeof(Matrix4x4)) return new Matrix4x4(
+                f_list[0], f_list[1], f_list[2], f_list[3],
+                f_list[4], f_list[5], f_list[6], f_list[7],
+                f_list[8], f_list[9], f_list[10], f_list[11],
+                f_list[12], f_list[13], f_list[14], f_list[15]);
 
             else throw new ArgumentException("Internal error: ParseValue passed unsupported Type.");
         }

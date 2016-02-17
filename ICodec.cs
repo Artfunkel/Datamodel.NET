@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.IO;
-using System.Collections.Generic;
+using System.Numerics;
 
 namespace Datamodel.Codecs
 {
@@ -108,11 +108,9 @@ namespace Datamodel.Codecs
                 return new Vector3Array(count);
             if (t == typeof(Vector4))
                 return new Vector4Array(count);
-            if (t == typeof(Angle))
-                return new AngleArray(count);
             if (t == typeof(Quaternion))
                 return new QuaternionArray(count);
-            if (t == typeof(Matrix))
+            if (t == typeof(Matrix4x4))
                 return new MatrixArray(count);
             if (t == typeof(byte))
                 return new ByteArray(count);
@@ -149,12 +147,10 @@ namespace Datamodel.Codecs
                 return new Vector3Array(source.Cast<Vector3>());
             if (t == typeof(Vector4))
                 return new Vector4Array(source.Cast<Vector4>());
-            if (t == typeof(Angle))
-                return new AngleArray(source.Cast<Angle>());
             if (t == typeof(Quaternion))
                 return new QuaternionArray(source.Cast<Quaternion>());
-            if (t == typeof(Matrix))
-                return new MatrixArray(source.Cast<Matrix>());
+            if (t == typeof(Matrix4x4))
+                return new MatrixArray(source.Cast<Matrix4x4>());
             if (t == typeof(byte))
                 return new ByteArray(source.Cast<byte>());
             if (t == typeof(UInt64))

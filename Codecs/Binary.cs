@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Numerics;
 using System.IO;
 
 namespace Datamodel.Codecs
@@ -20,9 +21,9 @@ namespace Datamodel.Codecs
 
         static Binary()
         {
-            SupportedAttributes[1] = SupportedAttributes[2] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), null /* ObjectID */, typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
-            SupportedAttributes[3] = SupportedAttributes[4] = SupportedAttributes[5] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix) };
-            SupportedAttributes[9] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix), typeof(UInt64), typeof(byte) };
+            SupportedAttributes[1] = SupportedAttributes[2] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), null /* ObjectID */, typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Vector3) /* angle*/, typeof(Quaternion), typeof(Matrix4x4) };
+            SupportedAttributes[3] = SupportedAttributes[4] = SupportedAttributes[5] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Vector3) /* angle*/, typeof(Quaternion), typeof(Matrix4x4) };
+            SupportedAttributes[9] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Vector3) /* angle*/, typeof(Quaternion), typeof(Matrix4x4), typeof(UInt64), typeof(byte) };
         }
 
         public void Dispose()
@@ -251,17 +252,34 @@ namespace Datamodel.Codecs
             }
 
             if (type == typeof(Vector2))
-                return new Vector2(ReadVector(2));
+            {
+                var ords = ReadVector(2);
+                return new Vector2(ords[0], ords[1]);
+            }
             if (type == typeof(Vector3))
-                return new Vector3(ReadVector(3));
-            if (type == typeof(Angle))
-                return new Angle(ReadVector(3));
+            {
+                var ords = ReadVector(3);
+                return new Vector3(ords[0], ords[1], ords[2]);
+            }
             if (type == typeof(Vector4))
-                return new Vector4(ReadVector(4));
+            {
+                var ords = ReadVector(4);
+                return new Vector4(ords[0], ords[1], ords[2], ords[3]);
+            }
             if (type == typeof(Quaternion))
-                return new Quaternion(ReadVector(4));
-            if (type == typeof(Matrix))
-                return new Matrix(ReadVector(4 * 4));
+            {
+                var ords = ReadVector(4);
+                return new Quaternion(ords[0], ords[1], ords[2], ords[3]);
+            }
+            if (type == typeof(Matrix4x4))
+            {
+                var ords = ReadVector(4*4);
+                return new Matrix4x4(
+                    ords[0], ords[1], ords[2], ords[3],
+                    ords[4], ords[5], ords[6], ords[7],
+                    ords[8], ords[9], ords[10], ords[11],
+                    ords[12], ords[13], ords[14], ords[15]);
+            }
 
             if (type == typeof(byte))
                 return Reader.ReadByte();
@@ -415,11 +433,11 @@ namespace Datamodel.Codecs
             }
             else if (type == typeof(Vector2))
                 length = sizeof(float) * 2;
-            else if (type == typeof(Vector3) || type == typeof(Angle))
+            else if (type == typeof(Vector3))
                 length = sizeof(float) * 3;
             else if (type == typeof(Vector4) || type == typeof(Quaternion))
                 length = sizeof(float) * 4;
-            else if (type == typeof(Matrix))
+            else if (type == typeof(Matrix4x4))
                 length = sizeof(float) * 4 * 4;
             else
                 length = System.Runtime.InteropServices.Marshal.SizeOf(type);
@@ -601,9 +619,58 @@ namespace Datamodel.Codecs
                     return;
                 }
 
-                if (value is IEnumerable<float>)
+                if (value is Vector2)
                 {
-                    Writer.Write(((IEnumerable<float>)value).SelectMany(f => BitConverter.GetBytes(f)).ToArray());
+                    var v = (Vector2)value;
+                    Writer.Write(v.X);
+                    Writer.Write(v.Y);
+                    return;
+                }
+                if (value is Vector3)
+                {
+                    var v = (Vector3)value;
+                    Writer.Write(v.X);
+                    Writer.Write(v.Y);
+                    Writer.Write(v.Z);
+                    return;
+                }
+                if (value is Vector4)
+                {
+                    var v = (Vector4)value;
+                    Writer.Write(v.X);
+                    Writer.Write(v.Y);
+                    Writer.Write(v.Z);
+                    Writer.Write(v.W);
+                    return;
+                }
+                if (value is Quaternion)
+                {
+                    var v = (Quaternion)value;
+                    Writer.Write(v.X);
+                    Writer.Write(v.Y);
+                    Writer.Write(v.Z);
+                    Writer.Write(v.W);
+                    return;
+                }
+                if (value is Matrix4x4)
+                {
+                    var v = (Matrix4x4)value;
+                    Writer.Write(v.M11);
+                    Writer.Write(v.M12);
+                    Writer.Write(v.M13);
+                    Writer.Write(v.M14);
+                    Writer.Write(v.M21);
+                    Writer.Write(v.M22);
+                    Writer.Write(v.M23);
+                    Writer.Write(v.M24);
+                    Writer.Write(v.M31);
+                    Writer.Write(v.M32);
+                    Writer.Write(v.M33);
+                    Writer.Write(v.M34);
+                    Writer.Write(v.M41);
+                    Writer.Write(v.M42);
+                    Writer.Write(v.M43);
+                    Writer.Write(v.M44);
                     return;
                 }
 

@@ -5,7 +5,7 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Linq;
-using System.Text;
+using System.Numerics;
 using System.Globalization;
 
 using AttrKVP = System.Collections.Generic.KeyValuePair<string, object>;
@@ -57,6 +57,37 @@ namespace Datamodel
         /// Gets the Type of this Attribute's Value.
         /// </summary>
         public Type ValueType { get; private set; }
+
+        /// <summary>
+        /// Gets or sets the OverrideType of this Attributes.
+        /// </summary>
+        public AttributeList.OverrideType? OverrideType
+        {
+            get
+            {
+                return _OverrideType;
+            }
+            set
+            {
+                switch (value)
+                {
+                    case null:
+                        break;
+                    case AttributeList.OverrideType.Angle:
+                        if (ValueType != typeof(Vector3))
+                            throw new AttributeTypeException("OverrideType.Angle can only be applied to Vector3 attributes");
+                        break;
+                    case AttributeList.OverrideType.Binary:
+                        if (ValueType != typeof(byte[]))
+                            throw new AttributeTypeException("OverrideType.Binary can only be applied to byte[] attributes");
+                        break;
+                    default:
+                        throw new NotImplementedException();
+                }
+                _OverrideType = value;
+            }
+        }
+        AttributeList.OverrideType? _OverrideType;
 
         /// <summary>
         /// Gets the <see cref="AttributeList"/> which this Attribute is a member of.
@@ -240,6 +271,21 @@ namespace Datamodel
             }
         }
 
+        /// <summary>
+        /// Contains the names of Datamodel types which are functionally identical to other types and don't have their own CLR representation.
+        /// </summary>
+        public enum OverrideType
+        {
+            /// <summary>
+            /// Maps to <see cref="Vector3"/>.
+            /// </summary>
+            Angle,
+            /// <summary>
+            /// Maps to <see cref="byte[]"/>.
+            /// </summary>
+            Binary,
+        }
+
         public AttributeList(Datamodel owner)
         {
             Inner = new OrderedDictionary();
@@ -259,6 +305,28 @@ namespace Datamodel
         public void Add(string key, object value)
         {
             this[key] = value;
+        }
+
+        /// <summary>
+        /// Gets the given atttribute's "override type". This applies when multiple Datamodel types map to the same CLR type.
+        /// </summary>
+        /// <param name="key">The name of the attribute.</param>
+        /// <returns>The attribute's Datamodel type, if different from its CLR type.</returns>
+        /// <exception cref="KeyNotFoundException">Thrown when the given attribute is not present in the list.</exception>
+        public OverrideType? GetOverrideType(string key)
+        {
+            return ((Attribute)Inner[key]).OverrideType;
+        }
+
+        /// <summary>
+        /// Sets the given attribute's "override type". This applies when multiple Datamodel types map to the same CLR type.
+        /// </summary>
+        /// <param name="key">The name of the attribute.</param>
+        /// <param name="type">The Datamodel type which the attribute should be stored as when written to DMX, or null.</param>
+        /// <exception cref="AttributeTypeException">Thrown when the attribute's CLR type does not map to the value given in <paramref name="type"/>.</exception>
+        public void SetOverrideType(string key, OverrideType? type)
+        {
+            ((Attribute)Inner[key]).OverrideType = type;
         }
 
         /// <summary>
@@ -854,660 +922,139 @@ namespace Datamodel
                 foreach (var item in WrapEnumerable((IEnumerable)Value))
                     yield return item;
         }
+
     }
 
-    #region Custom attribute types
-
-    [Serializable]
-    [TypeConverter(typeof(TypeConverters.Vector2Converter))]
-    public struct Vector2 : IEnumerable<float>, IEquatable<Vector2>
+    /// <summary>
+    /// A collection of dummy types with a TypeConverter attribute which converts them to the System.Numerics types which Datamodel.NET actually uses.
+    /// </summary>
+    namespace XAML
     {
-        public float X { get; set; }
-        public float Y { get; set; }
+        [TypeConverter(typeof(TypeConverters.Vector2Converter))]
+        public class Vector2
+        {
 
-        public static readonly Vector2 Zero = new Vector2();
+        }
+        [TypeConverter(typeof(TypeConverters.Vector3Converter))]
+        public class Vector3
+        {
 
-        public float Length { get { return (float)Math.Sqrt(X * X + Y * Y); } }
+        }
+        [TypeConverter(typeof(TypeConverters.Vector4Converter))]
+        public class Vector4
+        {
 
-        public Vector2(float x, float y)
-            : this()
-        {
-            X = x;
-            Y = y;
         }
-        public Vector2(IEnumerable<float> values)
-            : this()
+        [TypeConverter(typeof(TypeConverters.QuaternionConverter))]
+        public class Quaternion
         {
-            int i = 0;
-            foreach (var ordinate in values.Take(2))
-            {
-                switch (i)
-                {
-                    case 0: X = ordinate; break;
-                    case 1: Y = ordinate; break;
-                }
-                i++;
-            }
-        }
 
-        public void Normalise()
-        {
-            var scale = 1 / Length;
-            X *= scale;
-            Y *= scale;
         }
+        [TypeConverter(typeof(TypeConverters.MatrixConverter))]
+        public class Matrix
+        {
 
-        public double Dot(Vector2 other)
-        {
-            return X * other.X + Y * other.Y;
-        }
-
-        public IEnumerator<float> GetEnumerator()
-        {
-            yield return X;
-            yield return Y;
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public override string ToString()
-        {
-            return String.Join(" ", X, Y);
-        }
-
-        public bool Equals(Vector2 other)
-        {
-            return X == other.X && Y == other.Y;
-        }
-        public override bool Equals(object obj)
-        {
-            if (!(obj is Vector2)) return false;
-            return Equals((Vector2)obj);
-        }
-
-        public override int GetHashCode()
-        {
-            return X.GetHashCode() ^ Y.GetHashCode();
-        }
-
-        public static bool operator ==(Vector2 a, Vector2 b)
-        {
-            return a.Equals(b);
-        }
-        public static bool operator !=(Vector2 a, Vector2 b)
-        {
-            return !a.Equals(b);
-        }
-
-        public static Vector2 operator -(Vector2 a, Vector2 b)
-        {
-            return new Vector2(a.X - b.X, a.Y - b.Y);
-        }
-
-        public static Vector2 operator +(Vector2 a, Vector2 b)
-        {
-            return new Vector2(a.X + b.X, a.Y + b.Y);
-        }
-
-        public static Vector2 operator *(Vector2 a, float b)
-        {
-            return new Vector2(a.X * b, a.Y * b);
-        }
-
-        public static Vector2 operator /(Vector2 a, float b)
-        {
-            return new Vector2(a.X / b, a.Y / b);
         }
     }
 
-    [Serializable]
-    [TypeConverter(typeof(TypeConverters.Vector3Converter))]
-    public struct Vector3 : IEnumerable<float>, IEquatable<Vector3>
-    {
-        public float X { get; set; }
-        public float Y { get; set; }
-        public float Z { get; set; }
-
-        public static readonly Vector3 Zero = new Vector3();
-
-        public float Length { get { return (float)Math.Sqrt(X * X + Y * Y + Z * Z); } }
-
-        public Vector3(float x, float y, float z)
-            : this()
-        {
-            X = x;
-            Y = y;
-            Z = z;
-        }
-        public Vector3(IEnumerable<float> values)
-            : this()
-        {
-            int i = 0;
-            foreach (var ordinate in values.Take(3))
-            {
-                switch (i)
-                {
-                    case 0: X = ordinate; break;
-                    case 1: Y = ordinate; break;
-                    case 2: Z = ordinate; break;
-                }
-                i++;
-            }
-        }
-
-        public void Normalise()
-        {
-            var scale = 1 / Length;
-            X *= scale;
-            Y *= scale;
-            Z *= scale;
-        }
-
-        public double Dot(Vector3 other)
-        {
-            return X * other.X + Y * other.Y + Z * other.Z;
-        }
-
-        public IEnumerator<float> GetEnumerator()
-        {
-            yield return X;
-            yield return Y;
-            yield return Z;
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public override string ToString()
-        {
-            return String.Join(" ", X, Y, Z);
-        }
-
-        public bool Equals(Vector3 other)
-        {
-            return X == other.X && Y == other.Y && Z == other.Z;
-        }
-        public override bool Equals(object obj)
-        {
-            if (!(obj is Vector3)) return false;
-            return Equals((Vector3)obj);
-        }
-
-        public override int GetHashCode()
-        {
-            return X.GetHashCode() ^ Y.GetHashCode() ^ Z.GetHashCode();
-        }
-
-        public static bool operator ==(Vector3 a, Vector3 b)
-        {
-            return a.Equals(b);
-        }
-        public static bool operator !=(Vector3 a, Vector3 b)
-        {
-            return !a.Equals(b);
-        }
-
-        public static Vector3 operator -(Vector3 a, Vector3 b)
-        {
-            return new Vector3(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
-        }
-
-        public static Vector3 operator +(Vector3 a, Vector3 b)
-        {
-            return new Vector3(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
-        }
-
-        public static Vector3 operator *(Vector3 a, float b)
-        {
-            return new Vector3(a.X * b, a.Y * b, a.Z * b);
-        }
-
-        public static Vector3 operator /(Vector3 a, float b)
-        {
-            return new Vector3(a.X / b, a.Y / b, a.Z / b);
-        }
-    }
-
-    [Serializable]
-    [TypeConverter(typeof(TypeConverters.Vector3Converter))]
-    public struct Angle : IEnumerable<float>, IEquatable<Angle>
-    {
-        public float X { get; set; }
-        public float Y { get; set; }
-        public float Z { get; set; }
-
-        public static readonly Angle Zero = new Angle();
-
-        public Angle(float x, float y, float z)
-            : this()
-        { X = x; Y = y; Z = z; }
-
-        public Angle(IEnumerable<float> values)
-            : this()
-        {
-            int i = 0;
-            foreach (var ordinate in values.Take(3))
-            {
-                switch (i)
-                {
-                    case 0: X = ordinate; break;
-                    case 1: Y = ordinate; break;
-                    case 2: Z = ordinate; break;
-                }
-                i++;
-            }
-        }
-
-        public IEnumerator<float> GetEnumerator()
-        {
-            yield return X;
-            yield return Y;
-            yield return Z;
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public override string ToString()
-        {
-            return String.Join(" ", X, Y, Z);
-        }
-
-        public bool Equals(Angle other)
-        {
-            return X == other.X && Y == other.Y && Z == other.Z;
-        }
-        public override bool Equals(object obj)
-        {
-            if (!(obj is Angle)) return false;
-            return Equals((Angle)obj);
-        }
-
-        public override int GetHashCode()
-        {
-            return X.GetHashCode() ^ Y.GetHashCode() ^ Z.GetHashCode();
-        }
-
-        public static bool operator ==(Angle a, Angle b)
-        {
-            return a.Equals(b);
-        }
-        public static bool operator !=(Angle a, Angle b)
-        {
-            return !a.Equals(b);
-        }
-
-        public static Angle operator -(Angle a, Angle b)
-        {
-            return new Angle(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
-        }
-
-        public static Angle operator +(Angle a, Angle b)
-        {
-            return new Angle(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
-        }
-
-        public static Angle operator *(Angle a, float b)
-        {
-            return new Angle(a.X * b, a.Y * b, a.Z * b);
-        }
-
-        public static Angle operator /(Angle a, float b)
-        {
-            return new Angle(a.X / b, a.Y / b, a.Z / b);
-        }
-    }
-
-    [Serializable]
-    [TypeConverter(typeof(TypeConverters.Vector4Converter))]
-    public struct Vector4 : IEnumerable<float>, IEquatable<Vector4>
-    {
-        public float X { get; set; }
-        public float Y { get; set; }
-        public float Z { get; set; }
-        public float W { get; set; }
-
-        public static readonly Vector4 Zero = new Vector4();
-
-        public Vector4(float x, float y, float z, float w)
-            : this()
-        {
-            X = x; Y = y; Z = z; W = w;
-        }
-
-        public Vector4(IEnumerable<float> values)
-            : this()
-        {
-            int i = 0;
-            foreach (var ordinate in values.Take(4))
-            {
-                switch (i)
-                {
-                    case 0: X = ordinate; break;
-                    case 1: Y = ordinate; break;
-                    case 2: Z = ordinate; break;
-                    case 3: W = ordinate; break;
-                }
-                i++;
-            }
-        }
-
-        public IEnumerator<float> GetEnumerator()
-        {
-            yield return X;
-            yield return Y;
-            yield return Z;
-            yield return W;
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public override string ToString()
-        {
-            return String.Join(" ", X, Y, Z, W);
-        }
-
-        public bool Equals(Vector4 other)
-        {
-            return X == other.X && Y == other.Y && Z == other.Z && W == other.W;
-        }
-        public override bool Equals(object obj)
-        {
-            if (!(obj is Vector4)) return false;
-            return Equals((Vector4)obj);
-        }
-
-        public override int GetHashCode()
-        {
-            return X.GetHashCode() ^ Y.GetHashCode() ^ Z.GetHashCode() ^ W.GetHashCode();
-        }
-
-        public static bool operator ==(Vector4 a, Vector4 b)
-        {
-            return a.Equals(b);
-        }
-        public static bool operator !=(Vector4 a, Vector4 b)
-        {
-            return !a.Equals(b);
-        }
-
-        public static Vector4 operator -(Vector4 a, Vector4 b)
-        {
-            return new Vector4(a.X - b.X, a.Y - b.Y, a.Z - b.Z, a.W - b.W);
-        }
-
-        public static Vector4 operator +(Vector4 a, Vector4 b)
-        {
-            return new Vector4(a.X + b.X, a.Y + b.Y, a.Z + b.Z, a.W + b.W);
-        }
-
-        public static Vector4 operator *(Vector4 a, float b)
-        {
-            return new Vector4(a.X * b, a.Y * b, a.Z * b, a.W * b);
-        }
-
-        public static Vector4 operator /(Vector4 a, float b)
-        {
-            return new Vector4(a.X / b, a.Y / b, a.Z / b, a.W / b);
-        }
-    }
-
-    [Serializable]
-    [TypeConverter(typeof(TypeConverters.Vector4Converter))]
-    public struct Quaternion : IEnumerable<float>
-    {
-        public float X { get; set; }
-        public float Y { get; set; }
-        public float Z { get; set; }
-        public float W { get; set; }
-
-        public static readonly Quaternion Zero = new Quaternion();
-
-        public Quaternion(float x, float y, float z, float w)
-            : this()
-        {
-            X = x; Y = y; Z = z; W = w;
-        }
-
-        public Quaternion(IEnumerable<float> values)
-            : this()
-        {
-            int i = 0;
-            foreach (var ordinate in values.Take(4))
-            {
-                switch (i)
-                {
-                    case 0: X = ordinate; break;
-                    case 1: Y = ordinate; break;
-                    case 2: Z = ordinate; break;
-                    case 3: W = ordinate; break;
-                }
-                i++;
-            }
-        }
-
-        public void Normalise()
-        {
-            float scale = 1.0f / (float)(System.Math.Sqrt(W * W + (X * X + Y * Y + Z * Z)));
-            X *= scale;
-            Y *= scale;
-            Z *= scale;
-            W *= scale;
-        }
-
-        public IEnumerator<float> GetEnumerator()
-        {
-            yield return X;
-            yield return Y;
-            yield return Z;
-            yield return W;
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public override string ToString()
-        {
-            return String.Join(" ", X, Y, Z, W);
-        }
-
-        public bool Equals(Quaternion other)
-        {
-            return X == other.X && Y == other.Y && Z == other.Z && W == other.W;
-        }
-        public override bool Equals(object obj)
-        {
-            if (!(obj is Quaternion)) return false;
-            return Equals((Quaternion)obj);
-        }
-
-        public override int GetHashCode()
-        {
-            return X.GetHashCode() ^ Y.GetHashCode() ^ Z.GetHashCode() ^ W.GetHashCode();
-        }
-
-        public static bool operator ==(Quaternion a, Quaternion b)
-        {
-            return a.Equals(b);
-        }
-        public static bool operator !=(Quaternion a, Quaternion b)
-        {
-            return !a.Equals(b);
-        }
-    }
-
-    [Serializable]
-    [TypeConverter(typeof(TypeConverters.MatrixConverter))]
-    public struct Matrix : IEnumerable<float>, IEquatable<Matrix>
-    {
-        public Vector4 Row0 { get; set; }
-        public Vector4 Row1 { get; set; }
-        public Vector4 Row2 { get; set; }
-        public Vector4 Row3 { get; set; }
-
-        public static readonly Matrix Zero = new Matrix();
-
-        public Matrix(float[,] value)
-            : this()
-        {
-            if (value.GetUpperBound(0) < 4)
-                throw new InvalidOperationException("Not enough columns for a Matrix4.");
-
-            Row0 = new Vector4(value.GetValue(0) as float[]);
-            Row1 = new Vector4(value.GetValue(1) as float[]);
-            Row2 = new Vector4(value.GetValue(2) as float[]);
-            Row3 = new Vector4(value.GetValue(3) as float[]);
-        }
-
-        public Matrix(IEnumerable<float> values)
-            : this()
-        {
-            if (values.Count() < 4 * 4)
-                throw new ArgumentException("Not enough values for a Matrix4.");
-
-            Row0 = new Vector4(values.Take(4));
-            Row1 = new Vector4(values.Skip(4).Take(4));
-            Row2 = new Vector4(values.Skip(8).Take(4));
-            Row3 = new Vector4(values.Skip(12).Take(4));
-        }
-
-        public override string ToString()
-        {
-            return String.Join("  ", Row0, Row1, Row2, Row3);
-        }
-
-        public IEnumerator<float> GetEnumerator()
-        {
-            foreach (var value in Row0)
-                yield return value;
-            foreach (var value in Row1)
-                yield return value;
-            foreach (var value in Row2)
-                yield return value;
-            foreach (var value in Row3)
-                yield return value;
-        }
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        public bool Equals(Matrix other)
-        {
-            return Row0.Equals(other.Row0) && Row1.Equals(other.Row1) && Row2.Equals(other.Row2) && Row3.Equals(other.Row3);
-        }
-        public override bool Equals(object obj)
-        {
-            if (!(obj is Matrix)) return false;
-            return Equals((Matrix)obj);
-        }
-
-        public override int GetHashCode()
-        {
-            return Row0.GetHashCode() ^ Row1.GetHashCode() ^ Row2.GetHashCode() ^ Row3.GetHashCode();
-        }
-
-        public static bool operator ==(Matrix a, Matrix b)
-        {
-            return a.Equals(b);
-        }
-        public static bool operator !=(Matrix a, Matrix b)
-        {
-            return !a.Equals(b);
-        }
-    }
-
-    #endregion
-
+    /// <summary>
+    /// These type converters can be applied with TypeDescriptor.AddAttributes.
+    /// Don't do this if you want to use partial trust: it will cause construction of new attributes to fail!
+    /// </summary>
     namespace TypeConverters
     {
         public abstract class VectorConverter : TypeConverter
         {
+            readonly int Size;
+
+            public VectorConverter(int size)
+            {
+                Size = size;
+            }
+
+            protected abstract object CreateVectorObject(float[] ordinates);
+
             public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
             {
                 if (sourceType == typeof(string)) return true;
                 return base.CanConvertFrom(context, sourceType);
             }
 
-            protected float[] GetOrdinates(string value, CultureInfo culture)
+            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
             {
-                return value.Split(new string[] { culture.NumberFormat.CurrencyGroupSeparator, " " }, StringSplitOptions.RemoveEmptyEntries).Select(s => Single.Parse(s)).ToArray();
-            }
+                var str_val = value as string;
+                if (str_val != null)
+                {
+                    var ordinates = str_val.Split(new string[] { culture.NumberFormat.CurrencyGroupSeparator, " " }, StringSplitOptions.RemoveEmptyEntries).Select(s => float.Parse(s)).ToArray();
+                    if (ordinates.Length != Size) throw new ArgumentException(string.Format("Expected {0} values, got {1}", Size, ordinates.Length));
 
-            protected Exception NotEnoughValues(int expected, int actual)
-            {
-                return new ArgumentException(String.Format("Expected {0} values, got {1}", expected, actual));
+                    return CreateVectorObject(ordinates);
+                }
+                return base.ConvertFrom(context, culture, value);
             }
         }
 
         public class Vector2Converter : VectorConverter
         {
-            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
-            {
-                var str_val = value as string;
-                if (str_val != null)
-                {
-                    var ordinates = GetOrdinates(str_val, culture);
-                    if (ordinates.Length != 2) throw NotEnoughValues(2, ordinates.Length);
+            public Vector2Converter()
+                : base(2)
+            { }
 
-                    return new Vector2(ordinates[0], ordinates[1]);
-                }
-                return base.ConvertFrom(context, culture, value);
+            protected override object CreateVectorObject(float[] ordinates)
+            {
+                return new Vector2(ordinates[0], ordinates[1]);
             }
         }
 
         public class Vector3Converter : VectorConverter
         {
-            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
-            {
-                var str_val = value as string;
-                if (str_val != null)
-                {
-                    var ordinates = GetOrdinates(str_val, culture);
-                    if (ordinates.Length < 3) throw NotEnoughValues(3, ordinates.Length);
+            public Vector3Converter()
+                : base(3)
+            { }
 
-                    return new Vector3(ordinates[0], ordinates[1], ordinates[2]);
-                }
-                return base.ConvertFrom(context, culture, value);
+            protected override object CreateVectorObject(float[] ordinates)
+            {
+                return new Vector3(ordinates[0], ordinates[1], ordinates[2]);
             }
         }
 
         public class Vector4Converter : VectorConverter
         {
-            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
-            {
-                var str_val = value as string;
-                if (str_val != null)
-                {
-                    var ordinates = GetOrdinates(str_val, culture);
-                    if (ordinates.Length < 4) throw NotEnoughValues(4, ordinates.Length);
+            public Vector4Converter() :
+                base(4)
+            { }
 
-                    return new Vector4(ordinates[0], ordinates[1], ordinates[2], ordinates[3]);
-                }
-                return base.ConvertFrom(context, culture, value);
+            protected override object CreateVectorObject(float[] ordinates)
+            {
+                return new Vector4(ordinates[0], ordinates[1], ordinates[2], ordinates[3]);
+            }
+        }
+
+        public class QuaternionConverter : VectorConverter
+        {
+            public QuaternionConverter()
+                : base(4)
+            { }
+
+            protected override object CreateVectorObject(float[] ordinates)
+            {
+                return new Quaternion(ordinates[0], ordinates[1], ordinates[2], ordinates[3]);
             }
         }
 
         public class MatrixConverter : VectorConverter
         {
-            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
-            {
-                var str_val = value as string;
-                if (str_val != null)
-                {
-                    var ordinates = GetOrdinates(str_val, culture);
-                    if (ordinates.Length < 4 * 4) throw NotEnoughValues(4 * 4, ordinates.Length);
+            public MatrixConverter() :
+                base(4 * 4)
+            { }
 
-                    return new Matrix(ordinates);
-                }
-                return base.ConvertFrom(context, culture, value);
+            protected override object CreateVectorObject(float[] ordinates)
+            {
+                return new Matrix4x4(
+                        ordinates[0], ordinates[1], ordinates[2], ordinates[3],
+                        ordinates[4], ordinates[5], ordinates[6], ordinates[7],
+                        ordinates[8], ordinates[9], ordinates[10], ordinates[11],
+                        ordinates[12], ordinates[13], ordinates[14], ordinates[15]);
             }
         }
     }

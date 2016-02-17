@@ -9,6 +9,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Security;
 using System.Threading;
+using System.Numerics;
 using CodecRegistration = System.Tuple<string, int>;
 
 namespace Datamodel
@@ -35,7 +36,7 @@ namespace Datamodel
         #region Attribute types
         public static Type[] AttributeTypes { get { return _AttributeTypes; } }
         static Type[] _AttributeTypes = { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), 
-                typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3),typeof(Vector4), typeof(Angle), typeof(Quaternion), typeof(Matrix),
+                typeof(TimeSpan), typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3),typeof(Vector4), typeof(Quaternion), typeof(Matrix4x4),
 				typeof(byte), typeof(UInt64) };
 
         /// <summary>

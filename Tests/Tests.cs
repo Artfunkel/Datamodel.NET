@@ -5,6 +5,7 @@ using System.Linq;
 using System.IO;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Datamodel;
+using System.Numerics;
 using DM = Datamodel.Datamodel;
 
 namespace Datamodel_Tests
@@ -21,11 +22,10 @@ namespace Datamodel_Tests
         {
             var binary = new byte[16];
             new Random().NextBytes(binary);
-            var quat = new Quaternion(1, 2, 3, 4);
-            quat.Normalise(); // dmxconvert will normalise this if I don't!
+            var quat = Quaternion.Normalize(new Quaternion(1, 2, 3, 4)); // dmxconvert will normalise this if I don't!
 
-            TestValues_V1 = new List<object>(new object[] { "hello_world", 1, 1.5f, true, binary, null, System.Drawing.Color.Blue, 
-                new Vector2(1,2), new Vector3(1,2,3), new Angle(1,2,3), new Vector4(1,2,3,4), quat, new Matrix(Enumerable.Range(0,4*4).Select(i => (float)i))});
+            TestValues_V1 = new List<object>(new object[] { "hello_world", 1, 1.5f, true, binary, null, System.Drawing.Color.Blue,
+                new Vector2(1,2), new Vector3(1,2,3), new Vector4(1,2,3,4), quat, new Matrix4x4(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) });
 
             TestValues_V2 = TestValues_V1.ToList();
             TestValues_V2[5] = TimeSpan.FromMinutes(5);
@@ -148,6 +148,16 @@ namespace Datamodel_Tests
             dm.Root["ElementStub"] = new Element(dm, Guid.NewGuid());
         }
 
+        private void CompareVector(DM dm, string name, float[] actual)
+        {
+            var expected = (IEnumerable<float>)dm.Root[name];
+
+            Assert.AreEqual(actual.Count(), expected.Count());
+
+            foreach (var t in actual.Zip(expected, (a, e) => new Tuple<float, float>(a, e)))
+                Assert.AreEqual(t.Item1, t.Item2, 1e-6, name);
+        }
+
         protected void ValidatePopulated(string encoding_name, int encoding_version)
         {
             var dm = DM.Load(DmxConvertPath);
@@ -161,15 +171,14 @@ namespace Datamodel_Tests
                     CollectionAssert.AreEqual((ICollection)value, (ICollection)dm.Root[name]);
                 else if (value is System.Drawing.Color)
                     Assert.AreEqual(((System.Drawing.Color)value).ToArgb(), dm.Root.Get<System.Drawing.Color>(name).ToArgb());
-                else if (value is IEnumerable<float>)
+                else if (value is Quaternion)
                 {
-                    var actual = (IEnumerable<float>)value;
-                    var expected = (IEnumerable<float>)dm.Root[name];
-
-                    Assert.AreEqual(actual.Count(), expected.Count());
-
-                    foreach (var t in actual.Zip(expected, (a, e) => new Tuple<float, float>(a, e)))
-                        Assert.AreEqual(t.Item1, t.Item2, 1e-6, name);
+                    var quat = (Quaternion)value;
+                    var expected = dm.Root.Get<Quaternion>(name);
+                    Assert.AreEqual(quat.W, expected.W, 1e-6, name + " W");
+                    Assert.AreEqual(quat.X, expected.X, 1e-6, name + " X");
+                    Assert.AreEqual(quat.Y, expected.Y, 1e-6, name + " Y");
+                    Assert.AreEqual(quat.Z, expected.Z, 1e-6, name + " Z");
                 }
                 else
                     Assert.AreEqual(value, dm.Root[name], name);
@@ -187,7 +196,7 @@ namespace Datamodel_Tests
             dm.Root.GetArray<int>("Arr");
 
             if (memory_save)
-                dm.Save(new System.IO.MemoryStream(), encoding, version);
+                dm.Save(new MemoryStream(), encoding, version);
             else
             {
                 dm.Save(DmxSavePath, encoding, version);
