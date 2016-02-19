@@ -70,8 +70,12 @@ namespace DmxPad.Controls
         protected override void PrepareContainerForItemOverride(DependencyObject element, object item)
         {
             base.PrepareContainerForItemOverride(element, item);
-            if (TitleTemplate != null)
-                ((TreeGridViewItem)element).Title = TitleTemplate.LoadContent();
+            var tgv_item = (TreeGridViewItem)element;
+            if (TitleTemplateSelector != null)
+                tgv_item.TitleTemplate = TitleTemplateSelector.SelectTemplate(item, element);
+            else if (TitleTemplate != null)
+                tgv_item.Title = TitleTemplate.LoadContent();
+            
         }
         #endregion
 
@@ -102,6 +106,15 @@ namespace DmxPad.Controls
         }
         public static readonly DependencyProperty TitleTemplateProperty =
             DependencyProperty.Register("TitleTemplate", typeof(DataTemplate), typeof(TreeGridView),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsArrange));
+
+        public DataTemplateSelector TitleTemplateSelector
+        {
+            get { return (DataTemplateSelector)GetValue(TitleTemplateSelectorProperty); }
+            set { SetValue(TitleTemplateSelectorProperty, value); }
+        }
+        public static readonly DependencyProperty TitleTemplateSelectorProperty =
+            DependencyProperty.Register("TitleTemplateSelector", typeof(DataTemplateSelector), typeof(TreeGridView),
             new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsArrange));
 
         [Description("Sets the content that appears as the header of the Title column."), Category("Common Properties")]
@@ -248,7 +261,7 @@ namespace DmxPad.Controls
     {
         public TreeGridViewItem()
         {
-            if (TitleTemplate == null) SetBinding(TitleTemplateProperty, new Binding("TitleTemplate") { Source = Owner });
+            SetBinding(TitleTemplateProperty, new Binding("TitleTemplate") { Source = Owner });
             IsExpanded = false;
         }
 
@@ -310,7 +323,11 @@ namespace DmxPad.Controls
             var tgi = (TreeGridViewItem)element;
             if (tgi.Title == null)
             {
-                var template = TitleTemplate ?? Owner.TitleTemplate;
+                DataTemplate template;
+                if (Owner.TitleTemplateSelector != null)
+                    template = Owner.TitleTemplateSelector.SelectTemplate(item, element);
+                else
+                    template = TitleTemplate ?? Owner.TitleTemplate;
                 if (template != null)
                     tgi.Title = template.LoadContent();
             }

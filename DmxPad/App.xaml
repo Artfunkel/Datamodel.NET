@@ -28,7 +28,8 @@
         <converter:CollectionTemplateSelector x:Key="CollectionTemplateSelector"/>
         <converter:ElementAttributesWrapper x:Key="AttributeViewConverter"/>
 
-        <l:InspectPaneTemplateSelector x:Key="InspectPaneTemplateSelector"/>
+		<l:InspectPaneTemplateSelector x:Key="InspectPaneTemplateSelector"/>
+		<!--<l:TreeViewTitleTemplateSelector x:Key="TreeViewTitleTemplateSelector"/>-->
         <converter:ValueColumnTemplateSelector x:Key="ValueColumnTemplateSelector"/>
 
         <Image x:Key="DatamodelIcon" x:Shared="False" Source="/DmxPad;component/Resources/datamodel.png" Stretch="None"/>
@@ -39,11 +40,15 @@
         </DataTemplate>
 
         <HierarchicalDataTemplate DataType="{x:Type dm:Element}" ItemsSource="{Binding Converter={StaticResource AttributeViewConverter}}">
-            <Grid VerticalAlignment="Center" ToolTip="{Binding ID}" Background="Transparent">
+            <Grid VerticalAlignment="Center" ToolTip="{Binding ID}" Background="Transparent" IsEnabled="False">
                 <ContentControl Content="{Binding Converter={StaticResource AttributeIconConverter}}" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                 <TextBlock Text="{Binding Name}" Margin="20,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Left" />
             </Grid>
         </HierarchicalDataTemplate>
+		
+		<DataTemplate DataType="{x:Type dm:ElementArray}">
+			<TextBlock Text="{Binding Count,StringFormat=({0} Items)}" Foreground="{x:Static SystemColors.InactiveCaptionTextBrush}"/>
+		</DataTemplate>
 
         <HierarchicalDataTemplate DataType="{x:Type l:AttributeView}" ItemsSource="{Binding Value, Converter={StaticResource AttributeViewConverter}}">
             <Grid VerticalAlignment="Center">

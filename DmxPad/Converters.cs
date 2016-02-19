@@ -7,6 +7,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Globalization;
+using System.Numerics;
 
 using Datamodel;
 using DmEncoding = System.Tuple<string, int>;
@@ -214,9 +215,8 @@ namespace DmxPad.Converters
             TypeNames[typeof(Vector2)] = "vector2";
             TypeNames[typeof(Vector3)] = "vector3";
             TypeNames[typeof(Vector4)] = "vector4";
-            TypeNames[typeof(Angle)] = "angle";
             TypeNames[typeof(Quaternion)] = "quaternion";
-            TypeNames[typeof(Datamodel.Matrix)] = "matrix";
+            TypeNames[typeof(Matrix4x4)] = "matrix";
         }
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
@@ -457,11 +457,14 @@ namespace DmxPad.Converters
                 var name = part;
                 var index = -1;
 
-                var indexer_pos = part.LastIndexOf('[');
-                if (indexer_pos != -1)
+                if (!elem.ContainsKey(part))
                 {
-                    name = part.Substring(0, indexer_pos);
-                    index = Int32.Parse(part.Substring(indexer_pos + 1, part.Length - indexer_pos - 2));
+                    var indexer_pos = part.LastIndexOf('[');
+                    if (indexer_pos != -1)
+                    {
+                        name = part.Substring(0, indexer_pos);
+                        index = Int32.Parse(part.Substring(indexer_pos + 1, part.Length - indexer_pos - 2));
+                    }
                 }
 
                 if (!elem.ContainsKey(name)) return null;
@@ -612,7 +615,7 @@ namespace DmxPad.Converters
 
             if (inner == typeof(Vector2))
                 resource_name = "Vector2";
-            else if (inner == typeof(Vector3) || inner == typeof(Angle))
+            else if (inner == typeof(Vector3))
                 resource_name = "Vector3";
             else if (inner == typeof(Vector4) || inner == typeof(Quaternion))
                 resource_name = "Vector4";

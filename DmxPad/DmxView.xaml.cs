@@ -303,4 +303,25 @@ namespace DmxPad
             return GenericSingle;
         }
     }
+
+    public class TreeViewTitleTemplateSelector : DataTemplateSelector
+    {
+        public override DataTemplate SelectTemplate(object item, DependencyObject container)
+        {
+            if (item is AttributeView)
+                return (HierarchicalDataTemplate)App.Current.Resources[new System.Windows.DataTemplateKey(typeof(AttributeView))];
+
+            var tgv_item = (TreeGridViewItem)container;
+            var parent = (FrameworkElement)tgv_item.Parent;
+            if (parent == null)
+                return (HierarchicalDataTemplate)App.Current.Resources[new System.Windows.DataTemplateKey(typeof(Element))];
+
+            var parent_attr_view = parent.DataContext as AttributeView;
+            if (parent_attr_view != null)
+            {
+                ((ElementArray)parent_attr_view.Value).IndexOf((Element)item);
+            }
+            return base.SelectTemplate(item, container);
+        }
+    }
 }

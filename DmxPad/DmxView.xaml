@@ -138,7 +138,8 @@
                     </Style>
                 </c:TreeGridView.Resources>
                 <c:TreeGridView.ColumnDefinitions>
-                    <c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}" CellStyle="{StaticResource TypeColumnCellStyle}"/>
+					<c:TreeGridContentColumnDefinition Header="Value" Binding="{Binding Value}"/>
+					<c:TreeGridContentColumnDefinition Header="Type" Binding="{Binding Converter={StaticResource GetFriendlyTypeName}}" CellStyle="{StaticResource TypeColumnCellStyle}"/>
                 </c:TreeGridView.ColumnDefinitions>
             </c:TreeGridView>
 

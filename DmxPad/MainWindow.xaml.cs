@@ -121,7 +121,7 @@ namespace DmxPad
 
         private void Save_Executed(object sender, ExecutedRoutedEventArgs e)
         {
-            var vm = (ViewModel)e.Parameter;
+            var vm = (ViewModel)Tabs.SelectedItem;
             if (vm.File == null)
             {
                 SaveAs_Executed(sender, e);
@@ -133,7 +133,7 @@ namespace DmxPad
         private void SaveAs_Executed(object sender, ExecutedRoutedEventArgs e)
         {
             var sfd = new Microsoft.Win32.SaveFileDialog();
-            var vm = (ViewModel)e.Parameter;
+            var vm = (ViewModel)Tabs.SelectedItem;
 
             sfd.InitialDirectory = vm.File.Directory.FullName;
             sfd.FileName = vm.File.Name;
@@ -266,6 +266,12 @@ namespace DmxPad
                         vm.ComparisonDatamodel = new ComparisonDatamodel(new_dm_left, new_dm_right);
                 }
             }
+        }
+
+        private void Window_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetFormats().Contains("FileDrop"))
+                Load_UI((string[])e.Data.GetData("FileDrop"));
         }
     }
 }
