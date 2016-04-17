@@ -19,6 +19,11 @@ namespace Datamodel.Codecs
 
         static readonly Dictionary<int, Type[]> SupportedAttributes = new Dictionary<int, Type[]>();
 
+        /// <summary>
+        /// The number of Datamodel binary ticks in one second. Used to store TimeSpan values.
+        /// </summary>
+        const uint DatamodelTicksPerSecond = 10000;
+
         static Binary()
         {
             SupportedAttributes[1] = SupportedAttributes[2] = new Type[] { typeof(Element), typeof(int), typeof(float), typeof(bool), typeof(string), typeof(byte[]), null /* ObjectID */, typeof(System.Drawing.Color), typeof(Vector2), typeof(Vector3), typeof(Vector4), typeof(Vector3) /* angle*/, typeof(Quaternion), typeof(Matrix4x4) };
@@ -242,8 +247,8 @@ namespace Datamodel.Codecs
 
             if (type == typeof(byte[]))
                 return (Reader.ReadBytes(Reader.ReadInt32()));
-            if (type == typeof(TimeSpan))
-                return TimeSpan.FromSeconds(Reader.ReadInt32() / 10000f);
+            if (type == typeof(TimeSpan))                
+                return TimeSpan.FromTicks(Reader.ReadInt32() * (TimeSpan.TicksPerSecond / DatamodelTicksPerSecond));
 
             if (type == typeof(System.Drawing.Color))
             {
@@ -608,7 +613,7 @@ namespace Datamodel.Codecs
 
                 if (value is TimeSpan)
                 {
-                    Writer.Write((int)(((TimeSpan)value).TotalSeconds * 10000));
+                    Writer.Write((int)(((TimeSpan)value).Ticks / (TimeSpan.TicksPerSecond / DatamodelTicksPerSecond)));
                     return;
                 }
 
