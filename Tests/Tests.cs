@@ -28,7 +28,7 @@ namespace Datamodel_Tests
                 new Vector2(1,2), new Vector3(1,2,3), new Vector4(1,2,3,4), quat, new Matrix4x4(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16) });
 
             TestValues_V2 = TestValues_V1.ToList();
-            TestValues_V2[5] = TimeSpan.FromMinutes(5);
+            TestValues_V2[5] = TimeSpan.FromMinutes(5) + TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond / 2);
 
             TestValues_V3 = TestValues_V1.Concat(new object[] { (byte)0xFF, (UInt64)0xFFFFFFFF }).ToList();
         }

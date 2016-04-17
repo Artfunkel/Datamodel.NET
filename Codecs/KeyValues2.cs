@@ -515,7 +515,7 @@ namespace Datamodel.Codecs
                 return result;
             }
             else if (type == typeof(TimeSpan))
-                return TimeSpan.FromSeconds(float.Parse(value));
+                return TimeSpan.FromTicks((long)(double.Parse(value) * TimeSpan.TicksPerSecond));
 
             var num_list = value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
 
