@@ -238,7 +238,7 @@ namespace Datamodel
     /// </summary>
     [DebuggerTypeProxy(typeof(DebugView))]
     [DebuggerDisplay("Count = {Count}")]
-    public class AttributeList : IDictionary<string, object>, IDictionary, INotifyCollectionChanged
+    public partial class AttributeList : IDictionary<string, object>, IDictionary, INotifyCollectionChanged, ICustomTypeDescriptor
     {
         internal OrderedDictionary Inner;
         protected object Attribute_ChangeLock = new object();

@@ -66,6 +66,7 @@
   <ItemGroup>
     <Compile Include="Arrays.cs" />
     <Compile Include="Attributes.cs" />
+    <Compile Include="AttributeList_ICustomTypeDescriptor.cs" />
     <Compile Include="Codecs\Binary.cs" />
     <Compile Include="Codecs\KeyValues2.cs" />
     <Compile Include="Datamodel.cs" />
