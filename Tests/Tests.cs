@@ -324,10 +324,9 @@ namespace Datamodel_Tests
         [TestMethod]
         public void LoadXaml()
         {
-            var dm = System.Windows.Markup.XamlReader.Load(Xaml_File) as Datamodel.Datamodel;
-            var fact = dm.Root.GetArray<Element>("NonStubArray")[0];
-            var args = fact.GetArray<Element>("StubArray");
-            Assert.IsFalse(args.Any(e => e.Stub));
+            var dm = System.Windows.Markup.XamlReader.Load(Xaml_File) as DM;
+            Assert.AreSame(dm.Root.GetArray<Element>("NonStubArray")[0].GetArray<Element>("StubArray")[0], dm.Root.Get<Element>("NonStub"));
+            Assert.AreEqual(dm.Root.Get<Element>("NonStub").Get<Vector2>("Vec2"), new Vector2(1, 1));
         }
     }
 

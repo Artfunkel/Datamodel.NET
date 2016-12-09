@@ -316,7 +316,7 @@ namespace Datamodel
                         throw new ElementIdException(String.Format("Element ID {0} already in use in this Datamodel.", item.ID));
                     }
 
-                    System.Diagnostics.Debug.Assert(item.Owner != null);
+                    Debug.Assert(item.Owner != null);
                     if (item.Owner != this.Owner)
                         throw new ElementOwnershipException("Cannot add an element from a different Datamodel. Use ImportElement() to create a local copy instead.");
 
@@ -338,7 +338,7 @@ namespace Datamodel
                     ChangeLock.ExitUpgradeableReadLock();
                 }
 
-                if (CollectionChanged != null) CollectionChanged(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item));
+                CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Add, item));
             }
 
             /// <summary>
@@ -599,7 +599,7 @@ namespace Datamodel
         public bool AllowRandomIDs
         {
             get { return _AllowRandomIDs; }
-            set { _AllowRandomIDs = value; NotifyPropertyChanged("AllowRandomIDs"); }
+            set { _AllowRandomIDs = value; OnPropertyChanged(); }
         }
         bool _AllowRandomIDs = true;
 
@@ -615,7 +615,7 @@ namespace Datamodel
                 if (value != null && value.Contains(' '))
                     throw new ArgumentException("Format name cannot contain spaces.");
                 _Format = value;
-                NotifyPropertyChanged("Format");
+                OnPropertyChanged();
             }
         }
         string _Format;
@@ -626,7 +626,7 @@ namespace Datamodel
         public int FormatVersion
         {
             get { return _FormatVersion; }
-            set { _FormatVersion = value; NotifyPropertyChanged("FormatVersion"); }
+            set { _FormatVersion = value; OnPropertyChanged(); }
         }
         int _FormatVersion;
 
@@ -642,7 +642,7 @@ namespace Datamodel
                 if (value != null && value.Contains(' '))
                     throw new ArgumentException("Encoding name cannot contain spaces.");
                 _Encoding = value;
-                NotifyPropertyChanged("Encoding");
+                OnPropertyChanged();
             }
         }
         string _Encoding;
@@ -653,7 +653,7 @@ namespace Datamodel
         public int EncodingVersion
         {
             get { return _EncodingVersion; }
-            set { _EncodingVersion = value; NotifyPropertyChanged("EncodingVersion"); }
+            set { _EncodingVersion = value; OnPropertyChanged(); }
         }
         int _EncodingVersion;
 
@@ -677,7 +677,7 @@ namespace Datamodel
                         throw new ElementOwnershipException();
                 }
                 _Root = value;
-                NotifyPropertyChanged("Root");
+                OnPropertyChanged();
             }
         }
         Element _Root;
@@ -957,10 +957,9 @@ namespace Datamodel
         /// Raised when the Datamodel's <see cref="Format"/>, <see cref="FormatVersion"/>, or <see cref="Root"/> changes.
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
-        void NotifyPropertyChanged(string info)
+        protected void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName()] string property = "")
         {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(info));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
         }
         #endregion
     }

@@ -34,7 +34,7 @@ namespace Datamodel
         public virtual AttributeList Owner
         {
             get { return _Owner; }
-            internal set { _Owner = value; OnPropertyChanged("Owner"); }
+            internal set { _Owner = value; OnPropertyChanged(); }
         }
         AttributeList _Owner;
 
@@ -274,10 +274,9 @@ namespace Datamodel
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged(string property_name)
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName()] string property = "")
         {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(property_name));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
         }
 
         #region IList

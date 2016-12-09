@@ -537,10 +537,9 @@ namespace Datamodel
         /// Raised when <see cref="Element.Name"/>, <see cref="Element.ClassName"/>, or <see cref="Element.ID"/> has changed.
         /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged(string info)
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName()] string property = "")
         {
-            if (PropertyChanged != null)
-                PropertyChanged(this, new PropertyChangedEventArgs(info));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
         }
 
         /// <summary>
@@ -745,7 +744,7 @@ namespace Datamodel
             private set
             {
                 _Key = value;
-                OnPropertyChanged("Key");
+                OnPropertyChanged();
             }
         }
         string _Key;
@@ -762,7 +761,7 @@ namespace Datamodel
                 if (incc != null) incc.CollectionChanged -= OnValueCollectionChanged;
 
                 _Value = value;
-                OnPropertyChanged("Value");
+                OnPropertyChanged();
                 OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
                 WrappedAttributeMap.Clear();
 
@@ -783,7 +782,12 @@ namespace Datamodel
         public int Index
         {
             get { return _Index; }
-            private set { _Index = value; OnPropertyChanged("Index", "Key"); }
+            private set
+            {
+                _Index = value;
+                OnPropertyChanged();
+                OnPropertyChanged("Key");
+            }
         }
         int _Index;
 
@@ -882,11 +886,9 @@ namespace Datamodel
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged(params string[] property_names)
+        protected virtual void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName()] string property = "")
         {
-            if (PropertyChanged != null)
-                foreach (var prop_name in property_names)
-                    PropertyChanged(this, new PropertyChangedEventArgs(prop_name));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
         }
 
         public event NotifyCollectionChangedEventHandler CollectionChanged;
@@ -952,6 +954,15 @@ namespace Datamodel
         }
         [TypeConverter(typeof(TypeConverters.MatrixConverter))]
         public class Matrix
+        {
+
+        }
+
+        /// <summary>
+        /// Using <see cref="string"/> itself causes annoying XAML intellisense errors because it's a reference type. Use this redirect class in your XAML file instead.
+        /// </summary>
+        [TypeConverter(typeof(TypeConverters.StringConverter))]
+        public class String
         {
 
         }
@@ -1055,6 +1066,21 @@ namespace Datamodel
                         ordinates[4], ordinates[5], ordinates[6], ordinates[7],
                         ordinates[8], ordinates[9], ordinates[10], ordinates[11],
                         ordinates[12], ordinates[13], ordinates[14], ordinates[15]);
+            }
+        }
+
+        public class StringConverter : TypeConverter
+        {
+            public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+            {
+                if (sourceType == typeof(string))
+                    return true;
+                return base.CanConvertFrom(context, sourceType);
+            }
+
+            public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+            {
+                return value;
             }
         }
     }

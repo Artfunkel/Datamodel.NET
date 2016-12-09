@@ -1,14 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
-
-using AttrKVP = System.Collections.Generic.KeyValuePair<string, object>;
 
 namespace Datamodel
 {
@@ -93,7 +89,7 @@ namespace Datamodel
         }
 
         #endregion
-        
+
         #region Properties
 
         /// <summary>
@@ -116,7 +112,7 @@ namespace Datamodel
         public string Name
         {
             get { return _Name; }
-            set { _Name = value; OnPropertyChanged("Name"); }
+            set { _Name = value; OnPropertyChanged(); }
         }
         string _Name;
 
@@ -127,7 +123,7 @@ namespace Datamodel
         public string ClassName
         {
             get { return _ClassName; }
-            set { _ClassName = value; OnPropertyChanged("ClassName"); }
+            set { _ClassName = value; OnPropertyChanged(); }
         }
         string _ClassName = "DmeElement";
 
@@ -219,7 +215,7 @@ namespace Datamodel
         /// </summary>
         /// <param name="name">The name to search for. Cannot be null.</param>
         /// <returns>The value associated with the given name.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when the value of name is null.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when the value of <paramref name="name"/> is null.</exception>
         /// <exception cref="KeyNotFoundException">Thrown when an attempt is made to get a name that is not present on this Element.</exception>
         /// <exception cref="InvalidOperationException">Thrown when an attempt is made to get or set an attribute on a <see cref="Stub"/> Element.</exception>
         /// <exception cref="ElementOwnershipException">Thrown when an attempt is made to set the value of the attribute to an Element from a different <see cref="Datamodel"/>.</exception>
@@ -259,16 +255,7 @@ namespace Datamodel
             /// <summary>
             /// Gets a default Element Name equality comparer.
             /// </summary>
-            public static NameComparer Default
-            {
-                get
-                {
-                    if (_Default == null)
-                        _Default = new NameComparer();
-                    return _Default;
-                }
-            }
-            static NameComparer _Default;
+            public static NameComparer Default { get; } = new NameComparer();
 
             public bool Equals(Element x, Element y)
             {
@@ -298,16 +285,7 @@ namespace Datamodel
             /// <summary>
             /// Gets a default Element ClassName equality comparer.
             /// </summary>
-            public static ClassNameComparer Default
-            {
-                get
-                {
-                    if (_Default == null)
-                        _Default = new ClassNameComparer();
-                    return _Default;
-                }
-            }
-            static ClassNameComparer _Default;
+            public static ClassNameComparer Default { get; } = new ClassNameComparer();
 
             public bool Equals(Element x, Element y)
             {
@@ -337,16 +315,7 @@ namespace Datamodel
             /// <summary>
             /// Gets a default Element ID equality comparer.
             /// </summary>
-            public static IDComparer Default
-            {
-                get
-                {
-                    if (_Default == null)
-                        _Default = new IDComparer();
-                    return _Default;
-                }
-            }
-            static IDComparer _Default;
+            public static IDComparer Default { get; } = new IDComparer();
 
             public bool Equals(Element x, Element y)
             {
@@ -368,8 +337,6 @@ namespace Datamodel
                 return GetHashCode((Element)obj);
             }
         }
-
-
         #endregion
 
         /// <summary>
@@ -421,6 +388,36 @@ namespace Datamodel
                 ir.EndInit();
 
                 return result;
+            }
+
+            public override bool IsValid(ITypeDescriptorContext context, object value)
+            {
+                if (value is Guid)
+                    return true;
+
+                var str_value = value as string;
+                Guid guid;
+                if (str_value != null && Guid.TryParse(str_value, out guid))
+                    return true;
+                return false;
+            }
+
+            public override bool CanConvertTo(ITypeDescriptorContext context, Type destinationType)
+            {
+                if (destinationType == typeof(Guid) || destinationType == typeof(string))
+                    return true;
+                return base.CanConvertTo(context, destinationType);
+            }
+
+            public override object ConvertTo(ITypeDescriptorContext context, System.Globalization.CultureInfo culture, object value, Type destinationType)
+            {
+                var element = (Element)value;
+                if (destinationType == typeof(Guid))
+                    return element.ID;
+                if (destinationType == typeof(string))
+                    return element.ID.ToString();
+
+                return base.ConvertTo(context, culture, value, destinationType);
             }
         }
     }
