@@ -37,6 +37,10 @@ Additionally, the following Datamodel.NET types are supported:
 * Binary codec supports just-in-time attribute loading
 * Write your own codecs with the `ICodec` interface
 
+### Data Binding
+
+You can bind to an attribute as if it were a property of the host element, e.g. `{Binding MyElement.Hello}`. If an attribute's name collides with a statically-defined property of `Element` then use indexer syntax instead, e.g. `{Binding MyElement[Owner]}`.
+
 ### ObservableAttribute
 
 In order to correctly implement `IDictionary`, attributes are exposed as `KeyValuePair` objects. Since these aren't great for data binding the utility type `ObservableAttribute` is provided.
