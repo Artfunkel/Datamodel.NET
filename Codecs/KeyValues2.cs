@@ -283,7 +283,7 @@ namespace Datamodel.Codecs
         void WriteElement(Element element)
         {
             if (TypeNames.ContainsValue(element.ClassName))
-                throw new CodecException(String.Format("Element {} uses reserved type name \"{1}\".", element.ID, element.ClassName));
+                throw new CodecException(String.Format("Element {0} uses reserved type name \"{1}\".", element.ID, element.ClassName));
             Writer.WriteTokens(element.ClassName);
             Writer.WriteLine("{");
             Writer.Indent++;
