@@ -350,7 +350,7 @@ namespace Datamodel.Codecs
                     if (defer_mode == DeferredMode.Automatic)
                     {
                         CodecUtilities.AddDeferredAttribute(elem, name, Reader.BaseStream.Position);
-                        SkipAttribte();
+                        SkipAttribute();
                     }
                     else
                     {
@@ -388,7 +388,7 @@ namespace Datamodel.Codecs
             }
         }
 
-        void SkipAttribte()
+        void SkipAttribute()
         {
             var types = IdToType(Reader.ReadByte());
 
