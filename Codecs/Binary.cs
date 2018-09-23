@@ -59,7 +59,7 @@ namespace Datamodel.Codecs
             return ++i;
         }
 
-        Type IdToType(byte id)
+        Tuple<Type, Type> IdToType(byte id)
         {
             var type_list = SupportedAttributes[EncodingVersion];
             bool array = false;
@@ -82,7 +82,7 @@ namespace Datamodel.Codecs
 
             try
             {
-                return array ? type_list[id].MakeListType() : type_list[id];
+                return new Tuple<Type, Type>((array ? type_list[id].MakeListType() : type_list[id]), (array ? type_list[id] : null));
             }
             catch (IndexOutOfRangeException)
             {
@@ -371,14 +371,14 @@ namespace Datamodel.Codecs
 
         object DecodeAttribute(Datamodel dm)
         {
-            var type = IdToType(Reader.ReadByte());
+            var types = IdToType(Reader.ReadByte());
 
-            if (!Datamodel.IsDatamodelArrayType(type))
-                return ReadValue(dm, type, EncodingVersion < 4);
+            if (types.Item2 == null)
+                return ReadValue(dm, types.Item1, EncodingVersion < 4);
             else
             {
                 var count = Reader.ReadInt32();
-                var inner_type = Datamodel.GetArrayInnerType(type);
+                var inner_type = types.Item2;
                 var array = CodecUtilities.MakeList(inner_type, count);
 
                 foreach (var x in Enumerable.Range(0, count))
@@ -390,15 +390,14 @@ namespace Datamodel.Codecs
 
         void SkipAttribte()
         {
-            var type = IdToType(Reader.ReadByte());
+            var types = IdToType(Reader.ReadByte());
 
             int count = 1;
-            bool array = false;
-            if (Datamodel.IsDatamodelArrayType(type))
+            Type type = types.Item1;
+            if (types.Item2 != null)
             {
-                array = true;
                 count = Reader.ReadInt32();
-                type = Datamodel.GetArrayInnerType(type);
+                type = types.Item2;
             }
 
             if (type == typeof(Element))
@@ -424,7 +423,7 @@ namespace Datamodel.Codecs
             }
             else if (type == typeof(string))
             {
-                if (!StringDict.Dummy && !array && EncodingVersion >= 4)
+                if (!StringDict.Dummy && types.Item2 == null && EncodingVersion >= 4)
                     length = StringDict.IndiceSize;
                 else
                 {
